@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>错误信息</title>
+    <style>
+        .error-container {
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .error-title {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .error-detail {
+            white-space: pre-line;
+            font-family: monospace;
+        }
+        .button-group {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-title">{{ error_title }}</div>
+        <div class="error-detail">{{ error_detail }}</div>
+    </div>
+
+    <div class="button-group">
+        <p>请修正数据后重新上传</p>
+        <a href="{% url 'upload_scores' %}">返回上传</a>
+    </div>
+</body>
+</html>

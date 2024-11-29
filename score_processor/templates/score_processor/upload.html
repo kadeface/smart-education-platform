@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>学生成绩数据整理网页版</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: auto;
+            overflow: hidden;
+        }
+        header {
+            background: #50b3a2;
+            color: white;
+            padding-top: 30px;
+            min-height: 70px;
+            border-bottom: #e8491d 3px solid;
+        }
+        header a {
+            color: #ffffff;
+            text-decoration: none;
+            text-transform: uppercase;
+            font-size: 16px;
+        }
+        header h1 {
+            text-align: center;
+        }
+        form {
+            background: #ffffff;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .form-input {
+            margin-bottom: 15px;
+        }
+        .form-input label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-input input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button[type="submit"] {
+            background: #50b3a2;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button[type="submit"]:hover {
+            background: #e8491d;
+        }
+         footer {
+            background: #333;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+        }
+        footer p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>江门市中小学学生成绩数据分析网页版</h1>
+    </header>
+    <div class="container">
+        <h1>上传成绩文件</h1>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="form-input">
+                {{ form.as_p }}
+            </div>
+            <button type="submit">上传</button>
+        </form>
+    </div>
+    <footer>
+        <p>广东开平市教师发展中心 廖作东</p>
+        <p>邮箱：382241106@qq.com</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>成绩处理结果</title>
+    <style>
+        .stats-container {
+            margin: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .stats-title {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .stats-section {
+            margin: 15px 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>成绩处理结果</h1>
+
+    <div class="stats-container">
+        <div class="stats-title">统计信息</div>
+
+        <div class="stats-section">
+            <h3>考生分布</h3>
+            <ul>
+                <li>总人数：{{ stats.总人数 }}</li>
+                <li>理科人数：{{ stats.理科人数 }}</li>
+                <li>文科人数：{{ stats.文科人数 }}</li>
+                <li>未确定人数：{{ stats.未确定人数 }}</li>
+                <li>有效总分人数：{{ stats.有效总分人数 }}</li>
+            </ul>
+        </div>
+
+        {% if score_stats %}
+        <div class="stats-section">
+            <h3>成绩统计</h3>
+            {% for subject, stats in score_stats.items %}
+            <div>
+                <h4>{{ subject }}</h4>
+                <ul>
+                    {% for key, value in stats.items %}
+                    <li>{{ key }}: {{ value }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="stats-container">
+        <div class="stats-title">数据预览（前10条记录）</div>
+        {{ preview|safe }}
+    </div>
+
+    <div style="margin-top: 20px;">
+        <form method="post" action="{% url 'save_scores' %}">
+            {% csrf_token %}
+            <input type="hidden" name="exam_id" value="{{ exam_id }}">
+            <button type="submit">保存成绩数据</button>
+        </form>
+        <a href="{% url 'upload_scores' %}" style="margin-left: 10px;">返回重新上传</a>
+    </div>
+</body>
+</html>

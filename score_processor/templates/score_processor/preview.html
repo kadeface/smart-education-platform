@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>数据预览</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .stats {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .button-group {
+            margin-top: 20px;
+        }
+        .button-group form {
+            display: inline;
+        }
+    </style>
+</head>
+<body>
+    <h1>数据预览</h1>
+
+    <div class="stats">
+        <h2>基本统计</h2>
+        {% if stats %}
+            <ul>
+            {% for key, value in stats.items %}
+                <li>{{ key }}: {{ value }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+
+    <h2>数据预览（前10条记录）</h2>
+    {% if preview %}
+        {{ preview|safe }}
+    {% endif %}
+
+    <div class="button-group">
+        <form method="post" action="{% url 'clean_data' %}">
+            {% csrf_token %}
+            <button type="submit">开始数据清洗</button>
+        </form>
+        <a href="{% url 'upload_scores' %}">返回重新上传</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>成绩列表</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .return-link {
+            margin-top: 20px;
+            display: inline-block;
+            padding: 10px 20px;
+            text-decoration: none;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 4px;
+        }
+        .return-link:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>成绩列表</h1>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <table>
+        <tr>
+            <th>考试ID</th>
+            <th>学生姓名</th>
+            <th>学校</th>
+            <th>班级</th>
+            <th>科类</th>
+            <th>总分</th>
+        </tr>
+        {% for score in scores %}
+        <tr>
+            <td>{{ score.exam_id }}</td>
+            <td>{{ score.student_name }}</td>
+            <td>{{ score.school_name }}</td>
+            <td>{{ score.class_field }}</td>
+            <td>{{ score.select_type }}</td>
+            <td>{{ score.total_score }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+  <a href="{% url 'home' %}" class="return-link">返回首页</a>
+</body>
+</html>

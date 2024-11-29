@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>数据清洗结果</title>
+    <style>
+        .stats-container {
+            margin: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .stats-title {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>数据清洗结果</h1>
+
+    <div class="stats-container">
+        <div class="stats-title">清洗统计</div>
+        <ul>
+            <li>原始记录数：{{ stats.原始记录数 }}</li>
+
+            {% if stats.必修科目缺考 %}
+            <li>必修科目缺考：
+                <ul>
+                {% for subject, count in stats.必修科目缺考.items %}
+                    <li>{{ subject }}: {{ count }}人</li>
+                {% endfor %}
+                </ul>
+            </li>
+            {% endif %}
+
+            {% if stats.选考科目未选 %}
+            <li>选考科目未选：
+                <ul>
+                {% for subject, count in stats.选考科目未选.items %}
+                    <li>{{ subject }}: {{ count }}人</li>
+                {% endfor %}
+                </ul>
+            </li>
+            {% endif %}
+
+            {% if stats.无效成绩 %}
+            <li>无效成绩：
+                <ul>
+                {% for subject, count in stats.无效成绩.items %}
+                    <li>{{ subject }}: {{ count }}个</li>
+                {% endfor %}
+                </ul>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div class="stats-container">
+        <div class="stats-title">有效成绩统计</div>
+        {% for subject, stats in score_stats.items %}
+        <h3>{{ subject }}</h3>
+        <ul>
+            {% for key, value in stats.items %}
+                <li>{{ key }}: {{ value }}</li>
+            {% endfor %}
+        </ul>
+        {% endfor %}
+    </div>
+
+    <h2>数据预览（前10条记录）</h2>
+    {{ preview|safe }}
+
+    <div style="margin-top: 20px;">
+        <form method="post" action="{% url 'start_mapping' %}">
+            {% csrf_token %}
+            <input type="hidden" name="exam_id" value="{{ exam_id }}">
+            <button type="submit">生成统一ID</button>
+        </form>
+        <a href="{% url 'upload_scores' %}">返回重新上传</a>
+    </div>
+</body>
+</html>
