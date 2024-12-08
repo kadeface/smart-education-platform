@@ -1,0 +1,280 @@
+<!-- templates/score_analysis/statistics/basic.html -->
+{% extends 'score_analysis/templates/index.html' %}
+
+{% block title %}统计分析{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- 左侧筛选条件 -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">筛选条件</h5>
+            </div>
+            <div class="card-body">
+                <form id="statsForm">
+                    <div class="mb-3">
+                        <label for="exam_id" class="form-label">考试</label>
+                        <select class="form-select" id="exam_id" name="exam_id" required>
+                            <!-- 考试列表将通过JS动态加载 -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="level_type" class="form-label">层级</label>
+                        <select class="form-select" id="level_type" name="level_type">
+                            <option value="city">市级</option>
+                            <option value="district">区级</option>
+                            <option value="school">校级</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">查询</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧统计数据展示 -->
+    <div class="col-md-9">
+        <!-- 基础统计数据卡片 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">基础统计数据</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- 总人数统计 -->
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">总人数</h6>
+                                <h4 id="totalStudents" class="card-title mb-0">-</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 文科人数 -->
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">文科人数</h6>
+                                <h4 id="liberalStudents" class="card-title mb-0">-</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 理科人数 -->
+                    <div class="col-md-4">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">理科人数</h6>
+                                <h4 id="scienceStudents" class="card-title mb-0">-</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 科目统计数据卡片 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">科目统计数据</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped" id="subjectStatsTable">
+                        <thead>
+                            <tr>
+                                <th>科目</th>
+                                <th>平均分</th>
+                                <th>标准差</th>
+                                <th>最高分</th>
+                                <th>最低分</th>
+                                <th>人数</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 科目统计数据将通过JS动态加载 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分数段统计卡片 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">分数段统计</h5>
+            </div>
+            <div class="card-body">
+                <ul class="nav nav-tabs" id="segmentTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#top10">前10%</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#top30">前30%</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#middle">中间段</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#bottom30">后30%</a>
+                    </li>
+                </ul>
+                <div class="tab-content mt-3">
+                    <div class="tab-pane fade show active" id="top10">
+                        <!-- 前10%数据表格 -->
+                    </div>
+                    <div class="tab-pane fade" id="top30">
+                        <!-- 前30%数据表格 -->
+                    </div>
+                    <div class="tab-pane fade" id="middle">
+                        <!-- 中间段数据表格 -->
+                    </div>
+                    <div class="tab-pane fade" id="bottom30">
+                        <!-- 后30%数据表格 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+// 页面加载完成后加载数据
+document.addEventListener('DOMContentLoaded', function() {
+    loadInitialData();
+});
+
+// 表单提交事件
+document.getElementById('statsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    loadStatisticsData();
+});
+
+// 加载初始数据
+function loadInitialData() {
+    // 加载考试列表
+    loadExamList();
+    // 加载默认统计数据
+    loadStatisticsData();
+}
+
+// 加载统计数据
+function loadStatisticsData() {
+    const formData = new FormData(document.getElementById('statsForm'));
+    const params = new URLSearchParams(formData);
+
+    // 加载基础统计数据
+    fetch(`/score_analysis/statistics/basic/?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateBasicStats(data.data);
+                updateSubjectStats(data.data.subject_statistics);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+
+    // 加载分数段统计数据
+    fetch(`/score_analysis/statistics/segments/?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateSegmentStats(data.data);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+// 更新基础统计数据
+function updateBasicStats(data) {
+    document.getElementById('totalStudents').textContent = data.student_count.total;
+    document.getElementById('liberalStudents').textContent = data.stream_distribution.counts['文科'] || 0;
+    document.getElementById('scienceStudents').textContent = data.stream_distribution.counts['理科'] || 0;
+}
+
+// 更新科目统计数据
+function updateSubjectStats(data) {
+    const tbody = document.querySelector('#subjectStatsTable tbody');
+    tbody.innerHTML = '';
+
+    for (const [subject, stats] of Object.entries(data)) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${getSubjectName(subject)}</td>
+            <td>${stats.mean}</td>
+            <td>${stats.std}</td>
+            <td>${stats.max}</td>
+            <td>${stats.min}</td>
+            <td>${stats.count}</td>
+        `;
+        tbody.appendChild(row);
+    }
+}
+
+// 更新分数段统计数据
+function updateSegmentStats(data) {
+    // 更新各个分数段的数据表格
+    updateSegmentTable('top10', data.top_10);
+    updateSegmentTable('top30', data.top_30);
+    updateSegmentTable('middle', data.middle);
+    updateSegmentTable('bottom30', data.bottom_30);
+}
+
+// 更新单个分数段的表格
+function updateSegmentTable(segmentId, data) {
+    const container = document.getElementById(segmentId);
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>科目</th>
+                        <th>人数</th>
+                        <th>平均分</th>
+                        <th>标准差</th>
+                        <th>最高分</th>
+                        <th>最低分</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${generateSegmentTableRows(data.statistics)}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// 生成分数段表格行
+function generateSegmentTableRows(data) {
+    return Object.entries(data)
+        .map(([subject, stats]) => `
+            <tr>
+                <td>${getSubjectName(subject)}</td>
+                <td>${stats.count}</td>
+                <td>${stats.mean}</td>
+                <td>${stats.std}</td>
+                <td>${stats.max}</td>
+                <td>${stats.min}</td>
+            </tr>
+        `).join('');
+}
+
+// 获取科目名称
+function getSubjectName(subject) {
+    const subjectNames = {
+        'chinese': '语文',
+        'math': '数学',
+        'english': '英语',
+        'physics': '物理',
+        'chemistry': '化学',
+        'biology': '生物',
+        'history': '历史',
+        'politics': '政治',
+        'geography': '地理'
+    };
+    return subjectNames[subject] || subject;
+}
+</script>
+{% endblock %}
+

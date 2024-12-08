@@ -19,9 +19,12 @@ class BaseExamConfig(models.Model):
     update_time = models.DateTimeField(blank=True, null=True)
 
     class Meta:
+        app_label = 'score_processor'
         managed = False
         db_table = 'base_exam_config'
         db_table_comment = '考试基本信息表'
+        verbose_name = '考试基础信息设置'
+        verbose_name_plural = verbose_name
 
 class BaseSchoolInfo(models.Model):
     school_id = models.AutoField(primary_key=True)
@@ -75,6 +78,8 @@ class ScoreStudentBasic(models.Model):
         managed = False
         db_table = 'score_student_basic'
         db_table_comment = '学生基础成绩表'
+        verbose_name = '学生基础成绩表'
+        verbose_name_plural = verbose_name
 
 class StudentMapping(models.Model):
     unified_id = models.CharField(max_length=11, db_comment='统一考号(11位)')
@@ -89,14 +94,77 @@ class StudentMapping(models.Model):
         managed = False
         db_table = 'student_mapping'
         unique_together = (('exam_id', 'original_student_id'),)
+        verbose_name = '学号映射表'
+        verbose_name_plural = verbose_name
+
+
 
 class ExamUpload(models.Model):
+    STATUS_CHOICES = (
+        ('PENDING', '等待处理'),
+        ('PROCESSING', '处理中'),
+        ('COMPLETED', '已完成'),
+        ('FAILED', '失败')
+    )
+
     file = models.FileField(upload_to='exam_uploads/')
-    exam_id = models.CharField(max_length=50)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+    exam_id = models.CharField(max_length=50, verbose_name='考试ID')
+    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='上传时间')
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PENDING',
+        verbose_name='状态'
+    )
+    error_message = models.TextField(blank=True, verbose_name='错误信息')
 
     class Meta:
-        db_table = 'exam_uploads'
+        db_table = 'exam_uploads'  # 保持原有表名
+        managed = False
+        verbose_name = '成绩上传及记录处理'
+        verbose_name_plural = verbose_name
+        ordering = ['-uploaded_at']
 
     def __str__(self):
-        return f"{self.exam_id}-{self.subject_id}-{self.level_type}-{self.score_range}"
+        return f"{self.exam_id} ({self.get_status_display()})"
+
+class ExamSubjectConfig(models.Model):
+    """考试科目配置表"""
+    config_id = models.BigAutoField(primary_key=True)
+    exam = models.ForeignKey('BaseExamConfig', models.DO_NOTHING, db_comment='考试ID')
+    subject = models.ForeignKey('BaseSubjectConfig', models.DO_NOTHING, db_comment='科目ID')
+
+    # 分数线设置
+    full_score = models.DecimalField(max_digits=5, decimal_places=2, db_comment='满分')
+    pass_score = models.DecimalField(max_digits=5, decimal_places=2, db_comment='及格分数线')
+    excellent_score = models.DecimalField(max_digits=5, decimal_places=2, db_comment='优秀分数线')
+
+    # 权重设置
+    weight = models.DecimalField(max_digits=3, decimal_places=2, default=1.00, db_comment='分数权重')
+
+    # 统计指标
+    mean_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='平均分')
+    std_dev = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='标准差')
+    max_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='最高分')
+    min_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='最低分')
+
+    # 达标率
+    pass_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='及格率')
+    excellent_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='优秀率')
+    low_score_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='低分率')
+
+    # 配置状态
+    status = models.CharField(max_length=10, default='active', db_comment='状态：active/inactive')
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'exam_subject_config'
+        unique_together = (('exam', 'subject'),)
+        indexes = [
+            models.Index(fields=['exam', 'subject']),
+            models.Index(fields=['subject', 'status']),
+        ]
+        verbose_name = '考试科目配置'
+        verbose_name_plural = verbose_name

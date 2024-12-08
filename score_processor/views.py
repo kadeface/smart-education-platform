@@ -1,3 +1,4 @@
+import numpy as np
 from django.shortcuts import render
 
 # Create your views here.
@@ -8,9 +9,10 @@ from .services.student_mapper import StudentMapperService
 import pandas as pd
 from.models import ExamUpload
 from .services.data_cleaner import DataCleanerService
-from .services.score_processor import ScoreProcessorService
 import openpyxl
 from django.contrib import messages
+# 在 oldviews.py 或 admin.py 中
+from score_processor.services.score_processor import ScoreProcessorService
 def score_list(request):
     # 获取所有成绩记录
     scores = ScoreStudentBasic.objects.all()[:10]  # 先只取前10条数据
@@ -171,101 +173,70 @@ def start_mapping(request):
     return redirect('upload_scores')
 
 
-from .services.score_processor import ScoreProcessorService
+def clean_data(self, request, upload_id):
+    """清洗数据"""
+    try:
+        upload = self.get_object(request, upload_id)
+        processor = ScoreProcessorService()
+        cleaner = DataCleanerService()
 
-def process_scores(request):
-    if request.method == 'POST':
-        print("开始处理成绩...")  # 调试信息
-        upload_id = request.session.get('upload_id')
-        cleaned_file_path = request.session.get('cleaned_file_path')
-        exam_id = request.POST.get('exam_id')
-        print(f"Session数据 - upload_id: {upload_id}, exam_id: {exam_id}")  # 调试信息
-        print(f"清洗文件路径: {cleaned_file_path}")  # 调试信息
+        if request.method == 'POST':
+            # 加载数据
+            success, error = processor.load_file(upload.file.path)
+            if not success:
+                messages.error(request, f"文件加载失败: {error}")
+                return redirect('admin:score_processor_examupload_changelist')
 
-        if not all([upload_id, cleaned_file_path, exam_id]):
-            messages.error(request, '无法获取处理所需的信息')
-            return redirect('upload_scores')
+            # 清洗数据
+            result = cleaner.clean_data(processor.df)
+            if result['success']:
+                upload.status = 'PROCESSING'  # 继续处理
+                upload.save()
 
-        try:
-            # 读取清洗后的数据
-            df = pd.read_excel(cleaned_file_path)
-            print(f"成功读取数据，行数: {len(df)}")  # 调试信息
+                # 将清洗统计转换为普通Python类型
+                cleaning_stats = result['stats']
+                for key, value in cleaning_stats.items():
+                    if isinstance(value, np.int64):
+                        cleaning_stats[key] = int(value)
+                    elif isinstance(value, dict):
+                        for k, v in value.items():
+                            if isinstance(v, np.int64):
+                                value[k] = int(v)
 
-            # 处理成绩
-            processor = ScoreProcessorService()
-            processing_result = processor.process_scores(df)
-            print("成绩处理结果:", processing_result)  # 调试信息
-            if not processing_result['success']:
-                raise ValueError(processing_result['error'])
+                # 获取有效成绩统计并转换类型
+                score_stats = cleaner.get_valid_scores_stats(result['cleaned_df'])
 
-            # 显示处理结果
-            return render(request, 'score_processor/processing_result.html', {
-                'stats': processing_result['stats'],
-                'preview': df.head(10).to_html(index=False),
-                'exam_id': exam_id
-            })
+                context = {
+                    'title': '数据清洗',
+                    'subtitle': '数据清洗完成',
+                    'opts': self.model._meta,
+                    'upload': upload,
+                    'has_view_permission': True,
+                    'cleaning_stats': cleaning_stats,
+                    'score_stats': score_stats,
+                }
 
-        except Exception as e:
-            messages.error(request, f'处理成绩时出错：{str(e)}')
-            return redirect('upload_scores')
+                messages.success(request, "数据清洗完成")
+                return render(request, 'score_processor/cleaning.html', context)
+            else:
+                upload.status = 'FAILED'
+                upload.error_message = result.get('error', '未知错误')
+                upload.save()
+                messages.error(request, f"清洗失败: {result.get('error', '未知错误')}")
 
-    return redirect('upload_scores')
+        # GET请求显示清洗页面
+        context = {
+            'title': '数据清洗',
+            'subtitle': '点击开始清洗按钮进行数据清洗',
+            'opts': self.model._meta,
+            'upload': upload,
+            'has_view_permission': True,
+        }
+        return render(request, 'score_processor/cleaning.html', context)
 
-def clean_data(request):
-    if request.method == 'POST':
-        upload_id = request.session.get('upload_id')
-        exam_id = request.session.get('exam_id')  # 从session获取exam_id
-        print(f"Session信息 - upload_id: {upload_id}, exam_id: {exam_id}")
-        if not upload_id or not exam_id:
-            messages.error(request, '无法获取上传的文件信息')
-            return redirect('upload_scores')
-
-        try:
-            # 获取上传文件
-            upload = ExamUpload.objects.get(id=upload_id)
-            print(f"找到上传文件: {upload.file.path}")  # 调试信息
-            df = pd.read_excel(upload.file.path)
-            print(f"成功读取Excel文件，数据行数: {len(df)}")  # 调试信息
-            # 数据清洗
-            cleaner = DataCleanerService()
-            cleaning_result = cleaner.clean_data(df)
-
-            if not cleaning_result['success']:
-                raise ValueError(cleaning_result['error'])
-
-            # 获取清洗后的数据
-            cleaned_df = cleaning_result['cleaned_df']
-            print(f"清洗完成，清洗后数据行数: {len(cleaned_df)}")  # 调试信息
-            # 保存清洗后的数据到临时文件
-            cleaned_file_path = f"{upload.file.path}_cleaned.xlsx"
-            cleaned_df.to_excel(cleaned_file_path, index=False)
-            request.session['cleaned_file_path'] = cleaned_file_path
-            print(f"清洗后数据已保存到: {cleaned_file_path}")  # 调试信息
-            return render(request, 'score_processor/cleaning_result.html', {
-                'stats': cleaning_result['stats'],
-                'score_stats': cleaner.get_valid_scores_stats(cleaned_df),
-                'preview': cleaned_df.head(10).to_html(index=False),
-                'exam_id': exam_id  # 确保传递exam_id到模板
-            })
-
-        except ExamUpload.DoesNotExist:
-            error_msg = f"找不到ID为{upload_id}的上传文件"
-            print(error_msg)  # 调试信息
-            messages.error(request, error_msg)
-            return redirect('upload_scores')
-
-        except pd.errors.EmptyDataError:
-            error_msg = "Excel文件为空"
-            print(error_msg)  # 调试信息
-            messages.error(request, error_msg)
-            return redirect('upload_scores')
-
-        except Exception as e:
-            error_msg = f"数据清洗时出错：{str(e)}"
-            print(f"错误详情: {error_msg}")  # 调试信息
-            messages.error(request, error_msg)
-            return redirect('upload_scores')
-    return redirect('upload_scores')
+    except Exception as e:
+        messages.error(request, f"清洗数据失败: {str(e)}")
+        return redirect('admin:score_processor_examupload_changelist')
 
 
 def save_scores(request):
@@ -392,3 +363,46 @@ def save_scores(request):
             return redirect('process_scores')
 
         return redirect('upload_scores')
+
+
+def process_scores(self, request):
+    if request.method == 'POST':
+        upload_id = request.session.get('upload_id')
+        if not upload_id:
+            messages.error(request, "找不到上传记录")
+            return redirect('.../upload-scores/')
+
+        try:
+            upload = ExamUpload.objects.get(id=upload_id)
+            processor = ScoreProcessorService()
+
+            # 开始处理
+            upload.status = 'PROCESSING'
+            upload.save()
+
+            result = processor.process_scores(processor.df, upload_id)
+
+            if result['success']:
+                # 保存处理结果
+                processor.save_results(result['results'])
+
+                # 更新状态
+                upload.status = 'COMPLETED'
+                upload.save()
+
+                messages.success(request, "成绩处理成功")
+                request.session.pop('upload_id', None)
+                return redirect('admin:score_processor_scorestudentbasic_changelist')
+            else:
+                upload.status = 'FAILED'
+                upload.error_message = result['error']
+                upload.save()
+                messages.error(request, f"处理失败: {result['error']}")
+
+        except Exception as e:
+            upload.status = 'FAILED'
+            upload.error_message = str(e)
+            upload.save()
+            messages.error(request, f"处理失败: {str(e)}")
+
+    return redirect('.../preview-scores/')

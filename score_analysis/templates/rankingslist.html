@@ -1,0 +1,97 @@
+<!-- templates/score_analysis/rankings/list.html -->
+{% extends 'score_analysis/templates/index.html' %}
+
+{% block title %}排名查询{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title">排名查询</h5>
+    </div>
+    <div class="card-body">
+        <form id="rankingForm">
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label for="exam_id" class="form-label">考试</label>
+                    <select class="form-select" id="exam_id" name="exam_id" required>
+                        <!-- 考试列表将通过JS动态加载 -->
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="subject_id" class="form-label">科目</label>
+                    <select class="form-select" id="subject_id" name="subject_id">
+                        <option value="">全部</option>
+                        <option value="chinese">语文</option>
+                        <option value="math">数学</option>
+                        <option value="english">英语</option>
+                        <!-- 其他科目 -->
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="level_type" class="form-label">层级</label>
+                    <select class="form-select" id="level_type" name="level_type">
+                        <option value="city">市级</option>
+                        <option value="district">区级</option>
+                        <option value="school">校级</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">查询</button>
+                </div>
+            </div>
+        </form>
+
+        <div class="table-responsive mt-3">
+            <table class="table table-striped" id="rankingsTable">
+                <thead>
+                    <tr>
+                        <th>学生ID</th>
+                        <th>科目</th>
+                        <th>原始分</th>
+                        <th>排名</th>
+                        <th>总人数</th>
+                        <th>百分位</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 排名数据将通过JS动态加载 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.getElementById('rankingForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    fetch(`/score_analysis/rankings/query/?${new URLSearchParams(formData)}`)
+        .then(response => response.json())
+        .then(data => {
+            // 处理返回的数据，更新表格
+            updateRankingsTable(data);
+        })
+        .catch(error => console.error('Error:', error));
+});
+
+function updateRankingsTable(data) {
+    const tbody = document.querySelector('#rankingsTable tbody');
+    tbody.innerHTML = '';
+
+    data.data.forEach(ranking => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${ranking.unified_student_id}</td>
+            <td>${ranking.subject_id}</td>
+            <td>${ranking.raw_score}</td>
+            <td>${ranking.raw_score_rank}</td>
+            <td>${ranking.total_count}</td>
+            <td>${ranking.percentile}%</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+</script>
+{% endblock %}

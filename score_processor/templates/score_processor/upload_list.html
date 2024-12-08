@@ -1,0 +1,52 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block content %}
+    <div id="content-main">
+        <!-- 上传表单 -->
+        <div class="module">
+            <h2>上传成绩文件</h2>
+            <form method="post" enctype="multipart/form-data" action="{% url 'admin:score_processor_examupload_upload' %}">
+                {% csrf_token %}
+                <div class="form-row">
+                    {{ upload_form.as_p }}
+                </div>
+                <div class="submit-row">
+                    <input type="submit" class="default" value="上传文件"/>
+                </div>
+            </form>
+        </div>
+        <!-- 列表显示 -->
+        {{ block.super }}
+    </div>
+{% endblock %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .module {
+        margin-bottom: 20px;
+    }
+    .form-row {
+        padding: 10px;
+    }
+    .form-row label {
+        width: 150px;
+        display: inline-block;
+    }
+    .form-row select,
+    .form-row input[type="file"] {
+        width: 300px;
+    }
+    .submit-row {
+        padding: 10px;
+        margin: 0;
+        border-top: 1px solid #eee;
+        background: #f8f8f8;
+    }
+</style>
+{% endblock %}

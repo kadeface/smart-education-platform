@@ -1,60 +1,85 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>数据预览</title>
-    <style>
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .stats {
-            margin: 20px 0;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 4px;
-        }
-        .button-group {
-            margin-top: 20px;
-        }
-        .button-group form {
-            display: inline;
-        }
-    </style>
-</head>
-<body>
-    <h1>数据预览</h1>
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
 
-    <div class="stats">
-        <h2>基本统计</h2>
-        {% if stats %}
-            <ul>
-            {% for key, value in stats.items %}
-                <li>{{ key }}: {{ value }}</li>
-            {% endfor %}
-            </ul>
-        {% endif %}
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>{{ title }}</h2>
+
+        <!-- 显示统计信息 -->
+        <div class="results">
+            <h3>基础统计</h3>
+            <table>
+                {% for key, value in stats.items %}
+                <tr>
+                    <th>{{ key }}</th>
+                    <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+
+        <!-- 显示预览数据 -->
+        <div class="results">
+            <h3>数据预览（前10条）</h3>
+            {% if data.empty %}
+                <p>没有数据可以预览</p>
+            {% else %}
+                <table>
+                    <thead>
+                        <tr>
+                            {% for column in data.columns %}
+                            <th>{{ column }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data.values %}
+                        <tr class="{% cycle 'row1' 'row2' %}">
+                            {% for value in row %}
+                            <td>{{ value }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="submit-row">
+            <form method="post" action="{% url 'admin:score_processor_examupload_process' upload.id %}">
+                {% csrf_token %}
+                <input type="submit" value="确认处理" class="default" />
+            </form>
+            <a href="{% url 'admin:score_processor_examupload_changelist' %}" class="closelink">返回列表</a>
+        </div>
     </div>
+</div>
+{% endblock %}
 
-    <h2>数据预览（前10条记录）</h2>
-    {% if preview %}
-        {{ preview|safe }}
-    {% endif %}
-
-    <div class="button-group">
-        <form method="post" action="{% url 'clean_data' %}">
-            {% csrf_token %}
-            <button type="submit">开始数据清洗</button>
-        </form>
-        <a href="{% url 'upload_scores' %}">返回重新上传</a>
-    </div>
-</body>
-</html>
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .results table {
+        width: 100%;
+        margin: 10px 0;
+    }
+    .results table th,
+    .results table td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .results table th {
+        font-weight: bold;
+        background-color: #f8f8f8;
+    }
+    .row1 {
+        background-color: #fff;
+    }
+    .row2 {
+        background-color: #f9f9f9;
+    }
+</style>
+{% endblock %}

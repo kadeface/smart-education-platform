@@ -1,10 +1,43 @@
+#score_processor.py
+import pandas as pd
+from django.apps import apps
+from django.db import models
+
+
 class ScoreProcessorService:
     def __init__(self):
+        self.ExamUpload = apps.get_model('score_processor', 'ExamUpload')
         # 科目定义
         self.required_subjects = ['语文', '数学', '英语']
         self.science_subject = '物理'  # 理科必选
         self.arts_subject = '历史'  # 文科必选
         self.optional_subjects = ['化学', '生物', '政治', '地理']
+        self.df = None
+
+    def load_file(self, file):
+        """
+        加载并验证Excel文件
+        返回: (成功/失败, 错误信息)
+        """
+        try:
+            self.df = pd.read_excel(file)
+
+            # 验证必需的列
+            required_columns = self.required_subjects + [self.science_subject, self.arts_subject] + \
+                               self.optional_subjects + ['姓名', '考号', '班级']
+
+            missing_columns = [col for col in required_columns if col not in self.df.columns]
+            if missing_columns:
+                return False, f"缺少必需的列: {', '.join(missing_columns)}"
+
+            # 验证数据格式
+            for subject in self.required_subjects + [self.science_subject, self.arts_subject] + self.optional_subjects:
+                self.df[subject] = pd.to_numeric(self.df[subject], errors='coerce')
+
+            return True, None
+
+        except Exception as e:
+            return False, f"文件加载失败: {str(e)}"
 
     def determine_subject_type(self, scores):
         """
@@ -86,12 +119,21 @@ class ScoreProcessorService:
             print(f"总分计算错误: {str(e)}")
             return -1
 
-    def process_scores(self, df):
+    def process_scores(self, df, upload_id=None):
         """
         处理成绩数据
+        upload_id: ExamUpload记录的ID
         """
-        try:
+        upload = None
+        if upload_id:
+            try:
+                upload = self.ExamUpload.objects.get(id=upload_id)
+                upload.status = 'PROCESSING'
+                upload.save()
+            except self.ExamUpload.DoesNotExist:
+                print(f"Warning: Upload record {upload_id} not found")
 
+        try:
             print("开始处理成绩数据...")  # 调试信息
             results = []
             stats = {
@@ -101,6 +143,9 @@ class ScoreProcessorService:
                 '未确定人数': 0,
                 '有效总分人数': 0,
             }
+
+            total_rows = len(df)
+            processed_rows = 0
 
             for _, row in df.iterrows():
                 # 转换行数据为字典
@@ -122,7 +167,27 @@ class ScoreProcessorService:
                     **{subject: scores.get(subject, -1) for subject in self.required_subjects},
                     **{subject: scores.get(subject, -2) for subject in self.optional_subjects}
                 })
+
+                # 更新进度
+                processed_rows += 1
+                if upload and processed_rows % 100 == 0:  # 每处理100条更新一次状态
+                    progress = int(processed_rows / total_rows * 100)
+                    upload.error_message = f"处理进度: {progress}%"
+                    upload.save()
+
             print("成绩处理完成")  # 调试信息
+
+            # 保存统计信息
+            if upload:
+                upload.status = 'COMPLETED'
+                upload.error_message = f"""处理完成
+    总人数: {stats['总人数']}
+    理科: {stats['理科人数']}
+    文科: {stats['文科人数']}
+    未确定: {stats['未确定人数']}
+    有效总分: {stats['有效总分人数']}"""
+                upload.save()
+
             return {
                 'success': True,
                 'results': results,
@@ -130,8 +195,45 @@ class ScoreProcessorService:
             }
 
         except Exception as e:
-            print(f"成绩处理错误: {str(e)}")
+            error_msg = f"成绩处理错误: {str(e)}"
+            print(error_msg)
+
+            if upload:
+                upload.status = 'FAILED'
+                upload.error_message = error_msg
+                upload.save()
+
             return {
                 'success': False,
                 'error': str(e)
             }
+# 添加新的辅助方法
+    def validate_file(self, file):
+        """验证上传的文件"""
+        try:
+            df = pd.read_excel(file)
+            required_columns = ['姓名', '考号', '班级', '语文', '数学', '英语']
+            return all(col in df.columns for col in required_columns)
+        except Exception:
+            return False
+
+    def get_preview_data(self):
+        """
+        获取预览数据
+        返回: 处理结果的前10行和统计信息
+        """
+        if self.df is None:
+            return None
+
+        try:
+            result = self.process_scores(self.df)
+            if result['success']:
+                preview_data = pd.DataFrame(result['results']).head(10)
+                return {
+                    'data': preview_data,
+                    'stats': result['stats']
+                }
+            return None
+        except Exception as e:
+            print(f"获取预览数据失败: {str(e)}")
+            return None

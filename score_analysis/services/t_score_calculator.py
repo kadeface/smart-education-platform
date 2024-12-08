@@ -23,9 +23,28 @@ class TScoreCalculator:
         self.exam_id = exam_id
         self.logger = logging.getLogger(__name__)
     def calculate(self):
-        """
-        计算T分数
-        """
+
+        try:
+            # 处理每个科目
+            subjects = ['chinese', 'math', 'english', 'physics', 'chemistry',
+                       'biology', 'history', 'politics', 'geography']
+
+            # 对每个科目计算不同层级的T分
+            for subject in subjects:
+                self.logger.info(f"开始处理科目: {subject}")
+
+                # 获取原始成绩
+                scores_df = self._get_source_scores(subject)
+                if scores_df.empty:
+                    continue
+
+                # 处理不同层级
+                for level_type in ['city', 'district', 'school']:
+                    self._process_level(scores_df, subject, level_type)
+
+        except Exception as e:
+            self.logger.error(f"T分计算过程发生错误: {str(e)}")
+            raise
     def _get_source_scores(self, subject_id: str) -> pd.DataFrame:
         """
         获取原始成绩数据
@@ -62,6 +81,8 @@ class TScoreCalculator:
                 subject_id: 'raw_score',
                 'student_id': 'unified_student_id'
             })
+            # 在这里转换raw_score为float类型
+            df['raw_score'] = df['raw_score'].astype(float)
 
             # 处理空值
             df = df.dropna(subset=['raw_score'])
@@ -139,8 +160,9 @@ class TScoreCalculator:
             if sample_size < 10:
                 raise ValueError(f"样本量不足: {sample_size}")
 
-            # 计算统计值
-            raw_scores = df['raw_score']
+            # 先将raw_score转换为float类型
+            raw_scores = df['raw_score'].astype(float)
+
             stats = {
                 'sample_size': sample_size,
                 'mean': float(raw_scores.mean()),
@@ -228,9 +250,23 @@ class TScoreCalculator:
             stream_type: 文科/理科/未确定
         """
         try:
+            # 将raw_score转换为float类型进行计算
+            raw_scores = df['raw_score'].astype(float)
             # 计算Z分数和T分数
             z_scores = (df['raw_score'] - stats['mean']) / stats['std_dev']
-            t_scores = 50 + (10 * z_scores)
+            # 根据科目设置T分计算参数
+            subjects_150 = {'chinese', 'math', 'english'}
+            if subject_id in subjects_150:
+                # 满分150分的科目
+                t_scores = 75 + (25 * z_scores)
+                # 设置边界值 1-150
+                t_scores = np.where(raw_scores == 0, 0, np.clip(t_scores, 1, 150))
+            else:
+                # 满分100分的科目
+                t_scores = 50 + (15 * z_scores)
+                # 设置边界值 0-100
+                t_scores = np.where(raw_scores == 0, 0, np.clip(t_scores, 1, 100))
+
 
             # 准备批量创建的数据
             t_score_records = []
@@ -243,8 +279,8 @@ class TScoreCalculator:
                         stream_type=stream_type,
                         level_type=level_type,
                         raw_score=row['raw_score'],
-                        z_score=round(z_scores[idx], 2),
-                        t_score=round(t_scores[idx], 1)
+                        z_score=round(float(z_scores[idx]), 2),  # 确保是float
+                        t_score=round(float(t_scores[idx]), 1)  # 确保是float
                     )
                 )
 
@@ -269,4 +305,35 @@ class TScoreCalculator:
 
         except Exception as e:
             self.logger.error(f"计算保存T分时发生错误: {str(e)}")
+            raise
+
+
+    def _process_group(self, group_df: pd.DataFrame, subject_id: str, group_id: str, level_type: str):
+        """
+        处理单个组的T分计算
+
+        Args:
+            group_df: 分组的DataFrame
+            subject_id: 科目ID
+            group_id: 分组标识
+            level_type: 分析层级
+        """
+        try:
+            # 根据stream_type再次分组
+            stream_groups = dict(tuple(group_df.groupby('stream_type')))
+
+            # 处理每个stream_type的分组
+            for stream_type, stream_df in stream_groups.items():
+                # 计算统计值
+                stats = self._calculate_statistics(stream_df)
+
+                # 保存统计值
+                self._save_statistics(subject_id, group_id, level_type, stream_type, stats)
+
+                # 计算并保存T分
+                self._calculate_and_save_t_scores(stream_df, stats, subject_id,
+                                                  group_id, level_type, stream_type)
+
+        except Exception as e:
+            self.logger.error(f"处理分组 {group_id} 时发生错误: {str(e)}")
             raise

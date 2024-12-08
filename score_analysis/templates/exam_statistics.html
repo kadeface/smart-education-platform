@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Statistics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        h2 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Basic Statistics</h2>
+<table>
+    <tr>
+        <th>Metric</th>
+        <th>Value</th>
+    </tr>
+    {% for key, value in basic_stats.items %}
+    <tr>
+        <td>{{ key }}</td>
+        <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<h2>Threshold Statistics</h2>
+<table>
+    <tr>
+        <th>Line Type</th>
+        <th>Score</th>
+        <th>Above Count</th>
+        <th>Rate (%)</th>
+    </tr>
+    {% for line_type, stats in threshold_stats.items %}
+    <tr>
+        <td>{{ line_type }}</td>
+        <td>{{ stats.line }}</td>
+        <td>{{ stats.count }}</td>
+        <td>{{ stats.rate }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<h2>Rankings</h2>
+<table>
+    <tr>
+        <th>Metric</th>
+        <th>Value</th>
+    </tr>
+    {% for key, value in rankings.items %}
+    <tr>
+        <td>{{ key }}</td>
+        <td>{{ value }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>

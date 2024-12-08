@@ -1,0 +1,79 @@
+
+<!-- This div serves as a container for the exam list card -->
+<div class="card">
+    <!-- Header of the card with the title of the exam list -->
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">考试列表</h5>
+    </div>
+    <!-- Body of the card containing the main content -->
+    <div class="card-body">
+        <!-- Wrapper for the table to make it responsive -->
+        <div class="table-responsive">
+            <!-- Table for displaying exam information -->
+            <table class="table table-hover">
+                <!-- Table header -->
+                <thead>
+                    <tr>
+                        <th>考试名称</th>
+                        <th>考试日期</th>
+                        <th>考试类型</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <!-- Table body -->
+                <tbody>
+                    <!-- Loop through the exams list using Django's template language -->
+                    {% for exam in exams %}
+                    <!-- Table row for each exam -->
+                    <tr {% if exam.exam_date < today %}class="past-exam"{% endif %}>
+                        <!-- Display exam name -->
+                        <td>{{ exam.exam_name }}</td>
+                        <!-- Display exam date in Y-m-d format -->
+                        <td>{{ exam.exam_date|date:"Y-m-d" }}</td>
+                        <!-- Display exam type -->
+                        <td>{{ exam.exam_type }}</td>
+                        <!-- Button to view statistics for the exam -->
+                        <td>
+                            <a href="{% url 'score_analysis:exam_statistics' exam.exam_id %}"
+                               class="btn btn-sm btn-primary"
+                               title="点击查看该考试的统计信息">
+                                查看统计
+                            </a>
+                        </td>
+                    </tr>
+                    <!-- If the exams list is empty, display this message -->
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center">暂无考试数据</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <!-- 分页部分 -->
+<!-- 分页部分 -->
+{% if paginator.num_pages > 1 %}
+<nav aria-label="Page navigation" class="mt-3">
+    <ul class="pagination justify-content-center">
+        {% if current_page.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ current_page.previous_page_number }}">上一页</a>
+        </li>
+        {% endif %}
+
+        {% for num in paginator.page_range %}
+        <li class="page-item {% if num == current_page.number %}active{% endif %}">
+            <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+        {% endfor %}
+
+        {% if current_page.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ current_page.next_page_number }}">下一页</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+    </div>
+</div>

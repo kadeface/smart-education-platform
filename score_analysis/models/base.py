@@ -27,3 +27,4 @@ class BaseSchoolInfo(BaseSchoolInfoModel):
     """
     class Meta:
         proxy = True
+

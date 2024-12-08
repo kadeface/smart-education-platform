@@ -1,5 +1,33 @@
 # score_analysis/tests/test_models.py
+# test_t_score.py
+import pandas as pd
+import logging
+from score_analysis.services.t_score_calculator import TScoreCalculator
+'''
+# 设置日志
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+
+def test_t_score_calculation():
+    """测试T分计算"""
+    try:
+        # 初始化计算器
+        calculator = TScoreCalculator(exam_id='202307-CITY-H')
+
+        # 执行T分计算
+        calculator.process_exam()
+
+        logger.info("T分计算测试完成")
+
+    except Exception as e:
+        logger.error(f"测试出错: {str(e)}")
+
+
+if __name__ == '__main__':
+    test_t_score_calculation()
+'''
+from django.core.management import call_command
 from django.test import TestCase
 from score_analysis.models import (
     ScoreStudentBasic,
@@ -17,6 +45,8 @@ class TestScoreStudentBasic(TestCase):
 
     def setUp(self):
         """设置测试数据"""
+        call_command('migrate', 'score_processor.models.BaseExamConfig','score_processor.models.BaseSubjectConfig','score_processor.models.BaseSchoolInfo','score_processor.models.ScoreStudentBasic')
+
         # 先创建考试配置
         self.exam_config = BaseExamConfig.objects.create(
             exam_id='TEST001',
@@ -141,3 +171,4 @@ class TestStatisticalModels(TestCase):
             std_dev=Decimal('10.2')
         )
         self.assertIsNotNone(stats.stat_id)
+

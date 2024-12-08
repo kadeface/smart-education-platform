@@ -1,0 +1,229 @@
+<!-- index.html -->
+<div class="container my-4">
+    <!-- 考试数据管理区域 -->
+     <div class="section mb-4">
+        <h2 class="section-title mb-3">教学质量综合评价系统</h2>
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <a href="/score-processor/" class="btn btn-primary">
+                    上传新考试数据
+                </a>
+            </div>
+            <div class="col-md-6">
+                <div class="select-wrapper">
+                    <select id="examSelect" class="form-select" onchange="handleExamChange()">
+                        <option value="">选择考试...</option>
+                    </select>
+                    <!-- 添加加载指示器 -->
+                    <div id="loadingIndicator" class="loading-spinner" style="display:none">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">加载中...</span>
+                        </div>
+                    </div>
+                    <!-- 添加错误信息显示 -->
+                    <div id="examSelectError" class="invalid-feedback"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要功能区域 -->
+    <div class="row">
+        <!-- 排名分析卡片 -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="card-title">排名分析</h3>
+                    <p class="card-text">查看总分和单科排名情况</p>
+                    <a href="{% url 'score_analysis:rankings' %}" class="btn btn-primary">
+                        进入
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计分析卡片 -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="card-title">统计分析</h3>
+                    <p class="card-text">查看详细统计数据和分析</p>
+                    <a href="{% url 'score_analysis:statistics' %}" class="btn btn-primary">
+                        进入
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.section-title {
+    color: #333;
+    font-size: 1.5rem;
+    font-weight: 600;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #eee;
+}
+
+.card {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.card-title {
+    color: #2c3e50;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.card-text {
+    color: #666;
+    margin-bottom: 1.5rem;
+}
+
+.btn-primary {
+    background-color: #3498db;
+    border-color: #3498db;
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
+.form-select {
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    padding: 0.5rem;
+}
+</style>
+<script>
+// 格式化考试选项显示
+function formatExamOption(exam) {
+    const examDate = new Date(exam.exam_date).toLocaleDateString();
+    const gradeInfo = exam.grade_level ? `${exam.grade_level}年级` : '';
+    const typeInfo = exam.exam_type ? `(${exam.exam_type})` : '';
+    const semesterInfo = exam.semester ? `${exam.semester}` : '';
+
+    return `${exam.exam_name} ${typeInfo} ${gradeInfo} ${semesterInfo} - ${examDate}`;
+}
+
+// 加载考试列表
+function loadExamList() {
+    const examSelect = document.getElementById('examSelect');
+    const errorDiv = document.getElementById('examSelectError');
+    if (!examSelect) {
+        console.error('找不到考试选择下拉框元素');
+        return;
+    }
+    showLoading();
+    errorDiv.style.display = 'none';
+    examSelect.disabled = true;
+    console.log('开始加载考试列表...');
+
+    fetch('/score-analysis/api/exam/list/')
+        .then(response => {
+            console.log('API响应状态:', response.status);
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('获取到的考试数据:', data);
+            // 保留默认选项
+            examSelect.innerHTML = '<option value="">选择考试...</option>';
+
+            if (data.data && data.data.length > 0) {
+                data.data.forEach(exam => {
+                    const option = document.createElement('option');
+                    option.value = exam.exam_id;
+                    option.textContent = formatExamOption(exam);
+                    examSelect.appendChild(option);
+                });
+
+                // 尝试恢复上次选择
+                const lastSelected = localStorage.getItem('lastSelectedExam');
+                if (lastSelected) {
+                    examSelect.value = lastSelected;
+                    if (examSelect.value === lastSelected) {
+                        handleExamChange();
+                    }
+                }
+            } else {
+                const option = document.createElement('option');
+                option.value = "";
+                option.textContent = "暂无考试数据";
+                examSelect.appendChild(option);
+            }
+        })
+        .catch(error => {
+            console.error('加载考试列表失败:', error);
+            errorDiv.textContent = '加载考试列表失败，请稍后重试';
+            errorDiv.style.display = 'block';
+            examSelect.innerHTML = '<option value="">加载失败</option>';
+        })
+        .finally(() => {
+            hideLoading();
+            examSelect.disabled = false;
+        });
+}
+
+// 处理考试选择变化
+function handleExamChange() {
+    const examSelect = document.getElementById('examSelect');
+    const examId = examSelect.value;
+    console.log('考试选择变化:', examId);
+    if (!examId) {
+        console.log('未选择考试，清除概览');
+        clearOverview();
+        return;
+    }
+
+    // 保存选择
+    localStorage.setItem('lastSelectedExam', examId);
+    console.log('已保存考试选择到localStorage');
+    // 加载考试相关数据
+    loadExamOverview(examId);
+}
+
+// 加载考试概览数据
+function loadExamOverview(examId) {
+    // TODO: 实现加载考试概览数据的功能
+    console.log('Loading overview for exam:', examId);
+}
+
+// 清除概览数据
+function clearOverview() {
+    // TODO: 实现清除概览数据的功能
+    console.log('Clearing overview data');
+}
+
+// 显示加载状态
+function showLoading() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'block';
+    }
+}
+
+// 隐藏加载状态
+function hideLoading() {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
+    }
+}
+
+// 页面加载时执行
+document.addEventListener('DOMContentLoaded', function() {
+    loadExamList();
+});
+</script>

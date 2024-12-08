@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>{{ title }}</h2>
+        <p class="description">{{ subtitle }}</p>
+        
+        {% if messages %}
+        <ul class="messagelist">
+            {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- 操作按钮 -->
+        <div class="submit-row">
+            <form method="post">
+                {% csrf_token %}
+                <input type="submit" value="开始生成" class="default" />
+            </form>
+            <a href="{% url 'admin:score_processor_examupload_changelist' %}" class="closelink">返回列表</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

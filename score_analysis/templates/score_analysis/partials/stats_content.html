@@ -1,0 +1,96 @@
+{% load score_analysis_tags %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0">考试统计分析</h5>
+    </div>
+    <div class="card-body">
+        <!-- 文理科切换标签 -->
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            {% for stream_type in statistics.keys %}
+            {% if 'city' in statistics|get_item:stream_type %}
+                <li class="nav-item">
+                    <a class="nav-link {% if forloop.first %}active{% endif %}"
+                       data-bs-toggle="tab"
+                       href="#{{ stream_type }}-tab"
+                       role="tab">
+                        {{ stream_type|stream_type_name }}
+                    </a>
+                </li>
+            {% endif %}
+            {% endfor %}
+        </ul>
+
+        <!-- 统计内容 -->
+        <div class="tab-content">
+            {% for stream_type, levels in statistics.items %}
+            {% if 'city' in levels %}
+            <div class="tab-pane fade {% if forloop.first %}show active{% endif %}"
+                 id="{{ stream_type }}-tab"
+                 role="tabpanel">
+
+                <!-- 总分统计 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h6 class="mb-3">总分统计</h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card border-light">
+                                    <div class="card-body text-center">
+                                        <h3 class="text-primary mb-1">
+                                            {{ levels.city.total.mean_score|floatformat:1 }}
+                                        </h3>
+                                        <small class="text-muted">平均分</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card border-light">
+                                    <div class="card-body text-center">
+                                        <h3 class="text-info mb-1">
+                                            {{ levels.city.total.std_dev|floatformat:1 }}
+                                        </h3>
+                                        <small class="text-muted">标准差</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 其他总分统计指标 -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 学科统计 -->
+                <div class="row">
+                    <div class="col-12">
+                        <h6 class="mb-3">学科统计</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>科目</th>
+                                        <th>平均分</th>
+                                        <th>标准差</th>
+                                        <th>及格率</th>
+                                        <th>优秀率</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for subject_id, subject_stats in levels.city.subjects.items %}
+                                    <tr>
+                                        <td>{{ subject_id|subject_name }}</td>
+                                        <td>{{ subject_stats.mean_score|floatformat:1 }}</td>
+                                        <td>{{ subject_stats.std_dev|floatformat:1 }}</td>
+                                        <td>{{ subject_stats.pass_rate|floatformat:1 }}%</td>
+                                        <td>{{ subject_stats.excellent_rate|floatformat:1 }}%</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>

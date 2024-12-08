@@ -9,7 +9,7 @@ class ScoreStudentBasic(BaseScoreStudentBasic):
     扩展ScoreStudentBasic模型，添加分析相关的方法
     """
     class Meta:
-        proxy = True  # 这表明这是一个代理模型，不会创建新表
+        proxy =True  # 这表明这是一个代理模型，不会创建新表
 
 
     def get_subject_score(self, subject_id: str) -> Optional[Decimal]:
