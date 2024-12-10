@@ -1,0 +1,11 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools %}
+    <div class="object-tools">
+        <a href="{% url 'admin:score_analysis_scorerankings_add' %}" class="addlink">
+            上传结果
+        </a>
+    </div>
+    {{ block.super }}
+{% endblock %}
