@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 # Register your models here.
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, reverse
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django import forms
@@ -354,6 +354,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
         except Exception as e:
             messages.error(request, f"生成统一考号失败: {str(e)}")
             return redirect('admin:score_processor_examupload_mapping', upload_id=upload.id)
+
 # Register models
 admin.site.register(BaseExamConfig, ExamInfoAdmin)
 admin.site.register(StudentMapping, StudentMappingAdmin)

@@ -3,33 +3,14 @@ from django.db import models
 from .base import BaseExamConfig, BaseSubjectConfig
 #from django.core.exceptions import ValidationError
 
-class ScoreRankings(models.Model):
-    ranking_id = models.BigAutoField(primary_key=True)
-    exam = models.ForeignKey(BaseExamConfig, models.DO_NOTHING, db_comment='考试ID')
-    unified_student_id = models.CharField(max_length=50, db_comment='统一学生ID')
-    subject = models.ForeignKey(BaseSubjectConfig, models.DO_NOTHING, db_comment='科目ID')
-    stream_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
-    level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
-    raw_score = models.DecimalField(max_digits=6, decimal_places=2, null=True)
-    raw_score_rank = models.IntegerField(null=True)
-    total_count = models.IntegerField(null=True, db_comment='总人数')
-    percentile = models.DecimalField(max_digits=5, decimal_places=2, null=True)
-    total_score_threshold_flags = models.IntegerField(
-        null=True,
-        db_comment='总分达线标记(仅总分有效,位运算:1=本科线,2=特控线,4=211线,8=985线,16=清北线)'
-    )
-    create_time = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        managed = False
-        db_table = 'score_rankings'
-        unique_together = (('exam', 'unified_student_id', 'subject', 'stream_type', 'level_type'),)
+
 
 class ScoreDistributions(models.Model):
     distribution_id = models.BigAutoField(primary_key=True)
     exam = models.ForeignKey(BaseExamConfig, models.DO_NOTHING, db_comment='考试ID')
     subject = models.ForeignKey(BaseSubjectConfig, models.DO_NOTHING, db_comment='科目ID')
-    stream_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
+    select_type = models.CharField(max_length=10, db_comment='文科/理科')
     level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
     score_range = models.CharField(max_length=20, null=True, db_comment='分数段')
     student_count = models.IntegerField(null=True, db_comment='学生数')
@@ -43,9 +24,9 @@ class ScoreDistributions(models.Model):
         db_table = 'score_distributions'
         indexes = [
             models.Index(fields=['exam', 'subject'], name='idx_dist_exam_subject'),
-            models.Index(fields=['level_type', 'stream_type'], name='idx_dist_level_stream'),
+            models.Index(fields=['level_type', 'select_type'], name='idx_dist_level_stream'),
         ]
-        unique_together = (('exam', 'subject', 'stream_type', 'level_type', 'score_range'),)
+        unique_together = (('exam', 'subject', 'select_type', 'level_type', 'score_range'),)
 
 class SubjectTScore(models.Model):
     """学科T分表"""
@@ -53,7 +34,7 @@ class SubjectTScore(models.Model):
     exam = models.ForeignKey(BaseExamConfig, models.DO_NOTHING, db_comment='考试ID')
     unified_student_id = models.CharField(max_length=50, db_comment='统一学生ID')
     subject = models.ForeignKey(BaseSubjectConfig, models.DO_NOTHING, db_comment='科目ID')
-    stream_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
+    select_type = models.CharField(max_length=10, db_comment='文科/理科')
     level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
     raw_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='原始分')
     t_score = models.DecimalField(max_digits=5, decimal_places=1, null=True)
@@ -63,11 +44,11 @@ class SubjectTScore(models.Model):
     class Meta:
         managed = False
         db_table = 'subject_t_scores'
-        unique_together = (('exam', 'unified_student_id', 'subject', 'stream_type', 'level_type'),)
+        unique_together = (('exam', 'unified_student_id', 'subject', 'select_type', 'level_type'),)
         indexes = [
             models.Index(fields=['exam', 'unified_student_id'], name='idx_exam_student'),
             models.Index(fields=['subject', 'level_type'], name='idx_subject_level'),
-            models.Index(fields=['stream_type', 'level_type'], name='idx_stream_level'),
+            models.Index(fields=['select_type', 'level_type'], name='idx_select_level'),
         ]
 
 
@@ -75,7 +56,7 @@ class SubjectStatistics(models.Model):
     stat_id = models.BigAutoField(primary_key=True)
     exam = models.ForeignKey(BaseExamConfig, models.DO_NOTHING, db_comment='考试ID')
     subject = models.ForeignKey(BaseSubjectConfig, models.DO_NOTHING, db_comment='科目ID')
-    stream_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
+    select_type = models.CharField(max_length=10, db_comment='文科/理科')
     level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
     sample_size = models.IntegerField(null=True, db_comment='样本量')
     mean = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='原始分平均分')
@@ -92,7 +73,7 @@ class SubjectStatistics(models.Model):
     class Meta:
         managed = False
         db_table = 'subject_statistics'
-        unique_together = (('exam', 'subject', 'stream_type', 'level_type'),)
+        unique_together = (('exam', 'subject', 'select_type', 'level_type'),)
         indexes = [
             models.Index(fields=['exam', 'level_type'], name='idx_exam_level'),
         ]
@@ -115,7 +96,7 @@ class ExamScoreLines(models.Model):
     ]
     line_id = models.AutoField(primary_key=True)
     exam_id = models.CharField(max_length=50)
-    stream_type = models.CharField(
+    select = models.CharField(
         max_length=10,
         choices=STREAM_CHOICES,
         help_text='文理分科(文科/理科)',
@@ -127,6 +108,12 @@ class ExamScoreLines(models.Model):
         help_text='分数线类型:C9层，985层，211层，双一流层，优分层，本科层',
         default='本科层'  # 添加默认值
     )
+    select_type = models.CharField(
+        max_length=10,
+        choices=STREAM_CHOICES,
+        help_text='文理分科(文科/理科)',
+        default='理科'
+    )
     score = models.DecimalField(max_digits=6, decimal_places=2, help_text='分数线值')
     create_time = models.DateTimeField(auto_now_add=True)
     update_time = models.DateTimeField(auto_now=True)
@@ -134,12 +121,12 @@ class ExamScoreLines(models.Model):
     class Meta:
         managed = False
         db_table = 'exam_score_lines'
-        unique_together = ['exam_id','stream_type', 'line_type']
+        unique_together = ['exam_id','select_type', 'line_type']
         verbose_name = '考试分数线'
         verbose_name_plural = '考试分数线'
 
     def __str__(self):
-        return f"{self.exam_id}-{self.stream_type}-{self.line_type}"
+        return f"{self.exam_id}-{self.select_type}-{self.line_type}"
 
 
 class StatisticsExamTrend(models.Model):
@@ -151,7 +138,7 @@ class StatisticsExamTrend(models.Model):
                                      db_comment='对比考试')
     subject = models.ForeignKey('score_processor.BaseSubjectConfig', models.DO_NOTHING, null=True,
                                 db_comment='科目(为空表示总分)')
-    stream_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
+    select_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
     level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
 
     # 基础对比指标
@@ -165,7 +152,7 @@ class StatisticsExamTrend(models.Model):
     class Meta:
         managed = False
         db_table = 'statistics_exam_trend'
-        unique_together = (('current_exam', 'compare_exam', 'subject', 'stream_type', 'level_type'),)
+        unique_together = (('current_exam', 'compare_exam', 'subject', 'select_type', 'level_type'),)
 
 
 # StatisticsExamIndicators模型的简化版本
@@ -175,7 +162,7 @@ class StatisticsExamIndicators(models.Model):
     exam = models.ForeignKey('score_processor.BaseExamConfig', models.DO_NOTHING, db_comment='考试ID')
     subject = models.ForeignKey('score_processor.BaseSubjectConfig', models.DO_NOTHING, null=True,
                                 db_comment='科目(为空表示总分)')
-    stream_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
+    select_type = models.CharField(max_length=10, db_comment='文科/理科')
     level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
 
     # 成绩指标
@@ -201,7 +188,7 @@ class StatisticsExamIndicators(models.Model):
     class Meta:
         managed = False
         db_table = 'statistics_exam_indicators'
-        unique_together = (('exam', 'subject', 'stream_type', 'level_type'),)
+        unique_together = (('exam', 'subject', 'select_type', 'level_type'),)
 
 
 # StatisticsPrecomputedMetrics模型的简化版本
@@ -211,7 +198,7 @@ class StatisticsPrecomputedMetrics(models.Model):
     exam = models.ForeignKey('score_processor.BaseExamConfig', models.DO_NOTHING, db_comment='考试ID')
     subject = models.ForeignKey('score_processor.BaseSubjectConfig', models.DO_NOTHING, null=True,
                                 db_comment='科目(为空表示总分)')
-    stream_type = models.CharField(max_length=10, db_comment='文科/理科/统一')
+    select_type = models.CharField(max_length=10, db_comment='文科/理科')
     level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
     metric_type = models.CharField(max_length=50, db_comment='指标类型')
 
@@ -228,4 +215,28 @@ class StatisticsPrecomputedMetrics(models.Model):
     class Meta:
         managed = False
         db_table = 'statistics_precomputed_metrics'
-        unique_together = (('exam', 'subject', 'stream_type', 'level_type', 'metric_type'),)
+        unique_together = (('exam', 'subject', 'select_type', 'level_type', 'metric_type'),)
+
+
+class ScoreRankings(models.Model):
+    ranking_id = models.BigAutoField(primary_key=True)
+    exam = models.ForeignKey(BaseExamConfig, models.DO_NOTHING, db_comment='考试ID')
+    unified_student_id = models.CharField(max_length=50, db_comment='统一学生ID')
+    student_name = models.CharField(max_length=50)    # 新增
+    school_name = models.CharField(max_length=100)    # 新增
+    subject = models.ForeignKey(BaseSubjectConfig, models.DO_NOTHING, db_comment='科目ID')
+    select_type = models.CharField(max_length=10, db_comment='文科/理科')
+    level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
+    raw_score = models.DecimalField(max_digits=6, decimal_places=2, null=True)
+    raw_score_rank = models.IntegerField(null=True)
+    total_count = models.IntegerField(null=True, db_comment='总人数')
+    percentile = models.DecimalField(max_digits=5, decimal_places=2, null=True)
+
+    create_time = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'score_rankings'
+        verbose_name = '排名情况统计'
+        verbose_name_plural = '排名情况统计'
+        unique_together = (('exam', 'unified_student_id', 'subject', 'select_type', 'level_type'),)

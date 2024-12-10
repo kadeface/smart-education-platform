@@ -78,7 +78,7 @@ def calculate_level_rankings(df: pd.DataFrame, exam_id: str, subject_id: str, le
 
         for group_id, group_df in groups.items():
             # 处理文理科分组
-            for stream_type, stream_df in group_df.groupby('select_type'):
+            for select_type, stream_df in group_df.groupby('select_type'):
                 # 计算排名
                 stream_df['rank'] = stream_df['raw_score'].rank(method='min', ascending=False)
                 total_count = len(stream_df)
@@ -91,7 +91,7 @@ def calculate_level_rankings(df: pd.DataFrame, exam_id: str, subject_id: str, le
                         exam_id=exam_id,
                         unified_student_id=row['student_id'],
                         subject_id=subject_id,
-                        stream_type=stream_type,
+                        select_type=select_type,
                         level_type=level_type,
                         raw_score=row['raw_score'],
                         raw_score_rank=int(row['rank']),
@@ -102,7 +102,7 @@ def calculate_level_rankings(df: pd.DataFrame, exam_id: str, subject_id: str, le
                 # 批量保存
                 ScoreRankings.objects.bulk_create(rankings)
 
-                logger.info(f"{level_type} {group_id} {stream_type} {subject_id} 排名计算完成")
+                logger.info(f"{level_type} {group_id} {select_type} {subject_id} 排名计算完成")
 
     except Exception as e:
         logger.error(f"计算 {level_type} 排名时发生错误: {str(e)}")

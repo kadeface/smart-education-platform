@@ -1,6 +1,7 @@
 # score_analysis/templates/oldviews.py
 from django.shortcuts import render
 from django.http import JsonResponse
+from django.template.loader import select_template
 from django.views.decorators.http import require_http_methods
 from score_analysis.services.t_score_calculator import TScoreCalculator
 from score_analysis.services.ranking_calculator import RankingCalculator
@@ -52,7 +53,7 @@ def get_t_scores(request):
             'exam_id',
             'unified_student_id',
             'subject_id',
-            'stream_type',
+            'select_type',
             'level_type',
             'raw_score',
             't_score'
@@ -91,7 +92,7 @@ def get_rankings(request):
         exam_id = request.GET.get('exam_id')
         subject_id = request.GET.get('subject_id')
         level_type = request.GET.get('level_type')
-        stream_type = request.GET.get('stream_type')
+        select_type = request.GET.get('select_type')
         student_id = request.GET.get('student_id')
 
         if not exam_id:
@@ -104,8 +105,8 @@ def get_rankings(request):
             filters['subject_id'] = subject_id
         if level_type:
             filters['level_type'] = level_type
-        if stream_type:
-            filters['stream_type'] = stream_type
+        if select_type:
+            filters['select_type'] = select_type
         if student_id:
             filters['unified_student_id'] = student_id
 
@@ -114,7 +115,7 @@ def get_rankings(request):
             'exam_id',
             'unified_student_id',
             'subject_id',
-            'stream_type',
+            'select_type',
             'level_type',
             'raw_score',
             'raw_score_rank',

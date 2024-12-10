@@ -16,7 +16,7 @@ class ExamService:
             exam_stats = stats_service.process_exam_statistics(exam_id)
 
             # 获取文理科类型
-            stream_types = ScoreStudentBasic.objects.filter(
+            select_types = ScoreStudentBasic.objects.filter(
                 exam_id=exam_id
             ).values_list('select_type', flat=True).distinct()
 
@@ -35,9 +35,9 @@ class ExamService:
             }
 
             # 合并所有文理科的统计数据
-            for stream_type in stream_types:
+            for select_type in select_types:
                 # 获取市级统计数据（可以根据需要改为区级或校级）
-                stats_key = f"{stream_type}_city"
+                stats_key = f"{select_type}_city"
                 if stats_key in exam_stats:
                     total_stats = exam_stats[stats_key]['total']
 

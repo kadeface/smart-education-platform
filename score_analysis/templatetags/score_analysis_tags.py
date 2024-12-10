@@ -8,18 +8,17 @@ register = template.Library()
 def get_item(dictionary, key):
     """获取字典中的值"""
     return dictionary.get(key)
-
+'''
 @register.filter
-def stream_type_name(stream_type):
+def stream_type_name(select_type):
     """将文理科类型代码转换为显示名称"""
     names = {
         'arts': '文科',
         'science': '理科',
-        'general': '不分科',
         # 可以根据需要添加更多映射
     }
-    return names.get(stream_type, stream_type)
-
+    return names.get(select_type, select_type)
+'''
 @register.filter
 def subject_name(subject_id):
     """将科目ID转换为科目名称"""
