@@ -171,11 +171,11 @@ class StatisticsExamIndicators(models.Model):
     low_score_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='低分率')
 
     # 排名指标
-    top_10_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前10名最低分')
-    top_50_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前50名最低分')
-    top_100_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前100名最低分')
-    top_200_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前200名最低分')
-    top_1250_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前1250名最低分')
+    top_10_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前10名最低分')
+    top_50_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前50名最低分')
+    top_100_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前100名最低分')
+    top_200_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前200名最低分')
+    top_1250_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前1250名最低分')
 
     # 达线指标
     threshold_stats = models.JSONField(null=True, db_comment='各条线达线统计')  # {line_type: {count, rate}}
@@ -183,8 +183,28 @@ class StatisticsExamIndicators(models.Model):
     # 学校分布
     school_distribution = models.JSONField(null=True, db_comment='学校分布统计')  # {school_id: {count, rate}}
 
+
+    # 基础统计指标
+    student_count = models.IntegerField(null=True, db_comment='参考人数')
+    max_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='最高分')
+    min_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='最低分')
+    mean_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='平均分')
+
+    # 四分位数指标
+    q80_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='80分位分数')
+    median_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='中位数分数')
+    q20_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='20分位分数')
+    q10_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='10分位分数')
+
+    # 排名指标（补充）
+    top_20_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前20名最低分')
+    top_500_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前500名最低分')
+
+    # 排名分布
+    rank_distribution = models.JSONField(null=True, db_comment='排名分布统计')
     create_time = models.DateTimeField(auto_now_add=True)
 
+    # {rank_range: count}
     class Meta:
         managed = False
         db_table = 'statistics_exam_indicators'
@@ -231,9 +251,7 @@ class ScoreRankings(models.Model):
     raw_score_rank = models.IntegerField(null=True)
     total_count = models.IntegerField(null=True, db_comment='总人数')
     percentile = models.DecimalField(max_digits=5, decimal_places=2, null=True)
-
     create_time = models.DateTimeField(auto_now_add=True)
-
     class Meta:
         managed = False
         db_table = 'score_rankings'

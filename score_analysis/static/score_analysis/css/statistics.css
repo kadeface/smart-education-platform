@@ -1,0 +1,81 @@
+/* 整体布局 */
+.stats-summary {
+    padding: 20px;
+}
+
+.summary-section {
+    margin-bottom: 30px;
+}
+
+.summary-text {
+    line-height: 1.6;
+    color: #333;
+}
+
+/* 表格样式 */
+.stats-table {
+    margin-bottom: 40px;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.results-table th,
+.results-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+.results-table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+}
+
+.total-row {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+/* Tab切换样式 */
+.stats-tabs {
+    margin-top: 20px;
+}
+
+.tab-header {
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    padding: 10px 20px;
+    border: none;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+.tab-button.active {
+    background-color: #417690;
+    color: white;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* 数据高亮 */
+.highlight {
+    color: #417690;
+    font-weight: bold;
+}

@@ -1,0 +1,755 @@
+{% extends "score_analysis/base_site.html" %}
+{% load i18n static %}
+
+
+{# 在头部添加样式引用 #}
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static 'score_analysis/css/statistics.css' %}">
+{% endblock %}
+{% block content %}
+<!-- 综述信息部分 -->
+<div class="stats-summary">
+    <!-- 理科综述 -->
+    <div class="summary-section">
+        <h3>理科综述</h3>
+        <div class="summary-text">
+            本次考试，总计有<span id="science_school_count">-</span>所学校，参考总人数<span id="science_student_count">-</span>人。
+            均分为<span id="science_mean_score">-</span>分，最高分为<span id="science_max_score">-</span>分，
+            归属于<span id="science_top_school">-</span>。
+            清北线模拟上线（<span id="science_qb_line">-</span>分）人数<span id="science_qb_count">-</span>人
+            （<span id="science_qb_rate">-</span>%）
+            985线模拟上线（<span id="science_985_line">-</span>分）人数<span id="science_985_count">-</span>人
+            （<span id="science_985_rate">-</span>%）
+            211线模拟上线（<span id="science_211_line">-</span>分）人数<span id="science_211_count">-</span>人
+            （<span id="science_211_rate">-</span>%）
+            特控线模拟上线（<span id="science_tk_line">-</span>分）人数<span id="science_tk_count">-</span>人
+            （<span id="science_tk_rate">-</span>%）
+            本科线模拟上线（<span id="science_bk_line">-</span>分）人数<span id="science_bk_count">-</span>人
+            （<span id="science_bk_rate">-</span>%）
+            专科线模拟上线（<span id="science_zk_line">-</span>分）人数<span id="science_zk_count">-</span>人
+            （<span id="science_zk_rate">-</span>%）
+        </div>
+    </div>
+
+    <!-- 文科综述 -->
+    <div class="summary-section">
+        <h3>文科综述</h3>
+        <div class="summary-text">
+            本次考试，总计有<span id="arts_school_count">-</span>所学校，参考总人数<span id="arts_student_count">-</span>人。
+            均分为<span id="arts_mean_score">-</span>分，最高分为<span id="arts_max_score">-</span>分，
+            归属于<span id="arts_top_school">-</span>。
+            清北线模拟上线（<span id="arts_qb_line">-</span>分）人数<span id="arts_qb_count">-</span>人
+            （<span id="arts_qb_rate">-</span>%）
+            985线模拟上线（<span id="arts_985_line">-</span>分）人数<span id="arts_985_count">-</span>人
+            （<span id="arts_985_rate">-</span>%）
+            211线模拟上线（<span id="arts_211_line">-</span>分）人数<span id="arts_211_count">-</span>人
+            （<span id="arts_211_rate">-</span>%）
+            特控线模拟上线（<span id="arts_tk_line">-</span>分）人数<span id="arts_tk_count">-</span>人
+            （<span id="arts_tk_rate">-</span>%）
+            本科线模拟上线（<span id="arts_bk_line">-</span>分）人数<span id="arts_bk_count">-</span>人
+            （<span id="arts_bk_rate">-</span>%）
+            专科线模拟上线（<span id="arts_zk_line">-</span>分）人数<span id="arts_zk_count">-</span>人
+            （<span id="arts_zk_rate">-</span>%）
+        </div>
+    </div>
+</div>
+    <!-- Tab切换部分 -->
+<div class="stats-tabs">
+    <div class="tab-header">
+        <button class="tab-button active" data-tab="science">理科统计</button>
+        <button class="tab-button" data-tab="arts">文科统计</button>
+    </div>
+
+    <!-- 理科内容 -->
+    <div class="tab-content active" id="science-content">
+      <div class="tab-content active" id="science-content">
+    <!-- 2. 理科考试概况 -->
+    <div class="stats-table">
+        <h3>1.1.1、考试概况</h3>
+        <div class="table-responsive">
+            <table class="results-table exam-overview-table">
+                <thead>
+                    <tr>
+                        <th>分数线名称</th>
+                        <th>分数线</th>
+                        <th>学生人数</th>
+                        <th>占比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>清北线</td>
+                        <td>≥ <span id="science_qb_line_score">-</span></td>
+                        <td id="science_qb_line_count">-</td>
+                        <td id="science_qb_line_rate">-</td>
+                    </tr>
+                    <tr>
+                        <td>985线</td>
+                        <td>≥ <span id="science_985_line_score">-</span></td>
+                        <td id="science_985_line_count">-</td>
+                        <td id="science_985_line_rate">-</td>
+                    </tr>
+                    <tr>
+                        <td>211线</td>
+                        <td>≥ <span id="science_211_line_score">-</span></td>
+                        <td id="science_211_line_count">-</td>
+                        <td id="science_211_line_rate">-</td>
+                    </tr>
+                    <tr>
+                        <td>特控线</td>
+                        <td>≥ <span id="science_tk_line_score">-</span></td>
+                        <td id="science_tk_line_count">-</td>
+                        <td id="science_tk_line_rate">-</td>
+                    </tr>
+                    <tr>
+                        <td>本科线</td>
+                        <td>≥ <span id="science_bk_line_score">-</span></td>
+                        <td id="science_bk_line_count">-</td>
+                        <td id="science_bk_line_rate">-</td>
+                    </tr>
+                    <tr>
+                        <td>专科线</td>
+                        <td>≥ <span id="science_zk_line_score">-</span></td>
+                        <td id="science_zk_line_count">-</td>
+                        <td id="science_zk_line_rate">-</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+        {# templates/score_analysis/statistics/generate_stats.html - 在理科tab内容中添加 #}
+
+<!-- 3. 理科上线统计 -->
+<div class="stats-table">
+    <h3>1.1.4、上线统计</h3>
+    <div class="table-responsive">
+        <table class="results-table line-stats-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">统计单位</th>
+                    <th rowspan="2">参考人数</th>
+                    <th rowspan="2">最高分</th>
+                    <th rowspan="2">最低分</th>
+                    <th colspan="2">平均分</th>
+                    <th colspan="3">清北线</th>
+                    <th colspan="3">985线</th>
+                    <th colspan="3">211线</th>
+                    <th colspan="3">特控线</th>
+                    <th colspan="3">本科线</th>
+                    <th colspan="3">专科线</th>
+                </tr>
+                <tr>
+                    <th>分数</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                </tr>
+            </thead>
+            <tbody id="science-school-stats-body">
+                <tr class="total-row">
+                    <td>总体</td>
+                    <td id="science_total_students">-</td>
+                    <td id="science_highest_score">-</td>
+                    <td id="science_lowest_score">-</td>
+                    <td id="science_avg_score">-</td>
+                    <td>-</td>
+                    <td id="science_qb_count">-</td>
+                    <td id="science_qb_rate">-</td>
+                    <td>-</td>
+                    <td id="science_985_count">-</td>
+                    <td id="science_985_rate">-</td>
+                    <td>-</td>
+                    <td id="science_211_count">-</td>
+                    <td id="science_211_rate">-</td>
+                    <td>-</td>
+                    <td id="science_tk_count">-</td>
+                    <td id="science_tk_rate">-</td>
+                    <td>-</td>
+                    <td id="science_bk_count">-</td>
+                    <td id="science_bk_rate">-</td>
+                    <td>-</td>
+                    <td id="science_zk_count">-</td>
+                    <td id="science_zk_rate">-</td>
+                    <td>-</td>
+                </tr>
+                <!-- 学校数据将通过JavaScript动态添加 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+        <!-- 4. 理科各科四分位分析 -->
+<div class="stats-table">
+    <h3>1.1.5、各科四分位分析</h3>
+    <div class="table-responsive">
+        <table class="results-table quartile-stats-table">
+            <thead>
+                <tr>
+                    <th>学科</th>
+                    <th>总分</th>
+                    <th>语文</th>
+                    <th>数学</th>
+                    <th>英语</th>
+                    <th>物理</th>
+                    <th>化学</th>
+                    <th>生物</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>均分</td>
+                    <td id="science_total_mean">-</td>
+                    <td id="science_chinese_mean">-</td>
+                    <td id="science_math_mean">-</td>
+                    <td id="science_english_mean">-</td>
+                    <td id="science_physics_mean">-</td>
+                    <td id="science_chemistry_mean">-</td>
+                    <td id="science_biology_mean">-</td>
+                </tr>
+                <tr>
+                    <td>最高分</td>
+                    <td id="science_total_max">-</td>
+                    <td id="science_chinese_max">-</td>
+                    <td id="science_math_max">-</td>
+                    <td id="science_english_max">-</td>
+                    <td id="science_physics_max">-</td>
+                    <td id="science_chemistry_max">-</td>
+                    <td id="science_biology_max">-</td>
+                </tr>
+                <tr>
+                    <td>80%</td>
+                    <td id="science_total_80">-</td>
+                    <td id="science_chinese_80">-</td>
+                    <td id="science_math_80">-</td>
+                    <td id="science_english_80">-</td>
+                    <td id="science_physics_80">-</td>
+                    <td id="science_chemistry_80">-</td>
+                    <td id="science_biology_80">-</td>
+                </tr>
+                <tr>
+                    <td>中位数</td>
+                    <td id="science_total_median">-</td>
+                    <td id="science_chinese_median">-</td>
+                    <td id="science_math_median">-</td>
+                    <td id="science_english_median">-</td>
+                    <td id="science_physics_median">-</td>
+                    <td id="science_chemistry_median">-</td>
+                    <td id="science_biology_median">-</td>
+                </tr>
+                <tr>
+                    <td>20%</td>
+                    <td id="science_total_20">-</td>
+                    <td id="science_chinese_20">-</td>
+                    <td id="science_math_20">-</td>
+                    <td id="science_english_20">-</td>
+                    <td id="science_physics_20">-</td>
+                    <td id="science_chemistry_20">-</td>
+                    <td id="science_biology_20">-</td>
+                </tr>
+                <tr>
+                    <td>10%</td>
+                    <td id="science_total_10">-</td>
+                    <td id="science_chinese_10">-</td>
+                    <td id="science_math_10">-</td>
+                    <td id="science_english_10">-</td>
+                    <td id="science_physics_10">-</td>
+                    <td id="science_chemistry_10">-</td>
+                    <td id="science_biology_10">-</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+        <!-- 5. 理科优秀学生分布 -->
+<div class="stats-table">
+    <h3>1.1.6、优秀学生分布</h3>
+    <div class="table-responsive">
+        <table class="results-table top-students-table">
+            <thead>
+                <tr>
+                    <th>单位</th>
+                    <th>前10名</th>
+                    <th>前20名</th>
+                    <th>前50名</th>
+                    <th>前100名</th>
+                    <th>前200名</th>
+                    <th>前500名</th>
+                    <th>前1250名</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>最低分</td>
+                    <td id="science_top10_min">-</td>
+                    <td id="science_top20_min">-</td>
+                    <td id="science_top50_min">-</td>
+                    <td id="science_top100_min">-</td>
+                    <td id="science_top200_min">-</td>
+                    <td id="science_top500_min">-</td>
+                    <td id="science_top1250_min">-</td>
+                </tr>
+                <tr class="total-row">
+                    <td>总体</td>
+                    <td id="science_top10_total">-</td>
+                    <td id="science_top20_total">-</td>
+                    <td id="science_top50_total">-</td>
+                    <td id="science_top100_total">-</td>
+                    <td id="science_top200_total">-</td>
+                    <td id="science_top500_total">-</td>
+                    <td id="science_top1250_total">-</td>
+                </tr>
+                <!-- 学校分布数据 -->
+                <tr id="science_school_1">
+                    <td>开平市第一中学</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <!-- 其他学校数据将通过JavaScript动态添加 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+        <!-- 6. 理科平均分 -->
+<div class="stats-table">
+    <h3>1.1.7、平均分</h3>
+    <div class="table-responsive">
+        <table class="results-table average-scores-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">统计单位</th>
+                    <th colspan="2">总分</th>
+                    <th colspan="2">语文</th>
+                    <th colspan="2">数学</th>
+                    <th colspan="2">英语</th>
+                    <th colspan="2">物理</th>
+                    <th colspan="2">化学</th>
+                    <th colspan="2">生物</th>
+                </tr>
+                <tr>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="total-row">
+                    <td>总体</td>
+                    <td id="science_total_avg">-</td>
+                    <td>-</td>
+                    <td id="science_chinese_avg">-</td>
+                    <td>-</td>
+                    <td id="science_math_avg">-</td>
+                    <td>-</td>
+                    <td id="science_english_avg">-</td>
+                    <td>-</td>
+                    <td id="science_physics_avg">-</td>
+                    <td>-</td>
+                    <td id="science_chemistry_avg">-</td>
+                    <td>-</td>
+                    <td id="science_biology_avg">-</td>
+                    <td>-</td>
+                </tr>
+                <tr id="science_school_avg_1">
+                    <td>开平市第一中学</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <!-- 其他学校数据将通过JavaScript动态添加 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+    </div>
+
+    <!-- 文科内容 -->
+    <div class="tab-content" id="arts-content">
+        <!-- 这里将放置文科的2-6部分内容 -->
+         <!-- 2. 文科考试概况 -->
+        <div class="stats-table">
+            <h3>1.1.1、考试概况</h3>
+            <div class="table-responsive">
+                <table class="results-table exam-overview-table">
+                    <thead>
+                        <tr>
+                            <th>分数线名称</th>
+                            <th>分数线</th>
+                            <th>学生人数</th>
+                            <th>占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>清北线</td>
+                            <td>≥ <span id="arts_qb_line_score">-</span></td>
+                            <td id="arts_qb_line_count">-</td>
+                            <td id="arts_qb_line_rate">-</td>
+                        </tr>
+                        <tr>
+                            <td>985线</td>
+                            <td>≥ <span id="arts_985_line_score">-</span></td>
+                            <td id="arts_985_line_count">-</td>
+                            <td id="arts_985_line_rate">-</td>
+                        </tr>
+                        <tr>
+                            <td>211线</td>
+                            <td>≥ <span id="arts_211_line_score">-</span></td>
+                            <td id="arts_211_line_count">-</td>
+                            <td id="arts_211_line_rate">-</td>
+                        </tr>
+                        <tr>
+                            <td>特控线</td>
+                            <td>≥ <span id="arts_tk_line_score">-</span></td>
+                            <td id="arts_tk_line_count">-</td>
+                            <td id="arts_tk_line_rate">-</td>
+                        </tr>
+                        <tr>
+                            <td>本科线</td>
+                            <td>≥ <span id="arts_bk_line_score">-</span></td>
+                            <td id="arts_bk_line_count">-</td>
+                            <td id="arts_bk_line_rate">-</td>
+                        </tr>
+                        <tr>
+                            <td>专科线</td>
+                            <td>≥ <span id="arts_zk_line_score">-</span></td>
+                            <td id="arts_zk_line_count">-</td>
+                            <td id="arts_zk_line_rate">-</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+    <!-- 3. 文科上线统计 -->
+<div class="stats-table">
+    <h3>1.1.4、上线统计</h3>
+    <div class="table-responsive">
+        <table class="results-table line-stats-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">统计单位</th>
+                    <th rowspan="2">参考人数</th>
+                    <th rowspan="2">最高分</th>
+                    <th rowspan="2">最低分</th>
+                    <th colspan="2">平均分</th>
+                    <th colspan="3">清北线</th>
+                    <th colspan="3">985线</th>
+                    <th colspan="3">211线</th>
+                    <th colspan="3">特控线</th>
+                    <th colspan="3">本科线</th>
+                    <th colspan="3">专科线</th>
+                </tr>
+                <tr>
+                    <th>分数</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                    <th>人数</th>
+                    <th>比例</th>
+                    <th>排名</th>
+                </tr>
+            </thead>
+            <tbody id="arts-school-stats-body">
+                <tr class="total-row">
+                    <td>总体</td>
+                    <td id="arts_total_students">-</td>
+                    <td id="arts_highest_score">-</td>
+                    <td id="arts_lowest_score">-</td>
+                    <td id="arts_avg_score">-</td>
+                    <td>-</td>
+                    <td id="arts_qb_count">-</td>
+                    <td id="arts_qb_rate">-</td>
+                    <td>-</td>
+                    <td id="arts_985_count">-</td>
+                    <td id="arts_985_rate">-</td>
+                    <td>-</td>
+                    <td id="arts_211_count">-</td>
+                    <td id="arts_211_rate">-</td>
+                    <td>-</td>
+                    <td id="arts_tk_count">-</td>
+                    <td id="arts_tk_rate">-</td>
+                    <td>-</td>
+                    <td id="arts_bk_count">-</td>
+                    <td id="arts_bk_rate">-</td>
+                    <td>-</td>
+                    <td id="arts_zk_count">-</td>
+                    <td id="arts_zk_rate">-</td>
+                    <td>-</td>
+                </tr>
+                <!-- 学校数据将通过JavaScript动态添加 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+    <!-- 4. 文科各科四分位分析 -->
+<div class="stats-table">
+    <h3>1.1.5、各科四分位分析</h3>
+    <div class="table-responsive">
+        <table class="results-table quartile-stats-table">
+            <thead>
+                <tr>
+                    <th>学科</th>
+                    <th>总分</th>
+                    <th>语文</th>
+                    <th>数学</th>
+                    <th>英语</th>
+                    <th>政治</th>
+                    <th>历史</th>
+                    <th>地理</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>均分</td>
+                    <td id="arts_total_mean">-</td>
+                    <td id="arts_chinese_mean">-</td>
+                    <td id="arts_math_mean">-</td>
+                    <td id="arts_english_mean">-</td>
+                    <td id="arts_politics_mean">-</td>
+                    <td id="arts_history_mean">-</td>
+                    <td id="arts_geography_mean">-</td>
+                </tr>
+                <tr>
+                    <td>最高分</td>
+                    <td id="arts_total_max">-</td>
+                    <td id="arts_chinese_max">-</td>
+                    <td id="arts_math_max">-</td>
+                    <td id="arts_english_max">-</td>
+                    <td id="arts_politics_max">-</td>
+                    <td id="arts_history_max">-</td>
+                    <td id="arts_geography_max">-</td>
+                </tr>
+                <tr>
+                    <td>80%</td>
+                    <td id="arts_total_80">-</td>
+                    <td id="arts_chinese_80">-</td>
+                    <td id="arts_math_80">-</td>
+                    <td id="arts_english_80">-</td>
+                    <td id="arts_politics_80">-</td>
+                    <td id="arts_history_80">-</td>
+                    <td id="arts_geography_80">-</td>
+                </tr>
+                <tr>
+                    <td>中位数</td>
+                    <td id="arts_total_median">-</td>
+                    <td id="arts_chinese_median">-</td>
+                    <td id="arts_math_median">-</td>
+                    <td id="arts_english_median">-</td>
+                    <td id="arts_politics_median">-</td>
+                    <td id="arts_history_median">-</td>
+                    <td id="arts_geography_median">-</td>
+                </tr>
+                <tr>
+                    <td>20%</td>
+                    <td id="arts_total_20">-</td>
+                    <td id="arts_chinese_20">-</td>
+                    <td id="arts_math_20">-</td>
+                    <td id="arts_english_20">-</td>
+                    <td id="arts_politics_20">-</td>
+                    <td id="arts_history_20">-</td>
+                    <td id="arts_geography_20">-</td>
+                </tr>
+                <tr>
+                    <td>10%</td>
+                    <td id="arts_total_10">-</td>
+                    <td id="arts_chinese_10">-</td>
+                    <td id="arts_math_10">-</td>
+                    <td id="arts_english_10">-</td>
+                    <td id="arts_politics_10">-</td>
+                    <td id="arts_history_10">-</td>
+                    <td id="arts_geography_10">-</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+    <!-- 5. 文科优秀学生分布 -->
+<div class="stats-table">
+    <h3>1.1.6、优秀学生分布</h3>
+    <div class="table-responsive">
+        <table class="results-table top-students-table">
+            <thead>
+                <tr>
+                    <th>单位</th>
+                    <th>前10名</th>
+                    <th>前20名</th>
+                    <th>前50名</th>
+                    <th>前100名</th>
+                    <th>前200名</th>
+                    <th>前500名</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>最低分</td>
+                    <td id="arts_top10_min">-</td>
+                    <td id="arts_top20_min">-</td>
+                    <td id="arts_top50_min">-</td>
+                    <td id="arts_top100_min">-</td>
+                    <td id="arts_top200_min">-</td>
+                    <td id="arts_top500_min">-</td>
+                </tr>
+                <tr class="total-row">
+                    <td>总体</td>
+                    <td id="arts_top10_total">-</td>
+                    <td id="arts_top20_total">-</td>
+                    <td id="arts_top50_total">-</td>
+                    <td id="arts_top100_total">-</td>
+                    <td id="arts_top200_total">-</td>
+                    <td id="arts_top500_total">-</td>
+                </tr>
+                <tr id="arts_school_1">
+                    <td>开平市第一中学</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <!-- 其他学校数据将通过JavaScript动态添加 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+    {# templates/score_analysis/statistics/generate_stats.html - 在文科tab内容中添加 #}
+
+<!-- 6. 文科平均分 -->
+<div class="stats-table">
+    <h3>1.1.7、平均分</h3>
+    <div class="table-responsive">
+        <table class="results-table average-scores-table">
+            <thead>
+                <tr>
+                    <th rowspan="2">统计单位</th>
+                    <th colspan="2">总分</th>
+                    <th colspan="2">语文</th>
+                    <th colspan="2">数学</th>
+                    <th colspan="2">英语</th>
+                    <th colspan="2">政治</th>
+                    <th colspan="2">历史</th>
+                    <th colspan="2">地理</th>
+                </tr>
+                <tr>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                    <th>均分</th>
+                    <th>排名</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="total-row">
+                    <td>总体</td>
+                    <td id="arts_total_avg">-</td>
+                    <td>-</td>
+                    <td id="arts_chinese_avg">-</td>
+                    <td>-</td>
+                    <td id="arts_math_avg">-</td>
+                    <td>-</td>
+                    <td id="arts_english_avg">-</td>
+                    <td>-</td>
+                    <td id="arts_politics_avg">-</td>
+                    <td>-</td>
+                    <td id="arts_history_avg">-</td>
+                    <td>-</td>
+                    <td id="arts_geography_avg">-</td>
+                    <td>-</td>
+                </tr>
+                <tr id="arts_school_avg_1">
+                    <td>开平市第一中学</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                </tr>
+                <!-- 其他学校数据将通过JavaScript动态添加 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extrajs %}
+    {{ block.super }}
+    <script src="{% static 'score_analysis/js/statistics.js' %}"></script>
+{% endblock %}

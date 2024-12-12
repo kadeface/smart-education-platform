@@ -1,0 +1,71 @@
+/* 表格样式 */
+#result_list {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+#result_list th {
+    background: #417690;
+    color: white;
+    padding: 8px;
+    text-align: left;
+    font-weight: normal;
+}
+
+#result_list td {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+/* 行样式 */
+.row1 {
+    background-color: #fff;
+}
+
+.row2 {
+    background-color: #f9f9f9;
+}
+
+/* 按钮样式 */
+.button {
+    display: inline-block;
+    padding: 5px 10px;
+    margin: 2px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: white;
+    transition: background-color 0.3s;
+}
+
+/* 生成统计按钮 */
+.button[href*="generate"] {
+    background-color: #79aec8;
+}
+
+.button[href*="generate"]:hover {
+    background-color: #609ab6;
+}
+
+/* 查看结果按钮 */
+.button[href*="view"] {
+    background-color: #417690;
+}
+
+.button[href*="view"]:hover {
+    background-color: #205067;
+}
+
+/* 状态图标 */
+.has-statistics {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.has-statistics.yes {
+    color: #5cb85c;
+}
+
+.has-statistics.no {
+    color: #d9534f;
+}

@@ -1,4 +1,4 @@
-{% extends "admin/base_site.html" %}
+{% extends "score_analysis/base_site.html" %}
 {% load i18n admin_urls static %}
 
 {% block content %}
@@ -48,11 +48,11 @@
 
         <!-- 操作按钮 -->
         <div class="submit-row">
-            <form method="post" action="{% url 'admin:score_processor_examupload_process' upload.id %}">
+            <form method="post" action="{% url 'score_analysis:score_processor_examupload_process' upload.id %}">
                 {% csrf_token %}
                 <input type="submit" value="确认处理" class="default" />
             </form>
-            <a href="{% url 'admin:score_processor_examupload_changelist' %}" class="closelink">返回列表</a>
+            <a href="{% url 'score_analysis:score_processor_examupload_changelist' %}" class="closelink">返回列表</a>
         </div>
     </div>
 </div>

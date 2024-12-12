@@ -1,0 +1,42 @@
+{# templates/admin/score_analysis/statisticsexamindicators/exam_list.html #}
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'score_analysis/css/exam_list.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module" id="changelist">
+        <div class="results">
+            <table id="result_list">
+                <thead>
+                    <tr>
+                        <th>{% trans '考试名称' %}</th>
+                        <th>{% trans '考试时间' %}</th>
+                        <th>{% trans '已生成统计' %}</th>
+                        <th>{% trans '操作' %}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in cl.result_list %}
+
+                    <tr class="{% cycle 'row1' 'row2' %}">
+                        <td>{{ item.exam_name|default:item.exam_id }}</td>
+                        <td>{% item.exam_time %}</td>
+                        <td>{% item.has_statistics %}</td>
+                        <td>{% item.get_action_button %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">{% trans '暂无考试数据' %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

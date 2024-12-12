@@ -1,4 +1,4 @@
-{% extends "admin/base_site.html" %}
+{% extends "score_analysis/base_site.html" %}
 {% load i18n admin_urls static %}
 
 {% block content %}
@@ -71,7 +71,7 @@
         <div class="submit-row">
             {% if cleaning_stats %}
             <!-- 如果有清洗结果，显示下一步按钮 -->
-            <a href="{% url 'admin:score_processor_examupload_mapping' upload.id %}" class="button default">生成统一考号</a>
+            <a href="{% url 'score_analysis:score_processor_examupload_mapping' upload.id %}" class="button default">生成统一考号</a>
             {% else %}
             <!-- 如果没有清洗结果，显示开始清洗按钮 -->
             <form method="post">
@@ -79,7 +79,7 @@
                 <input type="submit" value="开始清洗" class="default" />
             </form>
             {% endif %}
-            <a href="{% url 'admin:score_processor_examupload_changelist' %}" class="closelink">返回列表</a>
+            <a href="{% url 'score_analysis:score_processor_examupload_changelist' %}" class="closelink">返回列表</a>
         </div>
     </div>
 </div>

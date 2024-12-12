@@ -1,4 +1,4 @@
-#from django.contrib import admin
+#from django.contrib import score_analysis
 import numpy as np
 import pandas as pd
 # Register your models here.
@@ -43,7 +43,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
     list_filter = ['status']
     search_fields = ['exam_id']
     readonly_fields = ['uploaded_at', 'status', 'error_message']
-    change_list_template = 'score_processor/upload_list.html'
+    change_list_template = 'admin/score_processor/examupload/upload_list.html'
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}

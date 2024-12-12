@@ -1,0 +1,44 @@
+
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+<link rel="stylesheet" type="text/css" href="{% static 'score_analysis/css/statistics.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ exam_name }} 统计结果</h1>
+
+    <!-- 返回按钮 -->
+    <div class="object-tools">
+        <a href="../" class="historylink">返回列表</a>
+    </div>
+
+    <!-- Tab切换按钮 -->
+    <div class="stats-tabs">
+        <div class="tab-header">
+            <button class="tab-button active" data-tab="science">理科统计</button>
+            <button class="tab-button" data-tab="arts">文科统计</button>
+        </div>
+
+        <!-- 理科内容 -->
+        <div id="science-content" class="tab-content active">
+            {% include "admin/score_analysis/statisticsexamindicators/includes/science_stats.html" %}
+        </div>
+
+        <!-- 文科内容 -->
+        <div id="arts-content" class="tab-content">
+            {% include "admin/score_analysis/statisticsexamindicators/includes/arts_stats.html" %}
+        </div>
+    </div>
+</div>
+
+<!-- 添加数据到页面 -->
+{{ science_data|json_script:"science-data" }}
+{{ arts_data|json_script:"arts-data" }}
+{% endblock %}
+
+{% block extrajs %}
+<script src="{% static 'score_analysis/js/statistics.js' %}"></script>
+{% endblock %}

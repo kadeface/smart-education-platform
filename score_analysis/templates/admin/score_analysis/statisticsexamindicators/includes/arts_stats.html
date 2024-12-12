@@ -1,0 +1,135 @@
+<!-- 文科统计内容 -->
+<div class="stats-summary">
+    <!-- 1. 综述部分 -->
+    <div class="summary-section">
+        <h3>1.2、综述</h3>
+        <p class="summary-text">
+            本次考试文科共有 <span id="arts_school_count">-</span> 所学校，
+            <span id="arts_student_count">-</span> 名考生参加考试。
+            总分平均分 <span id="arts_mean_score">-</span>，
+            最高分 <span id="arts_max_score">-</span>，
+            来自 <span id="arts_top_school">-</span>。
+        </p>
+    </div>
+
+    <!-- 2. 分数线部分 -->
+    <div class="summary-section">
+        <h3>1.2.1、分数线</h3>
+        <p class="summary-text">
+            清北线：<span id="arts_qb_line">-</span>，
+            上线人数：<span id="arts_qb_count">-</span>，
+            上线率：<span id="arts_qb_rate">-</span>%
+        </p>
+        <p class="summary-text">
+            985线：<span id="arts_985_line">-</span>，
+            上线人数：<span id="arts_985_count">-</span>，
+            上线率：<span id="arts_985_rate">-</span>%
+        </p>
+        <p class="summary-text">
+            211线：<span id="arts_211_line">-</span>，
+            上线人数：<span id="arts_211_count">-</span>，
+            上线率：<span id="arts_211_rate">-</span>%
+        </p>
+    </div>
+
+    <!-- 3. 平均分表格 -->
+    <div class="stats-table">
+        <h3>1.2.2、平均分</h3>
+        <div class="table-responsive">
+            <table class="results-table average-scores-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2">统计单位</th>
+                        <th colspan="2">总分</th>
+                        <th colspan="2">语文</th>
+                        <th colspan="2">数学</th>
+                        <th colspan="2">英语</th>
+                        <th colspan="2">政治</th>
+                        <th colspan="2">历史</th>
+                        <th colspan="2">地理</th>
+                    </tr>
+                    <tr>
+                        <th>均分</th>
+                        <th>排名</th>
+                        <th>均分</th>
+                        <th>排名</th>
+                        <th>均分</th>
+                        <th>排名</th>
+                        <th>均分</th>
+                        <th>排名</th>
+                        <th>均分</th>
+                        <th>排名</th>
+                        <th>均分</th>
+                        <th>排名</th>
+                        <th>均分</th>
+                        <th>排名</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="total-row">
+                        <td>总体</td>
+                        <td id="arts_total_avg">-</td>
+                        <td>-</td>
+                        <td id="arts_chinese_avg">-</td>
+                        <td>-</td>
+                        <td id="arts_math_avg">-</td>
+                        <td>-</td>
+                        <td id="arts_english_avg">-</td>
+                        <td>-</td>
+                        <td id="arts_politics_avg">-</td>
+                        <td>-</td>
+                        <td id="arts_history_avg">-</td>
+                        <td>-</td>
+                        <td id="arts_geography_avg">-</td>
+                        <td>-</td>
+                    </tr>
+                    <!-- 学校数据将通过JavaScript动态添加 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. 优秀生分布 -->
+    <div class="stats-table">
+    <h3>1.1.3、优秀生分布</h3>
+    <div class="table-responsive">
+        <table class="results-table">
+            <thead>
+                <tr>
+                    <th>统计单位</th>
+                    <th>前10名</th>
+                    <th>前20名</th>
+                    <th>前50名</th>
+                    <th>前100名</th>
+                    <th>前200名</th>
+                    <th>前500名</th>
+                    <th>前1250名</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>最低分</td>
+                    <td id="science_top10_min">-</td>
+                    <td id="science_top20_min">-</td>
+                    <td id="science_top50_min">-</td>
+                    <td id="science_top100_min">-</td>
+                    <td id="science_top200_min">-</td>
+                    <td id="science_top500_min">-</td>
+                    <td id="science_top1250_min">-</td>
+                </tr>
+                <tr class="total-row">
+                    <td>总体</td>
+                    <td id="science_top10_total">-</td>
+                    <td id="science_top20_total">-</td>
+                    <td id="science_top50_total">-</td>
+                    <td id="science_top100_total">-</td>
+                    <td id="science_top200_total">-</td>
+                    <td id="science_top500_total">-</td>
+                    <td id="science_top1250_total">-</td>
+                </tr>
+                <!-- 学校分布数据将通过JavaScript动态添加 -->
+            </tbody>
+        </table>
+    </div>
+</div>
+</div>

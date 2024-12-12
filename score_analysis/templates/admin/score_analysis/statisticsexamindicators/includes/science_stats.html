@@ -1,0 +1,16 @@
+<!-- 理科统计内容 -->
+<div class="stats-summary">
+    <div class="summary-section">
+        <h3>1.1、综述</h3>
+        <p class="summary-text">
+            本次考试理科共有 <span id="science_school_count">-</span> 所学校，
+            <span id="science_student_count">-</span> 名考生参加考试。
+            总分平均分 <span id="science_mean_score">-</span>，
+            最高分 <span id="science_max_score">-</span>，
+            来自 <span id="science_top_school">-</span>。
+        </p>
+    </div>
+    
+    <!-- 其他统计内容 -->
+    {% include "score_analysis/score_analysis/statisticsexamindicators/includes/science_tables.html" %}
+</div>

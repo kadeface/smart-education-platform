@@ -1,0 +1,12 @@
+{# templates/score_analysis/statistics/statisticsexamindicators/change_list.html #}
+{% extends "score_analysis/change_list.html" %}
+{% load i18n admin_urls %}
+
+{% block object-tools-items %}
+    {% if show_generate_stats %}
+        <li>
+            <a href="{% url 'score_analysis:generate-stats' %}" class="btn btn-high">生成基础统计</a>
+        </li>
+    {% endif %}
+    {{ block.super }}
+{% endblock %}

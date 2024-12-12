@@ -11,7 +11,7 @@ from.models import ExamUpload
 from .services.data_cleaner import DataCleanerService
 import openpyxl
 from django.contrib import messages
-# 在 oldviews.py 或 admin.py 中
+# 在 oldviews.py 或 score_analysis.py 中
 from score_processor.services.score_processor import ScoreProcessorService
 def score_list(request):
     # 获取所有成绩记录
@@ -104,7 +104,7 @@ def upload_scores(request):
             except Exception as e:
                 print(f"上传文件处理错误: {str(e)}")
                 messages.error(request, f'处理文件时出错：{str(e)}')
-                return redirect('upload_scores')
+                return redirect('score_processor:upload_scores')
     else:
         form = ScoreUploadForm()
 
@@ -113,7 +113,7 @@ def confirm_import(request):
     if request.method == 'POST':
         # 这里添加实际的数据导入逻辑
         pass
-    return redirect('score_list')
+    return redirect('score_processor:score_list')
 
 
 def start_mapping(request):
@@ -127,7 +127,7 @@ def start_mapping(request):
 
         if not all([upload_id, cleaned_file_path, exam_id]):
             messages.error(request, '无法获取必要的处理信息')
-            return redirect('upload_scores')
+            return redirect('score_processor:upload_scores')
 
         try:
             # 读取清洗后的数据
@@ -168,7 +168,7 @@ def start_mapping(request):
         except Exception as e:
             print(f"映射错误: {str(e)}")  # 调试信息
             messages.error(request, f'生成统一ID时出错：{str(e)}')
-            return redirect('upload_scores')
+            return redirect('score_processor:upload_scores')
 
     return redirect('upload_scores')
 
@@ -185,7 +185,7 @@ def clean_data(self, request, upload_id):
             success, error = processor.load_file(upload.file.path)
             if not success:
                 messages.error(request, f"文件加载失败: {error}")
-                return redirect('admin:score_processor_examupload_changelist')
+                return redirect('score_analysis:score_processor_examupload_changelist')
 
             # 清洗数据
             result = cleaner.clean_data(processor.df)
@@ -236,7 +236,7 @@ def clean_data(self, request, upload_id):
 
     except Exception as e:
         messages.error(request, f"清洗数据失败: {str(e)}")
-        return redirect('admin:score_processor_examupload_changelist')
+        return redirect('score_analysis:score_processor_examupload_changelist')
 
 
 def save_scores(request):
@@ -355,14 +355,14 @@ def save_scores(request):
                 print(f"最低分：{min(valid_scores)}")
                 print(f"平均分：{sum(valid_scores) / len(valid_scores):.2f}")
             messages.success(request, f'成功保存 {len(score_records)} 条成绩记录')
-            return redirect('score_list')
+            return redirect('score_processor:score_list')
 
         except Exception as e:
             print(f"保存成绩错误: {str(e)}")  # 调试信息
             messages.error(request, f'保存成绩时出错：{str(e)}')
-            return redirect('process_scores')
+            return redirect('score_processor:process_scores')
 
-        return redirect('upload_scores')
+        return redirect('score_processor:upload_scores')
 
 
 def process_scores(self, request):
@@ -370,7 +370,7 @@ def process_scores(self, request):
         upload_id = request.session.get('upload_id')
         if not upload_id:
             messages.error(request, "找不到上传记录")
-            return redirect('.../upload-scores/')
+            return redirect('score_processor:upload-scores')
 
         try:
             upload = ExamUpload.objects.get(id=upload_id)
@@ -392,7 +392,7 @@ def process_scores(self, request):
 
                 messages.success(request, "成绩处理成功")
                 request.session.pop('upload_id', None)
-                return redirect('admin:score_processor_scorestudentbasic_changelist')
+                return redirect('score_analysis:score_processor_scorestudentbasic_changelist')
             else:
                 upload.status = 'FAILED'
                 upload.error_message = result['error']
@@ -405,4 +405,4 @@ def process_scores(self, request):
             upload.save()
             messages.error(request, f"处理失败: {str(e)}")
 
-    return redirect('.../preview-scores/')
+    return redirect('score_processor:preview_scores')

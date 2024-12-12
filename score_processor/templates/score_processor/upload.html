@@ -1,4 +1,4 @@
-{% extends "admin/base_site.html" %}
+{% extends "score_analysis/base_site.html" %}
 {% load i18n admin_urls static %}
 
 {% block content %}
@@ -35,7 +35,7 @@
 
         <div class="submit-row">
             <input type="submit" value="上传文件" class="default" />
-            <a href="{% url 'admin:score_processor_examupload_changelist' %}" class="closelink">取消</a>
+            <a href="{% url 'score_analysis:score_processor_examupload_changelist' %}" class="closelink">取消</a>
         </div>
     </form>
 </div>
