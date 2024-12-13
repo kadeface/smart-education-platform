@@ -54,39 +54,6 @@ class ExamStatisticsService:
             # 记录错误并抛出异常
             raise Exception(f"处理考试统计时发生错误: {str(e)}")
 
-    def _update_total_statistics(self, exam_id, stream_type, level_type):
-        """更新总分统计数据"""
-        # 使用基础服务计算统计值
-        basic_stats = self.base_service.calculate_basic_stats(
-            exam_id, None, stream_type, level_type
-        )
-
-        # 计算分数线达成情况
-        threshold_stats = self.base_service.calculate_threshold_stats(
-            exam_id, stream_type
-        )
-
-        # 计算排名统计
-        ranking_stats = self.base_service.calculate_rankings(
-            exam_id, stream_type, level_type
-        )
-
-        # 更新到统计表
-        indicators = StatisticsExamIndicators.objects.update_or_create(
-            exam_id=exam_id,
-            subject_id=None,  # 总分统计
-            stream_type=stream_type,
-            level_type=level_type,
-            defaults={
-                'mean_score': basic_stats['mean'],
-                'std_dev': basic_stats['std_dev'],
-                'threshold_stats': threshold_stats,
-                **ranking_stats
-            }
-        )
-
-        return indicators[0]
-
     def _update_subject_statistics(self, exam_id, stream_type, level_type):
         """更新学科统计数据"""
         from score_processor.models import BaseSubjectConfig

@@ -1,4 +1,4 @@
-# score_analysis/models/statistics.py
+# score_analysis/models/statistics_service.py
 from django.db import models
 from .base import BaseExamConfig, BaseSubjectConfig
 #from django.core.exceptions import ValidationError
@@ -96,12 +96,6 @@ class ExamScoreLines(models.Model):
     ]
     line_id = models.AutoField(primary_key=True)
     exam_id = models.CharField(max_length=50)
-    select = models.CharField(
-        max_length=10,
-        choices=STREAM_CHOICES,
-        help_text='文理分科(文科/理科)',
-        default='理科'
-    )
     line_type = models.CharField(
         max_length=20,
         choices=LINE_TYPE_CHOICES,
@@ -161,7 +155,7 @@ class StatisticsExamIndicators(models.Model):
     indicator_id = models.BigAutoField(primary_key=True)
     exam = models.ForeignKey('score_processor.BaseExamConfig', models.DO_NOTHING, db_comment='考试ID')
     subject = models.ForeignKey('score_processor.BaseSubjectConfig', models.DO_NOTHING, null=True,
-                                db_comment='科目(为空表示总分)')
+                                db_comment='科目')
     select_type = models.CharField(max_length=10, db_comment='文科/理科')
     level_type = models.CharField(max_length=20, db_comment='分析层级：city/district/school')
 
@@ -171,11 +165,13 @@ class StatisticsExamIndicators(models.Model):
     low_score_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='低分率')
 
     # 排名指标
-    top_10_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前10名最低分')
-    top_50_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前50名最低分')
-    top_100_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前100名最低分')
-    top_200_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前200名最低分')
-    top_1250_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前1250名最低分')
+    top_10_distribution = models.JSONField(null=True, db_comment='前10名分布情况')  # 修改这里
+    top_20_distribution = models.JSONField(null=True, db_comment='前20名分布情况')  # 修改这里
+    top_50_distribution = models.JSONField(null=True, db_comment='前50名分布情况')  # 修改这里
+    top_100_distribution = models.JSONField(null=True, db_comment='前100名分布情况')  # 修改这里
+    top_200_distribution = models.JSONField(null=True, db_comment='前200名分布情况')  # 修改这里
+    top_500_distribution = models.JSONField(null=True, db_comment='前500名分布情况')  # 修改这里
+    top_1250_distribution = models.JSONField(null=True, db_comment='前1250名分布情况')  # 修改这里
 
     # 达线指标
     threshold_stats = models.JSONField(null=True, db_comment='各条线达线统计')  # {line_type: {count, rate}}
@@ -189,16 +185,14 @@ class StatisticsExamIndicators(models.Model):
     max_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='最高分')
     min_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='最低分')
     mean_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='平均分')
-
+    std_dev = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='标准差')
     # 四分位数指标
     q80_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='80分位分数')
     median_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='中位数分数')
     q20_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='20分位分数')
     q10_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='10分位分数')
 
-    # 排名指标（补充）
-    top_20_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前20名最低分')
-    top_500_distribution = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='前500名最低分')
+
 
     # 排名分布
     rank_distribution = models.JSONField(null=True, db_comment='排名分布统计')

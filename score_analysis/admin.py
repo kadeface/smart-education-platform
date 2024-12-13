@@ -14,8 +14,11 @@ from django.shortcuts import redirect
 from .models.base import BaseExamConfig,BaseSubjectConfig
 from .services.ranking_service import RankingService
 from .models.source import ScoreStudentBasic
-from .services.statistics import BaseStatisticsService
+from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
+import logging
+# 获取 logger 实例
+logger = logging.getLogger('django')  # 使用 Django 的默认 logger
 class ExamScoreLinesForm(forms.ModelForm):
     # 自定义表单字段
     exam_id = forms.ChoiceField(label='考试ID')
@@ -408,10 +411,12 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
         exams_with_scores = list(ScoreStudentBasic.objects.values_list('exam_id', flat=True).distinct())
 
         # 2. 获取现有的统计记录，并关联考试名称
+        # 只获取总分记录，避免重复显示
         existing_stats = StatisticsExamIndicators.objects.filter(
             exam_id__in=exams_with_scores,
             select_type='理科',
-            level_type='city'
+            level_type='city',
+            subject_id='total_score'  # 只显示总分记录
         ).annotate(
             exam_name=Subquery(
                 BaseExamConfig.objects.filter(
@@ -428,7 +433,8 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                     StatisticsExamIndicators(
                         exam_id=exam_id,
                         select_type='理科',
-                        level_type='city'
+                        level_type='city',
+                        subject_id='total_score'  # 确保新建记录是总分
                     )
                 )
             if stats_to_create:
@@ -437,7 +443,8 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 return StatisticsExamIndicators.objects.filter(
                     exam_id__in=exams_with_scores,
                     select_type='理科',
-                    level_type='city'
+                    level_type='city',
+                    subject_id='total_score'  # 只返回总分记录
                 ).annotate(
                     exam_name=Subquery(
                         BaseExamConfig.objects.filter(
@@ -447,6 +454,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 )
 
         return existing_stats
+
     def exam_id(self, obj):
         """获取考试名称"""
         return getattr(obj, 'exam_name', obj.exam_id)
@@ -469,61 +477,108 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
 
     def has_statistics(self, obj):
         """是否已生成统计"""
-        if obj.student_count:
-            return mark_safe('<span style="color: green;">✓</span>')
-        return mark_safe('<span style="color: red;">✗</span>')
+        try:
+            # 检查是否存在统计数据
+            has_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=obj.exam_id,
+                subject_id='total_score',  # 检查总分统计
+                student_count__gt=0  # 确保 student_count 大于 0
+            ).exists()
+
+            if has_stats:
+                return mark_safe('<span style="color: green;">✓</span>')
+            return mark_safe('<span style="color: red;">✗</span>')
+        except Exception as e:
+            logger.error(f"检查统计状态失败: {str(e)}")
+            return mark_safe('<span style="color: red;">✗</span>')
 
     has_statistics.short_description = '已生成统计'
 
 
     def get_action_button(self, obj):
         """获取操作按钮"""
-        button_text = "重新统计" if obj.student_count else "生成统计"
+        try:
+            # 检查是否存在有效的统计数据
+            has_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=obj.exam_id,
+                subject_id='total_score',
+                student_count__gt=0
+            ).exists()
 
-        generate_url = reverse(
-            'admin:score_analysis_statisticsexamindicators_generate',
-            args=[obj.exam_id]
-        )
+            button_text = "重新统计" if has_stats else "生成统计"
 
-        buttons = [
-            f'<a class="button" style="background-color: #79aec8; padding: 5px 10px; '
-            f'color: white; text-decoration: none; border-radius: 4px; margin-right: 5px;" '
-            f'href="{generate_url}">{button_text}</a>'
-        ]
-
-        if obj.student_count:
-            view_url = reverse(
-                'score_analysis:score_analysis_statisticsexamindicators_view',
+            generate_url = reverse(
+                'admin:score_analysis_statisticsexamindicators_generate_statistics',
                 args=[obj.exam_id]
             )
-            buttons.append(
-                f'<a class="button" style="background-color: #417690; padding: 5px 10px; '
-                f'color: white; text-decoration: none; border-radius: 4px;" '
-                f'href="{view_url}">查看结果</a>'
-            )
 
-        return mark_safe(''.join(buttons))
+            buttons = [
+                f'<a class="button" style="background-color: #79aec8; padding: 5px 10px; '
+                f'color: white; text-decoration: none; border-radius: 4px; margin-right: 5px;" '
+                f'href="{generate_url}">{button_text}</a>'
+            ]
 
+            if has_stats:
+                view_url = reverse(
+                    'admin:score_analysis_statisticsexamindicators_view_statistics',
+                    args=[obj.exam_id]
+                )
+                buttons.append(
+                    f'<a class="button" style="background-color: #417690; padding: 5px 10px; '
+                    f'color: white; text-decoration: none; border-radius: 4px;" '
+                    f'href="{view_url}">查看结果</a>'
+                )
+
+            return mark_safe(''.join(buttons))
+        except Exception as e:
+            logger.error(f"生成操作按钮失败: {str(e)}")
+            return "操作失败"
     def generate_statistics(self, request, exam_id):
         """生成统计数据"""
         try:
-            print(f"开始生成统计数据: exam_id={exam_id}")  # 调试日志
+            print(f"开始生成统计数据: exam_id={exam_id}")
             service = BaseStatisticsService()
 
-            # 生成理科和文科的统计
-            service.generate_all_statistics(exam_id, '理科', 'city')
-            service.generate_all_statistics(exam_id, '文科', 'city')
+            # 解析考试ID获取考试级别
+            # 格式示例: 202411-DIST-H 或 202411-CITY-H
+            exam_parts = exam_id.split('-')
+            if len(exam_parts) < 2:
+                raise ValueError(f"无效的考试ID格式: {exam_id}")
 
-            messages.success(request, f'考试 {exam_id} 的统计数据已生成')
+            exam_level = exam_parts[1].upper()  # DIST 或 CITY
 
-            # 打印重定向URL
-            redirect_url = f'../view-statistics/{exam_id}/'
-            print(f"重定向到: {redirect_url}")  # 调试日志
+            # 删除旧的统计数据
+            StatisticsExamIndicators.objects.filter(
+                exam_id=exam_id,
+                subject_id__isnull=True
+            ).delete()
 
-            return redirect(redirect_url)
+            if exam_level == 'CITY':
+                # 市级考试需要生成市级和区县级统计
+                # 1. 生成市级统计
+                service.generate_all_statistics(request, exam_id, '理科', 'city')
+                service.generate_all_statistics(request, exam_id, '文科', 'city')
+
+                # 2. 生成区县级统计
+                service.generate_all_statistics(request, exam_id, '理科', 'district')
+                service.generate_all_statistics(request, exam_id, '文科', 'district')
+
+                messages.success(request, f'考试 {exam_id} 的市级和区县级统计数据已生成')
+
+            elif exam_level == 'DIST':
+                # 区县考试只生成区县级统计
+                service.generate_all_statistics(request, exam_id, '理科', 'district')
+                service.generate_all_statistics(request, exam_id, '文科', 'district')
+
+                messages.success(request, f'考试 {exam_id} 的区县级统计数据已生成')
+
+            else:
+                raise ValueError(f"未知的考试级别: {exam_level}")
+
+            return redirect(f'../view-statistics/{exam_id}/')
 
         except Exception as e:
-            print(f"生成统计失败: {str(e)}")  # 调试日志
+            print(f"生成统计失败: {str(e)}")
             messages.error(request, f'考试 {exam_id} 统计数据生成失败: {str(e)}')
             return redirect('../')
 
@@ -533,10 +588,10 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
         custom_urls = [
             path('generate-statistics/<str:exam_id>/',
                  self.admin_site.admin_view(self.generate_statistics),
-                 name='score_analysis_statisticsexamindicators_generate'),
+                 name='score_analysis_statisticsexamindicators_generate_statistics'),
             path('view-statistics/<str:exam_id>/',
                  self.admin_site.admin_view(self.view_statistics),
-                 name='score_analysis_statisticsexamindicators_view'),
+                 name='score_analysis_statisticsexamindicators_view_statistics'),
         ]
         return custom_urls + urls
 
