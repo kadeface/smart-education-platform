@@ -1,0 +1,236 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+{# 在头部添加样式引用 #}
+{% block extrastyle %}
+    {{ block.super }}
+    <!-- DEBUG: CSS URL = {% static 'score_analysis/css/statistics.css' %} -->
+    <link rel="stylesheet" type="text/css" href="{% static 'score_analysis/css/statistics.css' %}">
+{% endblock %}
+
+{% block content %}
+    <!-- 调试信息开始 -->
+<div style="background: #f0f0f0; padding: 20px; margin: 20px; border: 1px solid #ccc;">
+    <h3>调试信息</h3>
+    <p>science_rankings 类型: {{ science_rankings|default:"无数据" }}</p>
+    <p>science_rankings 内容:</p>
+    <pre>{{ science_rankings }}</pre>
+    <hr>
+    <p>arts_rankings 类型: {{ arts_rankings|default:"无数据" }}</p>
+    <p>arts_rankings 内容:</p>
+    <pre>{{ arts_rankings }}</pre>
+</div>
+<!-- 调试信息结束 -->
+<div class="statistics-container">
+    <!-- 考试概况标题 -->
+    <div class="section-title">
+        <h2>1.1.1、考试概况</h2>
+    </div>
+
+    <!-- 理科综述 -->
+    <div class="summary-section">
+        <h3>理科综述</h3>
+        <div class="summary-text">
+            本次考试，总计有<span class="number-highlight">8</span>所学校，
+            参考总人数<span class="number-highlight">2123</span>人。
+            平均分为<span class="score-highlight">378.72</span>分，
+            最高分为<span class="score-highlight">601.5</span>分，
+            归属于<span class="school-highlight">开平市第一中学</span>。
+            C9层模拟上线（<span class="score-highlight">615.0</span>分）
+            人数<span class="number-highlight">0</span>人
+            （<span class="rate-highlight">0.0%</span>）
+            985层模拟上线（<span class="score-highlight">558.0</span>分）
+            人数<span class="number-highlight">30</span>人
+            （<span class="rate-highlight">1.41%</span>）
+            211层模拟上线（<span class="score-highlight">532.0</span>分）
+            人数<span class="number-highlight">86</span>人
+            （<span class="rate-highlight">4.05%</span>）
+            双一流层模拟上线（<span class="score-highlight">511.0</span>分）
+            人数<span class="number-highlight">141</span>人
+            （<span class="rate-highlight">6.64%</span>）
+            优分层模拟上线（<span class="score-highlight">477.0</span>分）
+            人数<span class="number-highlight">313</span>人
+            （<span class="rate-highlight">14.74%</span>）
+            本科层模拟上线（<span class="score-highlight">382.0</span>分）
+            人数<span class="number-highlight">1130</span>人
+            （<span class="rate-highlight">53.23%</span>）
+        </div>
+    </div>
+
+    <!-- 文科综述 -->
+    <div class="summary-section">
+        <h3>文科综述</h3>
+        <div class="summary-text">
+            本次考试，总计有<span class="number-highlight">8</span>所学校，
+            参考总人数<span class="number-highlight">1854</span>人。
+            平均分为<span class="score-highlight">347.73</span>分，
+            最高分为<span class="score-highlight">609.5</span>分，
+            归属于<span class="school-highlight">开平市第一中学</span>。
+            C9层模拟上线（<span class="score-highlight">620.0</span>分）
+            人数<span class="number-highlight">0</span>人
+            （<span class="rate-highlight">0.0%</span>）
+            985层模拟上线（<span class="score-highlight">567.0</span>分）
+            人数<span class="number-highlight">14</span>人
+            （<span class="rate-highlight">0.76%</span>）
+            211层模拟上线（<span class="score-highlight">556.0</span>分）
+            人数<span class="number-highlight">22</span>人
+            （<span class="rate-highlight">1.19%</span>）
+            双一流层模拟上线（<span class="score-highlight">520.0</span>分）
+            人数<span class="number-highlight">56</span>人
+            （<span class="rate-highlight">3.02%</span>）
+            优分层模拟上线（<span class="score-highlight">507.0</span>分）
+            人数<span class="number-highlight">74</span>人
+            （<span class="rate-highlight">3.99%</span>）
+            本科层模拟上线（<span class="score-highlight">401.0</span>分）
+            人数<span class="number-highlight">504</span>人
+            （<span class="rate-highlight">27.18%</span>）
+        </div>
+    </div>
+</div>
+
+
+<div class="score-distribution-section">
+    <div class="subject-tabs">
+        <input type="radio" id="science-tab" name="subject" checked>
+        <label for="science-tab" class="tab-button">理科分数线分布</label>
+
+        <input type="radio" id="arts-tab" name="subject">
+        <label for="arts-tab" class="tab-button">文科分数线分布</label>
+
+        <!-- 理科分数线表格 -->
+        <div class="stats-table science-content">
+            <div class="table-responsive">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>分数线名称</th>
+                            <th>分数线</th>
+                            <th>学生人数</th>
+                            <th>占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for level, data in science_score_lines.items %}
+                        <tr>
+                            <td>{{ level }}</td>
+                            <td class="score-value">>= {{ data.line }}</td>
+                            <td class="count-value">{{ data.count }}</td>
+                            <td class="rate-value">{{ data.rate }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 文科分数线表格 -->
+        <div class="stats-table arts-content">
+            <div class="table-responsive">
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>分数线名称</th>
+                            <th>分数线</th>
+                            <th>学生人数</th>
+                            <th>占比</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for level, data in arts_score_lines.items %}
+                        <tr>
+                            <td>{{ level }}</td>
+                            <td class="score-value">>= {{ data.line }}</td>
+                            <td class="count-value">{{ data.count }}</td>
+                            <td class="rate-value">{{ data.rate }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- 总分排名分布情况 -->
+<div class="score-distribution-section">
+    <h3>总分排名分布情况</h3>
+
+    <!-- 文理科切换按钮 -->
+    <div class="subject-tabs">
+        <input type="radio" id="rank-science-tab" name="rank-subject" checked>
+        <label for="rank-science-tab" class="tab-button">理科排名分布</label>
+
+        <input type="radio" id="rank-arts-tab" name="rank-subject">
+        <label for="rank-arts-tab" class="tab-button">文科排名分布</label>
+
+        <!-- 理科排名分布表格 -->
+        <div class="rank-science-content">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>学校</th>
+                        <th>前10名</th>
+                        <th>前20名</th>
+                        <th>前50名</th>
+                        <th>前100名</th>
+                        <th>前200名</th>
+                        <th>前500名</th>
+                        <th>前1250名</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for school, ranks in science_rankings.items %}
+                    <tr>
+                        <td>{{ school }}</td>
+                        <td class="count-value">{{ ranks.top_10 }}</td>
+                        <td class="count-value">{{ ranks.top_20 }}</td>
+                        <td class="count-value">{{ ranks.top_50 }}</td>
+                        <td class="count-value">{{ ranks.top_100 }}</td>
+                        <td class="count-value">{{ ranks.top_200 }}</td>
+                        <td class="count-value">{{ ranks.top_500 }}</td>
+                        <td class="count-value">{{ ranks.top_1250 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 文科排名分布表格 -->
+        <div class="rank-arts-content">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>学校</th>
+                        <th>前10名</th>
+                        <th>前20名</th>
+                        <th>前50名</th>
+                        <th>前100名</th>
+                        <th>前200名</th>
+                        <th>前500名</th>
+                        <th>前1250名</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for school, ranks in arts_rankings.items %}
+                    <tr>
+                        <td>{{ school }}</td>
+                        <td class="count-value">{{ ranks.top_10 }}</td>
+                        <td class="count-value">{{ ranks.top_20 }}</td>
+                        <td class="count-value">{{ ranks.top_50 }}</td>
+                        <td class="count-value">{{ ranks.top_100 }}</td>
+                        <td class="count-value">{{ ranks.top_200 }}</td>
+                        <td class="count-value">{{ ranks.top_500 }}</td>
+                        <td class="count-value">{{ ranks.top_1250 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
+
+{% block extrajs %}
+    {{ block.super }}
+
+{% endblock %}

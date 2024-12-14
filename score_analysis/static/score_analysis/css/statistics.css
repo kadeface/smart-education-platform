@@ -1,81 +1,311 @@
-/* 整体布局 */
-.stats-summary {
+/* 考试概况标题 */
+.section-title {
+    margin: 30px 0 20px;
+    padding-left: 15px;
+    border-left: 4px solid #00bfa5;
+}
+
+.section-title h2 {
+    color: #1d3557;
+    font-size: 1.6em;
+    font-weight: 600;
+    margin: 0;
+}
+
+/* 综述部分样式 */
+.summary-section {
+    margin-bottom: 30px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     padding: 20px;
 }
 
-.summary-section {
-    margin-bottom: 30px;
+.summary-section h3 {
+    color: #1d3557;
+    font-size: 1.4em;
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #00bfa5;
 }
 
 .summary-text {
-    line-height: 1.6;
-    color: #333;
+    line-height: 2;
+    color: #2c3e50;
+    font-size: 1.1em;
 }
 
-/* 表格样式 */
-.stats-table {
-    margin-bottom: 40px;
+/* 数字样式 */
+.number-highlight {
+    color: #0052cc;
+    font-weight: 600;
+    background-color: #deebff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-.table-responsive {
-    overflow-x: auto;
+/* 分数样式 */
+.score-highlight {
+    color: #bf2600;
+    font-weight: 600;
+    background-color: #ffebe6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-.results-table {
-    width: 100%;
-    border-collapse: collapse;
+/* 学校名称样式 */
+.school-highlight {
+    color: #006644;
+    font-weight: 600;
+    background-color: #e3fcef;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* 比率样式 */
+.rate-highlight {
+    color: #006644;
+    font-weight: 600;
+    background-color: #e3fcef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+}
+
+/* 分数线信息样式 */
+.score-lines {
     margin-top: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
-.results-table th,
-.results-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: center;
-}
-
-.results-table th {
-    background-color: #f5f5f5;
-    font-weight: bold;
-}
-
-.total-row {
+.score-line-item {
     background-color: #f8f9fa;
-    font-weight: bold;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 0.95em;
 }
 
-/* Tab切换样式 */
-.stats-tabs {
-    margin-top: 20px;
+/* 分数线数值样式 */
+.score-line-item .score-value {
+    color: #bf2600;
+    font-weight: 600;
+    background-color: #ffebe6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-.tab-header {
-    margin-bottom: 20px;
+/* 人数样式 */
+.score-line-item .count-value {
+    color: #0052cc;
+    font-weight: 600;
+    background-color: #deebff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-.tab-button {
-    padding: 10px 20px;
-    border: none;
-    background-color: #f0f0f0;
-    cursor: pointer;
-    margin-right: 5px;
+/* 比率样式 */
+.score-line-item .rate-value {
+    color: #006644;
+    font-weight: 600;
+    background-color: #e3fcef;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-.tab-button.active {
-    background-color: #417690;
-    color: white;
+/* 分数线数据样式 */
+.score-line-item {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 12px 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border-left: 4px solid #1d3557;
+    margin: 8px 0;
 }
 
-.tab-content {
+.score-value {
+    color: #c41d7f;  /* 玫红色 */
+    font-weight: 600;
+    font-size: 1.2em;
+    background-color: #fff0f6;  /* 浅粉色背景 */
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.count-value {
+    color: #1d39c4;  /* 靛蓝色 */
+    font-weight: 600;
+    font-size: 1.2em;
+    background-color: #f0f5ff;  /* 浅靛蓝背景 */
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.rate-value {
+    color: #08979c;  /* 青色 */
+    font-weight: 600;
+    font-size: 1.2em;
+    background-color: #e6fffb;  /* 浅青色背景 */
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* 分数线分布部分样式 */
+.score-distribution-section {
+    margin: 30px 0;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.subject-tabs {
+    padding: 15px 15px 0;  /* 减小padding */
+    margin-bottom: -10px;  /* 使用负margin减少与表格的间距 */
+}
+
+/* 隐藏radio按钮 */
+.subject-tabs input[type="radio"] {
     display: none;
 }
 
-.tab-content.active {
+/* 标签样式 */
+.tab-button {
+    display: inline-block;
+    padding: 8px 20px;  /* 减小按钮高度 */
+    margin-right: 5px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;  /* 更小的圆角 */
+    color: #666;
+    font-size: 1em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #fff;  /* 默认白色背景 */
+}
+
+/* 内容区域默认隐藏 */
+.science-content,
+.arts-content {
+    display: none;
+    margin-top: 0;  /* 移除顶部间距 */
+}
+
+/* 选中理科时的样式 */
+#science-tab:checked ~ .science-content {
+    display: block;
+}
+#science-tab:checked + .tab-button {
+    background-color: #00bfa5;  /* 使用图片中的青色 */
+    color: white;
+    border-color: #00bfa5;
+}
+
+/* 选中文科时的样式 */
+#arts-tab:checked ~ .arts-content {
+    display: block;
+}
+#arts-tab:checked + .tab-button {
+    background-color: #00bfa5;  /* 使用图片中的青色 */
+    color: white;
+    border-color: #00bfa5;
+}
+/* 未选中状态的样式 */
+.tab-button:not(:checked) + .tab-button {
+    background-color: #fff;
+    color: #666;
+    border-color: #e0e0e0;
+}
+/* 表格样式 */
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0;  /* 移除表格顶部间距 */
+}
+
+.results-table th {
+    background-color: #00bfa5;
+    color: white;
+    padding: 12px;
+    text-align: center;
+}
+
+.results-table td {
+    padding: 10px;
+    text-align: center;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+/* 数据单元格样式 */
+.results-table td.score-value {
+    color: #ff4081;  /* 分数使用粉红色 */
+}
+
+.results-table td.count-value {
+    color: #2196f3;  /* 人数使用蓝色 */
+}
+
+.results-table td.rate-value {
+    color: #00bfa5;  /* 比率使用青色 */
+}
+
+/* 表格行样式 */
+.results-table tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+/* 排名分布样式*/
+.results-table1 {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.results-table1 th,
+.results-table1 td {
+    padding: 8px;
+    text-align: center;
+    border: 1px solid #ddd;
+}
+
+.results-table1 th {
+    background-color: #f5f5f5;
+}
+
+.results-table1 tr:hover {
+    background-color: #f9f9f9;
+}
+
+/* 排名分布部分特定样式 */
+#rank-science-tab:checked + .tab-button {
+    background-color: #00bfa5;
+    color: white;
+    border-color: #00bfa5;
+}
+
+#rank-arts-tab:checked + .tab-button {
+    background-color: #00bfa5;
+    color: white;
+    border-color: #00bfa5;
+}
+
+/* 排名内容区域默认隐藏 */
+.rank-science-content,
+.rank-arts-content {
+    display: none;
+}
+
+/* 显示选中的排名内容 */
+#rank-science-tab:checked ~ .rank-science-content {
     display: block;
 }
 
-/* 数据高亮 */
-.highlight {
-    color: #417690;
-    font-weight: bold;
+#rank-arts-tab:checked ~ .rank-arts-content {
+    display: block;
 }
