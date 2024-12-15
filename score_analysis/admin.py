@@ -645,11 +645,6 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             science_rankings = self._process_rank_distribution(science_stats)
             arts_rankings = self._process_rank_distribution(arts_stats)
 
-            # 添加日志输出，帮助调试
-            #logger.info(f"Science stats: {science_stats}")
-            #logger.info(f"Science summary: {science_summary}")
-            #logger.info(f"Arts stats: {arts_stats}")
-            #logger.info(f"Arts summary: {arts_summary}")
             science_rankings = dict(sorted(
                 science_rankings.items(),
                 key=lambda x: x[1]['top_10'],
@@ -661,6 +656,9 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 key=lambda x: x[1]['top_10'],
                 reverse=True
             ))
+            #6处理四分位数分析
+            science_quartiles = self._process_quartile_analysis(science_stats, 'science')
+            arts_quartiles = self._process_quartile_analysis(arts_stats, 'arts')
             context = {
                 'title': f'{exam.exam_name} - 统计结果',
                 'exam_id': exam_id,
@@ -671,6 +669,8 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 'arts_score_lines': arts_score_lines,
                 'science_rankings': science_rankings,  # 添加排名数据
                 'arts_rankings': arts_rankings,      # 添加排名数据
+                'science_quartiles': science_quartiles,  # 添加四分位数数据
+                'arts_quartiles': arts_quartiles,# 添加四分位数数据
                 **self.admin_site.each_context(request),
             }
             #3 获取文科理科的分数线数据
@@ -685,7 +685,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             logger.error(f"获取统计数据失败: {str(e)}")
             messages.error(request, f'获取统计数据失败: {str(e)}')
             return redirect('admin:score_analysis_statisticsexamindicators_changelist')
-
+    #区县学校分数线分布情况
     def _process_school_distribution(self, school_distribution_json):
         """处理学校分布数据"""
         if not school_distribution_json:
@@ -723,7 +723,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             'max_score': max_score,
             'top_school': top_school
         }
-
+    #分数线达线情况
     def _score_line_distribution(self, stats_obj):
         """处理分数线分布数据"""
         if not stats_obj or not stats_obj.threshold_stats:
@@ -741,7 +741,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
         except Exception as e:
             logger.error(f"解析threshold_stats失败: {str(e)}")
             return {}
-
+    #各校的排名分布
     def _process_rank_distribution(self, stats):
         # 从stats中获取rank_distribution并解析JSON
         print("原始数据:", stats.rank_distribution)
@@ -770,7 +770,52 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 school_rankings[school][rank_level] = count
         print("处理后的数据:", school_rankings)
         return school_rankings
+    #四分位分布情况
+    def _process_quartile_analysis(self, stats, subject_type='science'):
+        """处理四分位分析数据"""
+        if not stats:
+            return {}
 
+        # 定义所有需要分析的科目
+        base_subjects = {
+            'total_score': '总分',
+            'chinese': '语文',
+            'math': '数学',
+            'english': '英语',
+            'chemistry': '化学',
+            'biology': '生物',
+            'politics': '政治',
+            'geography': '地理'
+        }
+
+        # 根据文理科添加特定科目
+        if subject_type == 'science':
+            base_subjects['physics'] = '物理'
+        elif subject_type == 'arts':
+            base_subjects['history'] = '历史'
+
+        quartile_data = {}
+
+        # 获取每个科目的统计数据
+        for subject_code, subject_name in base_subjects.items():
+            subject_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=stats.exam_id,
+                select_type=stats.select_type,
+                subject_id=subject_code,
+                student_count__gt=0
+            ).first()
+
+            if subject_stats:
+                quartile_data[subject_name] = {
+                    'mean': subject_stats.mean_score,
+                    'max': subject_stats.max_score,
+                    'q80': subject_stats.q80_score,
+                    'median': subject_stats.median_score,
+                    'q20': subject_stats.q20_score,
+                    'q10': subject_stats.q10_score
+                }
+
+        return quartile_data
     def _prepare_subject_data(self, stats, score_lines, select_type):
         """准备学科统计数据"""
         if not stats:

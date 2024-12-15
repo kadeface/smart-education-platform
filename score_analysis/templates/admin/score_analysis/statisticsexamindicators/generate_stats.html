@@ -8,22 +8,11 @@
 {% endblock %}
 
 {% block content %}
-    <!-- 调试信息开始 -->
-<div style="background: #f0f0f0; padding: 20px; margin: 20px; border: 1px solid #ccc;">
-    <h3>调试信息</h3>
-    <p>science_rankings 类型: {{ science_rankings|default:"无数据" }}</p>
-    <p>science_rankings 内容:</p>
-    <pre>{{ science_rankings }}</pre>
-    <hr>
-    <p>arts_rankings 类型: {{ arts_rankings|default:"无数据" }}</p>
-    <p>arts_rankings 内容:</p>
-    <pre>{{ arts_rankings }}</pre>
-</div>
-<!-- 调试信息结束 -->
+
 <div class="statistics-container">
     <!-- 考试概况标题 -->
     <div class="section-title">
-        <h2>1.1.1、考试概况</h2>
+        <h2>考试概况</h2>
     </div>
 
     <!-- 理科综述 -->
@@ -89,6 +78,7 @@
 
 
 <div class="score-distribution-section">
+<h3>分数线达线分布</h3>
     <div class="subject-tabs">
         <input type="radio" id="science-tab" name="subject" checked>
         <label for="science-tab" class="tab-button">理科分数线分布</label>
@@ -151,7 +141,7 @@
 </div>
 <!-- 总分排名分布情况 -->
 <div class="score-distribution-section">
-    <h3>总分排名分布情况</h3>
+    <h3>总分排名分布</h3>
 
     <!-- 文理科切换按钮 -->
     <div class="subject-tabs">
@@ -226,7 +216,79 @@
         </div>
     </div>
 </div>
+<!-- 四分位分析 -->
+<div class="quartile-section">
+    <h3>各科四分位分析</h3>
 
+    <!-- 文理科切换按钮 -->
+    <div class="quartile-tabs">
+        <input type="radio" id="quartile-science-tab" name="quartile-subject" checked>
+        <label for="quartile-science-tab" class="tab-button">理科四分位</label>
+
+        <input type="radio" id="quartile-arts-tab" name="quartile-subject">
+        <label for="quartile-arts-tab" class="tab-button">文科四分位</label>
+
+        <!-- 理科四分位表格 -->
+        <div class="quartile-science-content quartile-content">
+            <table class="quartile-table">
+                <thead>
+                    <tr>
+                        <th>学科</th>
+                        <th>平均分</th>
+                        <th>最高分</th>
+                        <th>80%位</th>
+                        <th>中位数</th>
+                        <th>20%位</th>
+                        <th>10%位</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subject, scores in science_quartiles.items %}
+                    <tr>
+                        <td>{{ subject }}</td>
+                        <td class="count-value">{{ scores.mean|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.max|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.q80|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.median|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.q20|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.q10|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 文科四分位表格 -->
+        <div class="quartile-arts-content quartile-content">
+            <table class="quartile-table">
+                <thead>
+                    <tr>
+                        <th>学科</th>
+                        <th>平均分</th>
+                        <th>最高分</th>
+                        <th>80%位</th>
+                        <th>中位数</th>
+                        <th>20%位</th>
+                        <th>10%位</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subject, scores in arts_quartiles.items %}
+                    <tr>
+                        <td>{{ subject }}</td>
+                        <td class="count-value">{{ scores.mean|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.max|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.q80|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.median|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.q20|floatformat:2 }}</td>
+                        <td class="count-value">{{ scores.q10|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
 
