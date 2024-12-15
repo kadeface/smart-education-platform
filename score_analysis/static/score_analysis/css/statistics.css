@@ -444,3 +444,151 @@
 .quartile-table tbody tr:hover {
     background-color: #f5f5f5;
 }
+
+/* 各校各科平均分分析样式 */
+.school-means-section {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.school-means-section h3 {
+    color: #1d3557;
+    font-size: 1.4em;
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #00bfa5;
+}
+
+/* 文理科切换按钮样式 */
+.school-means-tabs {
+    margin-bottom: 20px;
+}
+
+.school-means-tabs input[type="radio"] {
+    display: none;
+}
+
+.school-means-tabs label.tab-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: white;
+    color: black;
+    border-color: #00bfa5;
+    cursor: pointer;
+    border-radius: 4px;
+    margin-right: 10px;
+    transition: all 0.3s ease;
+}
+
+.school-means-tabs input[type="radio"]:checked + label.tab-button {
+    background-color: #00bfa5;
+    color: white;
+}
+
+/* 内容切换 */
+.means-content {
+    display: none;
+}
+
+#means-science-tab:checked ~ .means-science-content {
+    display: block;
+}
+
+#means-arts-tab:checked ~ .means-arts-content {
+    display: block;
+}
+
+/* 表格样式 */
+.means-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background-color: #fff;
+}
+
+.means-table th {
+    background-color: #f5f5f5;
+    padding: 12px 8px;
+    text-align: center;
+    font-weight: bold;
+    color: #333;
+    border: 1px solid #ddd;
+    white-space: nowrap;
+}
+
+.means-table td {
+    padding: 10px 8px;
+    text-align: center;
+    border: 1px solid #ddd;
+}
+
+/* 数据列样式 */
+.means-table .count-value {
+    color: #2196F3;  /* 蓝色 */
+    font-weight: 500;
+}
+
+.means-table .score-value {
+    color: #E91E63;  /* 粉红色 */
+    font-weight: 500;
+}
+
+/* 表格行交替颜色 */
+.means-table tr:nth-child(even) {
+    background-color: #fdeef4;
+}
+.means-table tr:nth-child(odd) {
+    background-color: #eef3fd;  /* 奇数行的背景色 */
+}
+.means-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+/* 表格滚动 */
+.means-content {
+    overflow-x: auto;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+/* 固定表头和第一列 */
+.means-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: #00bea4 !important;
+}
+
+.means-table td:first-child,
+.means-table th:first-child {
+    position: sticky;
+    left: 0;
+    background-color: inherit;
+    z-index: 1;
+}
+
+.means-table th:first-child {
+    z-index: 3;
+}
+
+/* 响应式布局 */
+@media screen and (max-width: 768px) {
+    .school-means-section {
+        padding: 10px;
+    }
+
+    .school-means-tabs label.tab-button {
+        padding: 8px 15px;
+        font-size: 14px;
+    }
+
+    .means-table th,
+    .means-table td {
+        padding: 8px 6px;
+        font-size: 14px;
+    }
+}

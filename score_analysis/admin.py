@@ -612,21 +612,23 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             exam = BaseExamConfig.objects.filter(exam_id=exam_id).first()
             if not exam:
                 raise ValueError(f"未找到考试ID: {exam_id}")
+            # 获取考试级别
+            level_type = self._get_exam_statistics(exam_id)
 
             # 2. 获取理科和文科的统计数据
             science_stats = StatisticsExamIndicators.objects.filter(
                 exam_id=exam_id,
                 select_type='理科',
-                subject_id='total_score',  # 修改这里，使用 total_score
-                #level_type='city'
+                subject_id='total_score',
+                level_type=level_type,
                 student_count__gt=0
             ).first()
 
             arts_stats = StatisticsExamIndicators.objects.filter(
                 exam_id=exam_id,
                 select_type='文科',
-                subject_id='total_score',  # 修改这里，使用 total_score
-                #level_type='city'
+                subject_id='total_score',
+                level_type=level_type,
                 student_count__gt=0
             ).first()
 
@@ -659,18 +661,24 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             #6处理四分位数分析
             science_quartiles = self._process_quartile_analysis(science_stats, 'science')
             arts_quartiles = self._process_quartile_analysis(arts_stats, 'arts')
+            # 7处理各校各科平均分分析
+            science_school_means = self._process_school_subject_means(science_stats, 'science')
+            arts_school_means = self._process_school_subject_means(arts_stats, 'arts')
+
             context = {
                 'title': f'{exam.exam_name} - 统计结果',
                 'exam_id': exam_id,
                 'exam_name': exam.exam_name,
-                'science_summary': science_summary,
-                'arts_summary': arts_summary,
-                'science_score_lines': science_score_lines,
-                'arts_score_lines': arts_score_lines,
+                'science_summary': science_summary,#理科综述数据
+                'arts_summary': arts_summary,#文科综述数据
+                'science_score_lines': science_score_lines,#添加理科分数线数据
+                'arts_score_lines': arts_score_lines,#添加文科分数线数据
                 'science_rankings': science_rankings,  # 添加排名数据
                 'arts_rankings': arts_rankings,      # 添加排名数据
                 'science_quartiles': science_quartiles,  # 添加四分位数数据
                 'arts_quartiles': arts_quartiles,# 添加四分位数数据
+                'science_school_means': science_school_means, #理科平均分
+                'arts_school_means': arts_school_means,  #文科平均分
                 **self.admin_site.each_context(request),
             }
             #3 获取文科理科的分数线数据
@@ -685,6 +693,15 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             logger.error(f"获取统计数据失败: {str(e)}")
             messages.error(request, f'获取统计数据失败: {str(e)}')
             return redirect('admin:score_analysis_statisticsexamindicators_changelist')
+    #获取考试的类型（江门市统考或者开平市统考）
+    def _get_exam_statistics(self, exam_id):
+        """获取考试统计数据"""
+
+        # 判断考试类型并返回对应的level_type
+        if 'CITY' in exam_id:
+            return 'city'  # 地市级统考
+        else:
+            return '开平市'  # 默认为区县级别（开平市）
     #区县学校分数线分布情况
     def _process_school_distribution(self, school_distribution_json):
         """处理学校分布数据"""
@@ -744,9 +761,12 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
     #各校的排名分布
     def _process_rank_distribution(self, stats):
         # 从stats中获取rank_distribution并解析JSON
-        print("原始数据:", stats.rank_distribution)
+        if not stats or not stats.rank_distribution:
+            # 如果统计数据为空或没有排名分布数据，返回空字典
+            return {}
+        #print("原始数据:", stats.rank_distribution)
         rank_data = json.loads(stats.rank_distribution)
-        print("解析后数据:", rank_data)
+       # print("解析后数据:", rank_data)
 
         # 获取所有学校
         schools = set()
@@ -816,6 +836,86 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 }
 
         return quartile_data
+    #各校的平均分列表
+    def _process_school_subject_means(self, stats, exam_type):
+        """处理各校各科平均分数据"""
+        try:
+            if not stats:
+                return {'subjects': [], 'schools': []}
+
+            exam_id = stats.exam_id
+            select_type = '理科' if exam_type == 'science' else '文科'
+            level_type = stats.level_type
+
+            # 获取所有科目的统计数据
+            all_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=exam_id,
+                select_type=select_type,
+                level_type=level_type
+            )
+
+            # 打印调试信息
+            logger.info(f"处理{select_type}各校各科平均分数据:")
+            logger.info(f"找到 {all_stats.count()} 个科目的统计数据")
+
+            # 准备数据结构
+            schools_data = {}
+            subjects_order = []
+
+            # 处理每个科目的数据
+            for stat in all_stats:
+                subject_name = stat.subject.subject_name
+                subjects_order.append(subject_name)
+
+                # 打印当前处理的科目
+                logger.info(f"处理科目: {subject_name}")
+
+                # 解析school_distribution JSON数据
+                try:
+                    school_dist = json.loads(stat.school_distribution)
+                    logger.info(f"科目 {subject_name} 的学校分布数据: {school_dist}")
+                except (json.JSONDecodeError, AttributeError) as e:
+                    logger.error(f"解析科目 {subject_name} 的school_distribution失败: {e}")
+                    continue
+
+                # 整理每个学校的数据
+                for school_name, school_stats in school_dist.items():
+                    if school_name not in schools_data:
+                        schools_data[school_name] = {
+                            'school_name': school_name,
+                            'subjects': {}
+                        }
+
+                    # 添加该科目的统计数据
+                    schools_data[school_name]['subjects'][subject_name] = {
+                        'count': school_stats['count'],
+                        'mean': school_stats['mean'],
+                        'std_dev': school_stats.get('std_dev', 0)
+                    }
+
+            # 转换为列表并按总分平均分排序
+            schools_list = list(schools_data.values())
+            schools_list.sort(
+                key=lambda x: x['subjects'].get('总分', {}).get('mean', 0),
+                reverse=True
+            )
+
+            # 打印最终的数据结构
+            logger.info(f"最终数据结构:")
+            logger.info(f"科目顺序: {subjects_order}")
+            logger.info(f"学校数据示例: {schools_list[0] if schools_list else 'No schools'}")
+
+            return {
+                'subjects': subjects_order,
+                'schools': schools_list
+            }
+
+        except Exception as e:
+            logger.error(f"处理学校科目平均分失败: exam_type={exam_type}, error={str(e)}")
+            logger.exception("详细错误信息:")
+            return {'subjects': [], 'schools': []}
+
+
     def _prepare_subject_data(self, stats, score_lines, select_type):
         """准备学科统计数据"""
         if not stats:

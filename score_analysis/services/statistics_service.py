@@ -47,7 +47,7 @@ class BaseStatisticsService:
                     'quantile_stats': self._calculate_quantile_stats(scores_data),
                     'subject_stats': self._calculate_subject_stats(scores_data, select_type),
                     'threshold_stats': self._calculate_threshold_stats(scores_data),
-                    'school_distribution': self._calculate_school_distribution(scores_data)
+                    #'school_distribution': self._calculate_school_distribution(scores_data)
                 }
 
             if exam_level == 'CITY':
@@ -228,30 +228,7 @@ class BaseStatisticsService:
             logger.error(f"计算达线统计失败: error={str(e)}")
             raise
 
-    def _calculate_school_distribution(self, scores):
-        """计算学校分布"""
-        try:
-            school_stats = scores.values('school_name') \
-                .annotate(
-                count=Count('student_id'),
-                mean=Avg('total_score'),
-                max_score=Max('total_score'),
-                min_score=Min('total_score')
-            ) \
-                .values('school_name', 'count', 'mean', 'max_score', 'min_score')
 
-            return {
-                str(stat['school_name']): {
-                    'count': stat['count'],
-                    'mean': round(float(stat['mean']), 2),
-                    'max_score': float(stat['max_score']),
-                    'min_score': float(stat['min_score'])
-                }
-                for stat in school_stats
-            }
-        except Exception as e:
-            logger.error(f"计算学校分布失败: error={str(e)}")
-            raise
 
     def _calculate_subject_quantile_stats(self, scores, subject):
         """计算科目分位数统计"""
@@ -458,6 +435,33 @@ class BaseStatisticsService:
                     'median': subject_scores[median_index] if median_index < total_count else subject_scores[-1],
                     'q20': subject_scores[q20_index] if q20_index < total_count else subject_scores[0],
                     'q10': subject_scores[q10_index] if q10_index < total_count else subject_scores[0]
+                })
+                # 计算该科目的学校分布
+                school_stats = scores.values('school_name') \
+                    .annotate(
+                    count=Count('student_id'),
+                    mean=Avg(field_name),
+                    max_score=Max(field_name),
+                    min_score=Min(field_name),
+                    std_dev=StdDev(field_name)
+                ) \
+                    .values('school_name', 'count', 'mean', 'max_score', 'min_score', 'std_dev')
+
+                # 构建学校分布数据
+                school_distribution = {
+                    str(stat['school_name']): {
+                        'count': stat['count'],
+                        'mean': round(float(stat['mean']), 2) if stat['mean'] else 0,
+                        'max_score': float(stat['max_score']) if stat['max_score'] else 0,
+                        'min_score': float(stat['min_score']) if stat['min_score'] else 0,
+                        'std_dev': round(float(stat['std_dev']), 2) if stat['std_dev'] else 0
+                    }
+                    for stat in school_stats
+                }
+
+                # 将所有统计数据合并到一起
+                stats.update({
+                    'school_distribution': school_distribution
                 })
 
                 subject_stats[subject] = stats
@@ -817,7 +821,7 @@ class BaseStatisticsService:
                     'q10_score': subject_stat['q10'],
 
                     # 学校分布
-                    'school_distribution': json.dumps(stats['school_distribution'], ensure_ascii=False),
+                    'school_distribution': json.dumps(subject_stat['school_distribution'], ensure_ascii=False),
 
                     # 排名分布
                     'rank_distribution': json.dumps(rank_distributions, ensure_ascii=False),

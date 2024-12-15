@@ -289,7 +289,95 @@
         </div>
     </div>
 </div>
+<!-- 各校各科平均分分析 -->
+<div class="school-means-section">
+    <h3>各校各科平均分分析</h3>
 
+    <!-- 文理科切换按钮 -->
+    <div class="school-means-tabs">
+        <input type="radio" id="means-science-tab" name="means-subject" checked>
+        <label for="means-science-tab" class="tab-button">理科平均分</label>
+
+        <input type="radio" id="means-arts-tab" name="means-subject">
+        <label for="means-arts-tab" class="tab-button">文科平均分</label>
+
+        <!-- 理科平均分表格 -->
+        <div class="means-science-content means-content">
+            <table class="means-table">
+                <thead>
+                    <tr>
+                        <th>学校</th>
+                        <th>人数</th>
+                        <th>总分平均分</th>
+                        <th>语文平均分</th>
+                        <th>数学平均分</th>
+                        <th>英语平均分</th>
+                        <th>物理平均分</th>
+                        <th>化学平均分</th>
+                        <th>生物平均分</th>
+                        <th>政治平均分</th>
+                        <th>地理平均分</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for school in science_school_means.schools %}
+                    <tr>
+                        <td>{{ school.school_name }}</td>
+                        <td class="count-value">{{ school.subjects.总分.count }}</td>
+                        <td class="score-value">{{ school.subjects.总分.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.语文.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.数学.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.英语.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.物理.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.化学.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.生物.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.政治.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.地理.mean|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 文科平均分表格 -->
+        <div class="means-arts-content means-content">
+            <table class="means-table">
+                <thead>
+                    <tr>
+                        <th>学校</th>
+                        <th>人数</th>
+                        <th>总分平均分</th>
+                        <th>语文平均分</th>
+                        <th>数学平均分</th>
+                        <th>英语平均分</th>
+                        <th>历史平均分</th>
+                        <th>化学平均分</th>
+                        <th>生物平均分</th>
+                        <th>政治平均分</th>
+                        <th>地理平均分</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for school in arts_school_means.schools %}
+                    <tr>
+                        <td>{{ school.school_name }}</td>
+                        <td class="count-value">{{ school.subjects.总分.count }}</td>
+                        <td class="score-value">{{ school.subjects.总分.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.语文.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.数学.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.英语.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.历史.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.化学.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.生物.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.政治.mean|floatformat:2 }}</td>
+                        <td class="score-value">{{ school.subjects.地理.mean|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extrajs %}
