@@ -602,3 +602,198 @@
     text-align: right;
 }
 
+/* 区县面板基础样式 */
+.district-panel {
+    margin: 15px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+/* 使用checkbox实现切换 */
+.district-toggle {
+    display: none;  /* 隐藏checkbox */
+}
+
+/* 头部样式 */
+.district-header {
+    padding: 12px 15px;
+    background: #f8f9fa;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+}
+
+.district-header:hover {
+    background: #f0f0f0;
+}
+
+.district-header h4 {
+    margin: 0;
+    font-size: 16px;
+    color: #333;
+}
+
+/* 展开/收起按钮样式 */
+.toggle-btn {
+    color: #666;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: #fff;
+    border: 1px solid #ddd;
+}
+
+/* 内容区域默认隐藏 */
+.district-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    background: #fff;
+}
+
+/* 选中状态显示内容 */
+.district-toggle:checked ~ .district-content {
+    max-height: 2000px;  /* 设置一个足够大的值 */
+}
+
+/* 切换按钮文字 */
+.district-toggle:checked ~ .district-header .toggle-btn::before {
+    content: '收起';
+}
+
+.district-toggle:not(:checked) ~ .district-header .toggle-btn::before {
+    content: '展开';
+}
+
+/* 箭头样式 */
+.district-header::after {
+    content: '▼';
+    margin-left: 8px;
+    transition: transform 0.3s;
+}
+
+.district-toggle:checked ~ .district-header::after {
+    transform: rotate(180deg);
+}
+
+/* 内容区域样式 */
+.district-content .summary-section {
+    margin: 10px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.district-content h5 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 15px;
+}
+/* 展开/收起按钮样式优化 */
+.toggle-btn {
+    position: relative;
+    color: #1890ff;  /* 使用蓝色 */
+    font-size: 14px;
+    padding: 6px 16px;
+    border-radius: 4px;
+    background: #fff;
+    border: 1px solid #1890ff;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;  /* 图标和文字之间的间距 */
+}
+
+/* 鼠标悬停效果 */
+.toggle-btn:hover {
+    background: #e6f7ff;  /* 淡蓝色背景 */
+    border-color: #40a9ff;
+    color: #40a9ff;
+}
+
+/* 添加小图标 */
+.toggle-btn::after {
+    content: '';
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%231890ff' d='M8 12L2 6h12z'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+    transition: transform 0.3s;
+}
+
+/* 展开状态的图标旋转 */
+.district-toggle:checked ~ .district-header .toggle-btn::after {
+    transform: rotate(180deg);
+}
+
+/* 展开状态的按钮样式 */
+.district-toggle:checked ~ .district-header .toggle-btn {
+    background: #e6f7ff;
+}
+
+/* 按钮文字样式 */
+.district-toggle:checked ~ .district-header .toggle-btn::before {
+    content: '收起';
+}
+
+.district-toggle:not(:checked) ~ .district-header .toggle-btn::before {
+    content: '展开';
+}
+
+/* 移除header的箭头 */
+.district-header::after {
+    display: none;
+}
+
+/* 优化header样式 */
+.district-header {
+    padding: 12px 20px;  /* 增加左右内边距 */
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.3s;
+}
+
+.district-header:hover {
+    background: #f5f5f5;
+}
+
+/* 标题样式优化 */
+.district-header h4 {
+    font-size: 16px;
+    color: #262626;
+    font-weight: 500;
+}
+
+/* 面板样式优化 */
+.district-panel {
+    margin: 16px 0;
+    border: 1px solid #f0f0f0;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+/* 内容区域样式优化 */
+.district-content {
+    padding: 20px;
+}
+
+/* 添加展开/收起动画 */
+.district-content {
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.district-toggle:checked ~ .district-content {
+    max-height: 2000px;
+    opacity: 1;
+    padding: 20px;
+}

@@ -11,70 +11,104 @@
 
 <div class="statistics-container">
     <!-- 考试概况标题 -->
-     <!-- 添加导出按钮 -->
-
     <div class="section-title">
         <h2>考试概况</h2>
     </div>
 
-    <!-- 理科综述 -->
-    <div class="summary-section">
-        <h3>理科综述</h3>
-        <div class="summary-text">
-            本次考试，总计有<span class="number-highlight">8</span>所学校，
-            参考总人数<span class="number-highlight">2123</span>人。
-            平均分为<span class="score-highlight">378.72</span>分，
-            最高分为<span class="score-highlight">601.5</span>分，
-            归属于<span class="school-highlight">开平市第一中学</span>。
-            C9层模拟上线（<span class="score-highlight">615.0</span>分）
-            人数<span class="number-highlight">0</span>人
-            （<span class="rate-highlight">0.0%</span>）
-            985层模拟上线（<span class="score-highlight">558.0</span>分）
-            人数<span class="number-highlight">30</span>人
-            （<span class="rate-highlight">1.41%</span>）
-            211层模拟上线（<span class="score-highlight">532.0</span>分）
-            人数<span class="number-highlight">86</span>人
-            （<span class="rate-highlight">4.05%</span>）
-            双一流层模拟上线（<span class="score-highlight">511.0</span>分）
-            人数<span class="number-highlight">141</span>人
-            （<span class="rate-highlight">6.64%</span>）
-            优分层模拟上线（<span class="score-highlight">477.0</span>分）
-            人数<span class="number-highlight">313</span>人
-            （<span class="rate-highlight">14.74%</span>）
-            本科层模拟上线（<span class="score-highlight">382.0</span>分）
-            人数<span class="number-highlight">1130</span>人
-            （<span class="rate-highlight">53.23%</span>）
-        </div>
-    </div>
+    <!-- 市级数据 -->
+    <div class="summary-container">
+        <!-- 理科综述 -->
+        <div class="summary-section">
+            <h3>理科综述</h3>
+            <div class="summary-text">
+                本次考试，总计有<span class="number-highlight">{{ science_summary.school_count }}</span>所学校，
+                参考总人数<span class="number-highlight">{{ science_summary.student_count }}</span>人。
+                平均分为<span class="score-highlight">{{ science_summary.mean_score }}</span>分，
+                最高分为<span class="score-highlight">{{ science_summary.max_score }}</span>分，
+                归属于<span class="school-highlight">{{ science_summary.top_school }}</span>。
 
-    <!-- 文科综述 -->
-    <div class="summary-section">
-        <h3>文科综述</h3>
-        <div class="summary-text">
-            本次考试，总计有<span class="number-highlight">8</span>所学校，
-            参考总人数<span class="number-highlight">1854</span>人。
-            平均分为<span class="score-highlight">347.73</span>分，
-            最高分为<span class="score-highlight">609.5</span>分，
-            归属于<span class="school-highlight">开平市第一中学</span>。
-            C9层模拟上线（<span class="score-highlight">620.0</span>分）
-            人数<span class="number-highlight">0</span>人
-            （<span class="rate-highlight">0.0%</span>）
-            985层模拟上线（<span class="score-highlight">567.0</span>分）
-            人数<span class="number-highlight">14</span>人
-            （<span class="rate-highlight">0.76%</span>）
-            211层模拟上线（<span class="score-highlight">556.0</span>分）
-            人数<span class="number-highlight">22</span>人
-            （<span class="rate-highlight">1.19%</span>）
-            双一流层模拟上线（<span class="score-highlight">520.0</span>分）
-            人数<span class="number-highlight">56</span>人
-            （<span class="rate-highlight">3.02%</span>）
-            优分层模拟上线（<span class="score-highlight">507.0</span>分）
-            人数<span class="number-highlight">74</span>人
-            （<span class="rate-highlight">3.99%</span>）
-            本科层模拟上线（<span class="score-highlight">401.0</span>分）
-            人数<span class="number-highlight">504</span>人
-            （<span class="rate-highlight">27.18%</span>）
+                {% for key, line in science_summary.score_lines.items %}
+                    {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
+                    人数<span class="number-highlight">{{ line.count }}</span>人
+                    （<span class="rate-highlight">{{ line.rate }}%</span>）
+                {% endfor %}
+            </div>
         </div>
+
+        <!-- 文科综述 -->
+        <div class="summary-section">
+            <h3>文科综述</h3>
+            <div class="summary-text">
+                本次考试，总计有<span class="number-highlight">{{ arts_summary.school_count }}</span>所学校，
+                参考总人数<span class="number-highlight">{{ arts_summary.student_count }}</span>人。
+                平均分为<span class="score-highlight">{{ arts_summary.mean_score }}</span>分，
+                最高分为<span class="score-highlight">{{ arts_summary.max_score }}</span>分，
+                归属于<span class="school-highlight">{{ arts_summary.top_school }}</span>。
+
+                {% for key, line in arts_summary.score_lines.items %}
+                    {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
+                    人数<span class="number-highlight">{{ line.count }}</span>人
+                    （<span class="rate-highlight">{{ line.rate }}%</span>）
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- 区县数据（仅地市级考试显示） -->
+        {% if level_type == '地市级' and district_data %}
+            <div class="district-summaries">
+                <h3>区县数据</h3>
+                {% for district, data in district_data.items %}
+                    <div class="district-panel">
+                        <!-- 添加隐藏的checkbox -->
+                        <input type="checkbox" id="district-{{ forloop.counter }}" class="district-toggle">
+
+                        <!-- 修改header为label -->
+                        <label class="district-header" for="district-{{ forloop.counter }}">
+                            <h4>{{ district }}</h4>
+                            <span class="toggle-btn"></span>
+                        </label>
+
+                        <div class="district-content">
+                            <!-- 区县理科综述 -->
+                            <div class="summary-section">
+                                <h5>理科综述</h5>
+                                <div class="summary-text">
+                                    本次考试，总计有<span class="number-highlight">{{ data.science.school_count }}</span>所学校，
+                                    参考总人数<span class="number-highlight">{{ data.science.student_count }}</span>人。
+                                    平均分为<span class="score-highlight">{{ data.science.mean_score }}</span>分，
+                                    最高分为<span class="score-highlight">{{ data.science.max_score }}</span>分，
+                                    归属于<span class="school-highlight">{{ data.science.top_school }}</span>。
+
+                                    {% for key, line in data.science.score_lines.items %}
+                                        {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
+                                        人数<span class="number-highlight">{{ line.count }}</span>人
+                                        （<span class="rate-highlight">{{ line.rate }}%</span>）
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- 区县文科综述 -->
+                            <div class="summary-section">
+                                <h5>文科综述</h5>
+                                <div class="summary-text">
+                                    本次考试，总计有<span class="number-highlight">{{ data.arts.school_count }}</span>所学校，
+                                    参考总人数<span class="number-highlight">{{ data.arts.student_count }}</span>人。
+                                    平均分为<span class="score-highlight">{{ data.arts.mean_score }}</span>分，
+                                    最高分为<span class="score-highlight">{{ data.arts.max_score }}</span>分，
+                                    归属于<span class="school-highlight">{{ data.arts.top_school }}</span>。
+
+                                    {% for key, line in data.arts.score_lines.items %}
+                                        {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
+                                        人数<span class="number-highlight">{{ line.count }}</span>人
+                                        （<span class="rate-highlight">{{ line.rate }}%</span>）
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
     </div>
 </div>
 
@@ -382,7 +416,47 @@
 </div>
 {% endblock %}
 
+
+<!-- 在页面底部添加脚本 -->
 {% block extrajs %}
-    {{ block.super }}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const districtPanels = document.querySelectorAll('.district-panel');
+
+    districtPanels.forEach(panel => {
+        const header = panel.querySelector('.district-header');
+        const content = panel.querySelector('.district-content');
+        const toggleBtn = panel.querySelector('.toggle-btn');
+
+        // 确保初始状态是收起的
+        content.style.display = 'none';
+
+        // 处理点击事件
+        header.addEventListener('click', function(e) {
+            // 如果点击的是按钮，不做处理（避免触发两次）
+            if (e.target.classList.contains('toggle-btn')) {
+                return;
+            }
+            togglePanel();
+        });
+
+        // 按钮点击事件
+        toggleBtn.addEventListener('click', function(e) {
+            e.stopPropagation();  // 阻止事件冒泡
+            togglePanel();
+        });
+
+        // 切换面板显示状态
+        function togglePanel() {
+            const isVisible = content.style.display === 'block';
+            content.style.display = isVisible ? 'none' : 'block';
+            toggleBtn.textContent = isVisible ? '展开' : '收起';
+            header.classList.toggle('expanded');
+        }
+    });
+});
+</script>
+
 
 {% endblock %}
