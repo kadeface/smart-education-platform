@@ -173,7 +173,7 @@ class ScoreRankingsAdmin(admin.ModelAdmin):
     search_fields = ['unified_student_id', 'student_name', 'school_name']
     list_per_page = 10
     ordering = ['subject', 'select_type', 'raw_score_rank']
-    change_list_template = 'score_analysis/score_analysis/scorerankings/change_list.html'
+    change_list_template = 'admin/score_analysis/scorerankings/change_list.html'
     def __init__(self, model, admin_site):
         super().__init__(model, admin_site)
         # 初始化时从数据库获取科目配置
@@ -309,7 +309,7 @@ class ScoreRankingsAdmin(admin.ModelAdmin):
                 'opts': self.model._meta,
             }
 
-            return TemplateResponse(request, 'score_analysis/generate_rankings.html', context)
+            return TemplateResponse(request, 'admin/score_analysis/scorerankings/generate_rankings.html', context)
 
         except Exception as e:
             self.message_user(request, f"获取考试列表失败: {str(e)}", level=messages.ERROR)

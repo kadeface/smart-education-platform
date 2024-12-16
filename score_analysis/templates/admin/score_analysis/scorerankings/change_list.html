@@ -1,11 +1,20 @@
-{% extends "score_analysis/change_list.html" %}
+{% extends "admin/change_list.html" %}
 {% load i18n admin_urls %}
 
 {% block object-tools %}
-    <div class="object-tools">
-        <a href="{% url 'score_analysis:score_analysis_scorerankings_add' %}" class="addlink">
-            上传结果
-        </a>
-    </div>
+    {% if has_add_permission %}
+        <ul class="object-tools">
+            <li>
+                {# 添加生成排名按钮 #}
+                <a href="{% url 'admin:score_analysis_scorerankings_add' %}" class="addlink">
+                    {% blocktranslate %}生成排名{% endblocktranslate %}
+                </a>
+            </li>
+        </ul>
+    {% endif %}
+{% endblock %}
+
+{% block result_list %}
+    {# 继承原有的结果列表显示 #}
     {{ block.super }}
 {% endblock %}

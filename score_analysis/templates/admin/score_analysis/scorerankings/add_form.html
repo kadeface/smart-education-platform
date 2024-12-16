@@ -1,0 +1,55 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'admin/css/forms.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <form method="post" id="ranking_form">
+        {% csrf_token %}
+        <div>
+            <fieldset class="module aligned">
+                <h2>选择考试生成排名</h2>
+                <div class="form-row">
+                    <div class="field-box">
+                        <label for="id_exam_id" class="required">考试:</label>
+                        <select name="exam_id" id="id_exam_id" required>
+                            <option value="">---------</option>
+                            {% for exam in exams %}
+                                <option value="{{ exam.exam_id }}">
+                                    {{ exam.exam_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </fieldset>
+            
+            <div class="submit-row">
+                <input type="submit" value="生成排名" class="default" name="_save">
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block javascript %}
+{{ block.super }}
+<script type="text/javascript">
+    (function($) {
+        $(document).ready(function() {
+            // 可以在这里添加表单验证等JavaScript逻辑
+            $('#ranking_form').on('submit', function(e) {
+                var examId = $('#id_exam_id').val();
+                if (!examId) {
+                    e.preventDefault();
+                    alert('请选择考试！');
+                }
+            });
+        });
+    })(django.jQuery);
+</script>
+{% endblock %}
