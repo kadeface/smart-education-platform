@@ -143,58 +143,68 @@ class BaseStatisticsService:
             rankings: 排名数据
             subject: 科目（'total_score'/'chinese'/'math' 等）
             district_name: 区县名称，如果提供则只统计该区县的排名
+        Returns:
+            dict: {
+                'school_rankings': {
+                    '学校A': {'top_10': 3, 'top_20': 5, ...},
+                    '学校B': {'top_10': 2, 'top_20': 4, ...},
+                }
+            }
         """
         try:
             # 根据科目选择合适的排名范围
+            rank_ranges = {
+                'top_10': 10,
+                'top_20': 20,
+                'top_50': 50,
+                'top_100': 100
+            }
+
+            # 总分增加更多范围
             if subject == 'total_score':
-                # 总分使用全部范围
-                rank_ranges = {
-                    'top_10': 10,
-                    'top_20': 20,
-                    'top_50': 50,
-                    'top_100': 100,
+                rank_ranges.update({
                     'top_200': 200,
                     'top_500': 500,
                     'top_1250': 1250
-                }
-            else:
-                # 单科目使用较小的范围
-                rank_ranges = {
-                    'top_10': 10,
-                    'top_20': 20,
-                    'top_50': 50,
-                    'top_100': 100
-                }
+                })
 
             # 如果指定了区县，添加level_type过滤条件
             if district_name:
                 logger.info(f"计算{district_name}的{subject}排名分布")
                 rankings = rankings.filter(level_type=district_name)
 
-            distributions = {}
-            for range_name, rank_limit in rank_ranges.items():
-                # 根据科目筛选排名
-                top_students = rankings.filter(
-                    raw_score_rank__lte=rank_limit,
-                    subject=subject
-                )
+            # 初始化学校排名统计
+            school_rankings = {}
 
-                # 统计每个学校的人数
-                school_counts = {}
-                for student in top_students:
-                    school_name = student.school_name
-                    if school_name:
-                        school_counts[school_name] = school_counts.get(school_name, 0) + 1
+            # 获取所有符合条件的学生记录
+            students = rankings.filter(
+                subject=subject,
+                raw_score_rank__lte=max(rank_ranges.values())  # 只获取最大范围内的记录
+            ).values('school_name', 'raw_score_rank')
 
-                # 直接存储学校分布数据
-                distributions[range_name] = school_counts
+            # 统计每个学校在各个范围的人数
+            for student in students:
+                school_name = student.get('school_name')
+                rank = student.get('raw_score_rank')
 
-            logger.info(f"计算{subject}排名分布成功: {distributions}")
-            return distributions
+                if not school_name:
+                    continue
+
+                # 初始化学校数据
+                if school_name not in school_rankings:
+                    school_rankings[school_name] = {f'top_{n}': 0 for n in rank_ranges.values()}
+
+                # 更新各个范围的计数
+                for range_name, rank_limit in rank_ranges.items():
+                    if rank <= rank_limit:
+                        school_rankings[school_name][range_name] += 1
+
+            logger.info(f"计算{subject}排名分布成功")
+            return school_rankings
 
         except Exception as e:
             logger.error(f"计算{subject}排名分布失败: error={str(e)}")
-            logger.error(f"rankings 数据: {rankings.query}")  # 打印查询语句
+            logger.error(f"rankings 数据: {rankings.query}")
             raise
 
     def _calculate_threshold_stats(self, scores):
@@ -825,13 +835,6 @@ class BaseStatisticsService:
 
                     # 排名分布
                     'rank_distribution': json.dumps(rank_distributions, ensure_ascii=False),
-                    'top_10_distribution': json.dumps(rank_distributions.get('top_10', {}), ensure_ascii=False),
-                    'top_20_distribution': json.dumps(rank_distributions.get('top_20', {}), ensure_ascii=False),
-                    'top_50_distribution': json.dumps(rank_distributions.get('top_50', {}), ensure_ascii=False),
-                    'top_100_distribution': json.dumps(rank_distributions.get('top_100', {}), ensure_ascii=False),
-                    'top_200_distribution': json.dumps(rank_distributions.get('top_200', {}), ensure_ascii=False),
-                    'top_500_distribution': json.dumps(rank_distributions.get('top_500', {}), ensure_ascii=False),
-                    'top_1250_distribution': json.dumps(rank_distributions.get('top_1250', {}), ensure_ascii=False),
 
                     # 达线统计（如果有的话）
                     'threshold_stats': json.dumps(stats.get('threshold_stats', {}), ensure_ascii=False),

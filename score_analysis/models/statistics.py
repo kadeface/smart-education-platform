@@ -164,21 +164,11 @@ class StatisticsExamIndicators(models.Model):
     pass_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='及格率')
     low_score_rate = models.DecimalField(max_digits=5, decimal_places=2, null=True, db_comment='低分率')
 
-    # 排名指标
-    top_10_distribution = models.JSONField(null=True, db_comment='前10名分布情况')  # 修改这里
-    top_20_distribution = models.JSONField(null=True, db_comment='前20名分布情况')  # 修改这里
-    top_50_distribution = models.JSONField(null=True, db_comment='前50名分布情况')  # 修改这里
-    top_100_distribution = models.JSONField(null=True, db_comment='前100名分布情况')  # 修改这里
-    top_200_distribution = models.JSONField(null=True, db_comment='前200名分布情况')  # 修改这里
-    top_500_distribution = models.JSONField(null=True, db_comment='前500名分布情况')  # 修改这里
-    top_1250_distribution = models.JSONField(null=True, db_comment='前1250名分布情况')  # 修改这里
-
     # 达线指标
     threshold_stats = models.JSONField(null=True, db_comment='各条线达线统计')  # {line_type: {count, rate}}
 
     # 学校分布
     school_distribution = models.JSONField(null=True, db_comment='学校分布统计')  # {school_id: {count, rate}}
-
 
     # 基础统计指标
     student_count = models.IntegerField(null=True, db_comment='参考人数')
@@ -191,11 +181,8 @@ class StatisticsExamIndicators(models.Model):
     median_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='中位数分数')
     q20_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='20分位分数')
     q10_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, db_comment='10分位分数')
-
-
-
     # 排名分布
-    rank_distribution = models.JSONField(null=True, db_comment='排名分布统计')
+    rank_distribution = models.JSONField(null=True, db_comment='排名分布统计')  # {school_name: {top_10: n, top_20: n, ...}}
     create_time = models.DateTimeField(auto_now_add=True)
 
     # {rank_range: count}

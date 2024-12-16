@@ -557,11 +557,14 @@
 }
 
 /* 固定表头和第一列 */
-.means-table thead th {
+.means-table thead th{
     position: sticky;
     top: 0;
     z-index: 2;
+    color: white !important;
+    font-weight: 500 !important;
     background-color: #00bea4 !important;
+
 }
 
 .means-table td:first-child,

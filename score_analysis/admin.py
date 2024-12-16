@@ -783,36 +783,41 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             return {}
     #各校的排名分布
     def _process_rank_distribution(self, stats):
-        # 从stats中获取rank_distribution并解析JSON
-        if not stats or not stats.rank_distribution:
-            # 如果统计数据为空或没有排名分布数据，返回空字典
+        """处理排名分布数据
+
+        Args:
+            stats: StatisticsExamIndicators实例
+
+        Returns:
+            dict: {
+                '学校A': {'top_10': 5, 'top_20': 8, ...},
+                '学校B': {'top_10': 3, 'top_20': 6, ...},
+            }
+        """
+        try:
+            # 检查数据是否存在
+            if not stats or not stats.rank_distribution:
+                logger.warning("没有排名分布数据")
+                return {}
+
+            # 解析JSON数据
+            rank_data = json.loads(stats.rank_distribution)
+
+            # 数据已经是正确的格式，直接返回
+            # 格式: {'学校名': {'top_10': n, 'top_20': n, ...}}
+
+            # 按top_10人数排序（如果需要）
+            sorted_data = dict(sorted(
+                rank_data.items(),
+                key=lambda x: x[1].get('top_10', 0),
+                reverse=True
+            ))
+
+            return sorted_data
+
+        except Exception as e:
+            logger.error(f"处理排名分布数据失败: {str(e)}")
             return {}
-        #print("原始数据:", stats.rank_distribution)
-        rank_data = json.loads(stats.rank_distribution)
-       # print("解析后数据:", rank_data)
-
-        # 获取所有学校
-        schools = set()
-        for rank_group in rank_data.values():
-            schools.update(rank_group.keys())
-
-        # 为每个学校创建完整的排名数据
-        school_rankings = {school: {
-            'top_10': 0,
-            'top_20': 0,
-            'top_50': 0,
-            'top_100': 0,
-            'top_200': 0,
-            'top_500': 0,
-            'top_1250': 0
-        } for school in schools}
-
-        # 填充数据
-        for rank_level, school_data in rank_data.items():
-            for school, count in school_data.items():
-                school_rankings[school][rank_level] = count
-        print("处理后的数据:", school_rankings)
-        return school_rankings
     #四分位分布情况
     def _process_quartile_analysis(self, stats, subject_type='science'):
         """处理四分位分析数据"""
