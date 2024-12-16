@@ -14,5 +14,4 @@ urlpatterns = [
     path('process-scores/', views.process_scores, name='process_scores'),
     path('save-scores/', views.save_scores, name='save_scores'),
     path('clean/<int:upload_id>/', views.clean_data, name='score_processor_examupload_clean'),
-
 ]

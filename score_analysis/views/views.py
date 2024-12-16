@@ -196,33 +196,3 @@ def export_statistics(request):
             'message': f'导出失败: {str(e)}'
         })
     pass
-
-
-@require_http_methods(["GET"])
-def frontend_exam_list(request):
-    """用户端考试列表视图"""
-    exams = BaseExamConfig.objects.filter(
-        status='published'
-    ).order_by('-exam_date')
-
-    return render(request, 'score_analysis/frontend/exam_list.html', {
-        'exams': exams
-    })
-
-
-@require_http_methods(["GET"])
-def frontend_exam_detail(request, exam_id):
-    """用户端考试详情视图"""
-    try:
-        exam = BaseExamConfig.objects.get(exam_id=exam_id)
-        stats_service = ExamStatisticsService()
-        statistics = stats_service.process_exam_statistics(exam_id)
-
-        return render(request, 'score_analysis/frontend/exam_detail.html', {
-            'exam': exam,
-            'statistics': statistics
-        })
-    except BaseExamConfig.DoesNotExist:
-        return render(request, 'score_analysis/frontend/error.html', {
-            'error_message': '未找到该考试'
-        }, status=404)
