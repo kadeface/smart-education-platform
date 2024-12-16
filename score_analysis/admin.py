@@ -17,6 +17,7 @@ from .models.source import ScoreStudentBasic
 from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
 import logging
+
 # 获取 logger 实例
 logger = logging.getLogger('django')  # 使用 Django 的默认 logger
 class ExamScoreLinesForm(forms.ModelForm):
@@ -608,14 +609,15 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
     def view_statistics(self, request, exam_id):
         """查看统计结果页面"""
         try:
-            # 1. 获取考试基本信息
-            exam = BaseExamConfig.objects.filter(exam_id=exam_id).first()
-            if not exam:
-                raise ValueError(f"未找到考试ID: {exam_id}")
-            # 获取考试级别
-            level_type = self._get_exam_statistics(exam_id)
+            # 获取正确的level_type
+            level_type = self._get_level_type(exam_id)
+            logger.info(f"考试 {exam_id} 的统计层级为: {level_type}")
+
+            if not level_type:
+                raise ValueError(f"无法确定考试 {exam_id} 的统计层级")
 
             # 2. 获取理科和文科的统计数据
+
             science_stats = StatisticsExamIndicators.objects.filter(
                 exam_id=exam_id,
                 select_type='理科',
@@ -631,7 +633,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 level_type=level_type,
                 student_count__gt=0
             ).first()
-
+            exam_name = BaseExamConfig.objects.filter(exam_id=exam_id).values_list('exam_name', flat=True).first()
             # 3. 处理理科和文科的学校分布数据
             science_summary = self._process_school_distribution(
                 science_stats.school_distribution if science_stats else None
@@ -666,9 +668,9 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             arts_school_means = self._process_school_subject_means(arts_stats, 'arts')
 
             context = {
-                'title': f'{exam.exam_name} - 统计结果',
+                'title': f'{exam_name} - 统计结果',
                 'exam_id': exam_id,
-                'exam_name': exam.exam_name,
+                'exam_name': exam_name,
                 'science_summary': science_summary,#理科综述数据
                 'arts_summary': arts_summary,#文科综述数据
                 'science_score_lines': science_score_lines,#添加理科分数线数据
@@ -702,6 +704,27 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             return 'city'  # 地市级统考
         else:
             return '开平市'  # 默认为区县级别（开平市）
+    #获取考试的类型（江门市统考或者区县市统考）
+    def _get_level_type(self, exam_id):
+        """根据考试ID获取对应的level_type值"""
+        logger.info(f"开始确定考试 {exam_id} 的统计层级")
+
+        if 'CITY' in exam_id:
+            return '地市级'
+        else:
+            # 对于区县级考试，查询第一条记录获取具体区县名称
+            first_record = StatisticsExamIndicators.objects.filter(
+                exam_id=exam_id,
+                subject_id='total_score',  # 使用总分记录
+                student_count__gt = 0
+            ).first()
+
+            if first_record:
+                logger.info(f"获取到区县名称: {first_record.level_type}")
+                return first_record.level_type
+            else:
+                logger.error(f"未找到考试 {exam_id} 的任何统计记录")
+                return None
     #区县学校分数线分布情况
     def _process_school_distribution(self, school_distribution_json):
         """处理学校分布数据"""
@@ -855,8 +878,8 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             )
 
             # 打印调试信息
-            logger.info(f"处理{select_type}各校各科平均分数据:")
-            logger.info(f"找到 {all_stats.count()} 个科目的统计数据")
+           # logger.info(f"处理{select_type}各校各科平均分数据:")
+           # logger.info(f"找到 {all_stats.count()} 个科目的统计数据")
 
             # 准备数据结构
             schools_data = {}
@@ -868,7 +891,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 subjects_order.append(subject_name)
 
                 # 打印当前处理的科目
-                logger.info(f"处理科目: {subject_name}")
+             #   logger.info(f"处理科目: {subject_name}")
 
                 # 解析school_distribution JSON数据
                 try:
@@ -901,9 +924,9 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             )
 
             # 打印最终的数据结构
-            logger.info(f"最终数据结构:")
-            logger.info(f"科目顺序: {subjects_order}")
-            logger.info(f"学校数据示例: {schools_list[0] if schools_list else 'No schools'}")
+           # logger.info(f"最终数据结构:")
+           # logger.info(f"科目顺序: {subjects_order}")
+            #logger.info(f"学校数据示例: {schools_list[0] if schools_list else 'No schools'}")
 
             return {
                 'subjects': subjects_order,
@@ -1151,3 +1174,4 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                     'zk_line': 0
                 }
             }
+
