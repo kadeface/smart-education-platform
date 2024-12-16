@@ -8,10 +8,7 @@
 {% endblock %}
 
 {% block content %}
-    {% if not request.is_frontend %}
-        {# 后台管理界面的导航等内容 #}
-        {% include "admin/score_analysis/statisticsexamindicators/includes/admin_nav.html" %}
-    {% endif %}
+
 <div class="statistics-container">
     <!-- 考试概况标题 -->
     <div class="section-title">

@@ -1294,4 +1294,85 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                     'zk_line': 0
                 }
             }
+def _get_statistics_context(self, exam_id):
+    """获取统计数据上下文"""
+    try:
+        # 获取考试层级信息
+        level_type, districts = self._get_level_type(exam_id)
 
+        if not level_type:
+            raise ValueError(f"无法确定考试 {exam_id} 的统计层级")
+
+        # 获取理科和文科的统计数据
+        science_stats = StatisticsExamIndicators.objects.filter(
+            exam_id=exam_id,
+            select_type='理科',
+            subject_id='total_score',
+            level_type=level_type,
+            student_count__gt=0
+        ).first()
+
+        arts_stats = StatisticsExamIndicators.objects.filter(
+            exam_id=exam_id,
+            select_type='文科',
+            subject_id='total_score',
+            level_type=level_type,
+            student_count__gt=0
+        ).first()
+
+        # 获取考试名称
+        exam_name = BaseExamConfig.objects.filter(
+            exam_id=exam_id
+        ).values_list('exam_name', flat=True).first()
+
+        # 处理统计数据
+        context = {
+            'title': f'{exam_name} - 统计结果',
+            'exam_id': exam_id,
+            'exam_name': exam_name,
+            'level_type': level_type,
+
+            # 统计数据
+            'science_summary': self._process_summary_data(science_stats),
+            'arts_summary': self._process_summary_data(arts_stats),
+            'science_score_lines': self._score_line_distribution(science_stats),
+            'arts_score_lines': self._score_line_distribution(arts_stats),
+            'science_rankings': self._process_rank_distribution(science_stats),
+            'arts_rankings': self._process_rank_distribution(arts_stats),
+            'science_quartiles': self._process_quartile_analysis(science_stats, 'science'),
+            'arts_quartiles': self._process_quartile_analysis(arts_stats, 'arts'),
+            'science_school_means': self._process_school_subject_means(science_stats, 'science'),
+            'arts_school_means': self._process_school_subject_means(arts_stats, 'arts'),
+        }
+
+        # 如果是地市级考试，获取区县数据
+        if level_type == '地市级' and districts:
+            district_data = {}
+            for district in districts:
+                district_stats_science = StatisticsExamIndicators.objects.filter(
+                    exam_id=exam_id,
+                    select_type='理科',
+                    subject_id='total_score',
+                    level_type=district,
+                    student_count__gt=0
+                ).first()
+
+                district_stats_arts = StatisticsExamIndicators.objects.filter(
+                    exam_id=exam_id,
+                    select_type='文科',
+                    subject_id='total_score',
+                    level_type=district,
+                    student_count__gt=0
+                ).first()
+
+                district_data[district] = {
+                    'science': self._process_summary_data(district_stats_science),
+                    'arts': self._process_summary_data(district_stats_arts)
+                }
+
+            context['district_data'] = district_data
+
+        return context
+
+    except Exception as e:
+        raise Exception(f"获取统计数据失败: {str(e)}")
