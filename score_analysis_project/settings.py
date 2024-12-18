@@ -25,7 +25,12 @@ SECRET_KEY = 'django-insecure-kfs7ejh07zltfo$yd4_h8a77tlx*vcg-$)$#l634xlf&l=r_=_
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+#ALLOWED_HOSTS = [ '*', ] # 允许所有主机访问（不建议在正式环境使用）
+#'*',  # 允许所有主机访问（不建议在正式环境使用）
+#'localhost',  # 允许localhost访问
+#'127.0.0.1',  # 允许本地IP访问
+#'192.168.1.100',  # 允许特定IP访问（替换为你的服务器IP）
+#'yourdomain.com',  # 允许特定域名访问
 
 
 # Application definition
@@ -56,7 +61,8 @@ ROOT_URLCONF = 'score_analysis_project.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'score_processor', 'templates'), ],  # 显式添加应用模板目录],
+        'DIRS': [os.path.join(BASE_DIR, 'score_processor', 'templates'),
+                 os.path.join(BASE_DIR, 'templates'),  ],  # 显式添加应用模板目录],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

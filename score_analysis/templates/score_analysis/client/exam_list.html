@@ -1,0 +1,40 @@
+{% extends "score_analysis/client/base.html" %}
+{% load static %}
+
+{% block title %}考试列表 - 高中学业质量监测系统{% endblock %}
+
+{% block extra_css %}  {# 改为 extra_css 以匹配 base.html #}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static 'score_analysis/css/exam_list.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="exam-list-container">
+    <h1>考试列表</h1>
+
+    <div class="exam-grid">
+        {% for exam in exams %}
+            <div class="exam-card">
+                <div class="exam-info">
+                    <h2>{{ exam.exam_name }}</h2>
+                    <p class="exam-date">考试日期：{{ exam.exam_date|date:"Y-m-d" }}</p>
+                    <p class="exam-type">类型：{{ exam.exam_type }}</p>
+                </div>
+                <div class="exam-actions">
+                    <a href="{% url 'score_analysis:view_statistics_result' exam_id=exam.exam_id %}"
+                       class="view-stats-btn">
+                        查看统计结果
+                    </a>
+                </div>
+            </div>
+        {% empty %}
+            <div class="no-data">
+                <p>暂无考试数据</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}  {# 如果需要 JavaScript #}
+{% endblock %}
