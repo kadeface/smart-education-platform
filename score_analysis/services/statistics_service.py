@@ -179,7 +179,6 @@ class BaseStatisticsService:
             # 获取所有符合条件的学生记录
             students = rankings.filter(
                 subject=subject,
-                raw_score__gt=0,  # 添加这个条件过滤零分
                 raw_score_rank__lte=max(rank_ranges.values())  # 只获取最大范围内的记录
             ).values('school_name', 'raw_score_rank')
 
