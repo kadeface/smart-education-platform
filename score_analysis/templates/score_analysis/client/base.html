@@ -1,0 +1,33 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}高中学业质量监测系统{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'score_analysis/css/frontend.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header class="site-header">
+        <nav class="main-nav">
+            <div class="nav-brand">考试统计系统</div>
+            <div class="nav-links">
+                <a href="{% url 'score_analysis:client_exam_list' %}">考试列表</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <p>开平市教师发展中心&copy; 2024 高中学业质量监测系统</p>
+        <p>廖作东 联系电话 0750-2022186</p>
+
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

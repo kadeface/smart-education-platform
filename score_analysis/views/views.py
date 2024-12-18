@@ -24,7 +24,7 @@ def exam_list_view(request):
 
         # 检查模板文件是否存在
         template_path = os.path.join(settings.BASE_DIR, 'score_analysis', 'templates', 'score_analysis',
-                                     'exam_overview.html')
+                                     'exam_list.html')
         print(f"\n=== Template File Check ===")
         print(f"Looking for template at: {template_path}")
         print(f"Template exists: {os.path.exists(template_path)}")
@@ -32,7 +32,7 @@ def exam_list_view(request):
         # 尝试加载模板
         print("\n=== Template Loading Test ===")
         try:
-            template = get_template('score_analysis/exam_overview.html')
+            template = get_template('score_analysis/exam_list.html')
             print(f"Template found at: {template.origin.name}")
         except Exception as e:
             print(f"Template loading error: {str(e)}")

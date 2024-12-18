@@ -1,0 +1,66 @@
+{% extends "score_analysis/client/base.html" %}
+{% load static %}
+
+{% block title %}统计结果 - {{ exam.exam_name }}{% endblock %}
+
+{% block content %}
+<div class="statistics-container">
+    <div class="exam-header">
+        <h1>{{ exam.exam_name }} - 统计结果</h1>
+        <div class="exam-info">
+            <span>考试日期：{{ exam.exam_date|date:"Y-m-d" }}</span>
+            <span>考试类型：{{ exam.exam_type }}</span>
+        </div>
+    </div>
+
+    <div class="statistics-content">
+        {% for indicator in indicators %}
+            <div class="stat-section">
+                {% if indicator.subject %}
+                    <h3>{{ indicator.subject }} 统计数据</h3>
+                {% else %}
+                    <h3>总体统计数据</h3>
+                {% endif %}
+
+                <div class="stat-cards">
+                    <div class="stat-card">
+                        <div class="stat-card-title">参考人数</div>
+                        <div class="stat-card-value">{{ indicator.student_count }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-title">平均分</div>
+                        <div class="stat-card-value">{{ indicator.mean_score|floatformat:1 }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-title">最高分</div>
+                        <div class="stat-card-value">{{ indicator.max_score }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-title">最低分</div>
+                        <div class="stat-card-value">{{ indicator.min_score }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-title">及格率</div>
+                        <div class="stat-card-value">{{ indicator.pass_rate|floatformat:1 }}%</div>
+                    </div>
+                </div>
+
+                {% if indicator.rank_distribution %}
+                <div class="chart-section">
+                    <h4>分数分布</h4>
+                    <div class="chart-container">
+                        {{ indicator.rank_distribution|safe }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="actions">
+        <a href="{% url 'score_analysis:client_exam_list' %}" class="back-btn">
+            返回列表
+        </a>
+    </div>
+</div>
+{% endblock %}

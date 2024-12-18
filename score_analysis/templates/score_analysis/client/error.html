@@ -1,0 +1,21 @@
+
+{% extends "score_analysis/client/base.html" %}
+{% load static %}
+
+{% block title %}错误 - 考试统计系统{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="error-content">
+        <h1>出错了！</h1>
+        <p class="error-message">{{ error_message }}</p>
+        <div class="error-actions">
+            <a href="{% url 'score_analysis:client_exam_list' %}" class="back-btn">
+                返回考试列表
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+```
+

@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% block title %}考试统计分析{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- 左侧筛选条件 -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">筛选条件</h5>
+                </div>
+                <div class="card-body">
+                    <form id="exam-filter-form">
+                        <!-- 快速时间选择 -->
+                        <div class="mb-3">
+                            <label class="form-label">快速选择时间范围</label>
+                            <select name="quick_select" class="form-select">
+                                <option value="">自定义</option>
+                                <option value="last_month">最近一个月</option>
+                                <option value="last_3_months">最近三个月</option>
+                                <option value="last_6_months">最近六个月</option>
+                                <option value="last_year">最近一年</option>
+                            </select>
+                        </div>
+
+                        <!-- 日期范围 -->
+                        <div class="mb-3">
+                            <label class="form-label">开始日期</label>
+                            <input type="date" name="date_start" class="form-control" value="{{ filters.date_start|default:'' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">结束日期</label>
+                            <input type="date" name="date_end" class="form-control" value="{{ filters.date_end|default:'' }}">
+                        </div>
+
+                        <!-- 考试类型 -->
+                        <div class="mb-3">
+                            <label class="form-label">考试类型</label>
+                            <select name="exam_type" class="form-select">
+                                <option value="">全部类型</option>
+                                {% for type_value, type_name in exam_type_choices %}
+                                <option value="{{ type_value }}" {% if filters.exam_type == type_value %}selected{% endif %}>
+                                    {{ type_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">查询</button>
+                            <button type="button" class="btn btn-secondary" id="reset-filters">重置</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧内容区域 -->
+        <div class="col-md-9">
+            <!-- 考试列表 -->
+            <div id="exam-list-container">
+                {% include "score_analysis/partials/exam_list.html" %}
+            </div>
+
+            <!-- 统计数据展示区域 -->
+            <div id="stats-container" class="mt-4">
+                <!-- 统计数据将通过AJAX加载 -->
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('exam-filter-form');
+    const resetBtn = document.getElementById('reset-filters');
+
+    // 查看统计数据
+    function viewStatistics(examId) {
+        // 使用绝对路径
+        fetch(`/score-analysis/api/statistics/?exam_id=${examId}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('stats-container').innerHTML = data.html;
+            } else {
+                alert(data.message || '获取统计数据失败');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取统计数据失败');
+        });
+    }
+
+    // 刷新考试列表
+    function refreshExamList(formData) {
+        const queryString = new URLSearchParams(formData).toString();
+        // 使用绝对路径
+        fetch(`/score-analysis/?${queryString}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('exam-list-container').innerHTML = data.html;
+                setupEventListeners();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('刷新列表失败');
+        });
+    }
+    // 设置事件监听器
+    function setupEventListeners() {
+        document.querySelectorAll('.view-stats').forEach(btn => {
+            btn.addEventListener('click', function() {
+                viewStatistics(this.dataset.examId);
+            });
+        });
+    }
+
+    // 重置按钮事件
+    resetBtn.addEventListener('click', function() {
+        form.reset();
+        const formData = new FormData(form);
+        refreshExamList(formData);
+    });
+
+    // 表单提交事件
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        refreshExamList(formData);
+    });
+
+    // 初始化
+    setupEventListeners();
+});
+</script>
+{% endblock extra_js%}
