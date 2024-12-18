@@ -899,14 +899,12 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
     #各校的排名分布
     def _process_rank_distribution(self, stats):
         """处理排名分布数据
-
         Args:
             stats: StatisticsExamIndicators实例
-
         Returns:
             dict: {
-                '学校A': {'top_10': 5, 'top_20': 8, ...},
-                '学校B': {'top_10': 3, 'top_20': 6, ...},
+                '学校A': {'top_10': 5, 'top_20': 8, 'top_50': 10, ...},
+                '学校B': {'top_10': 0, 'top_20': 0, 'top_50': 2, ...},  # 没有的排名补0
             }
         """
         try:
@@ -918,13 +916,25 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             # 解析JSON数据
             rank_data = json.loads(stats.rank_distribution)
 
-            # 数据已经是正确的格式，直接返回
-            # 格式: {'学校名': {'top_10': n, 'top_20': n, ...}}
+            # 获取school_rankings数据
+            school_rankings = rank_data.get('school_rankings', {})
 
-            # 按top_10人数排序（如果需要）
+            # 定义所有需要的排名范围
+            rank_ranges = ['top_10', 'top_20', 'top_50', 'top_100',
+                           'top_200', 'top_500', 'top_1250']
+
+            # 处理每个学校的数据，确保所有排名范围都存在
+            processed_rankings = {}
+            for school, rankings in school_rankings.items():
+                processed_rankings[school] = {
+                    rank_range: rankings.get(rank_range, 0)
+                    for rank_range in rank_ranges
+                }
+
+            # 按top_10人数排序
             sorted_data = dict(sorted(
-                rank_data.items(),
-                key=lambda x: x[1].get('top_10', 0),
+                processed_rankings.items(),
+                key=lambda x: x[1]['top_10'],
                 reverse=True
             ))
 
@@ -933,7 +943,6 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
         except Exception as e:
             logger.error(f"处理排名分布数据失败: {str(e)}")
             return {}
-    #四分位分布情况
     def _process_quartile_analysis(self, stats, subject_type='science'):
         """处理四分位分析数据"""
         if not stats:

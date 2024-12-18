@@ -138,75 +138,65 @@ class BaseStatisticsService:
             raise
 
     def _calculate_rank_distribution(self, rankings, subject, district_name=None):
-        """计算单个科目的排名分布
+        """计算排名分布
         Args:
-            rankings: 排名数据
+            rankings: 成绩查询集 (ScoreStudentBasic.objects)
             subject: 科目（'total_score'/'chinese'/'math' 等）
-            district_name: 区县名称，如果提供则只统计该区县的排名
+            district_name: 区县名称，默认None表示地市级统计
         Returns:
             dict: {
                 'school_rankings': {
-                    '学校A': {'top_10': 3, 'top_20': 5, ...},
-                    '学校B': {'top_10': 2, 'top_20': 4, ...},
+                    '学校A': {'top_10': 5, 'top_20': 8, 'top_50': 15, ...},  # 实际人数
+                    '学校B': {'top_1250': 20}
                 }
             }
         """
         try:
-            # 根据科目选择合适的排名范围
-            rank_ranges = {
-                'top_10': 10,
-                'top_20': 20,
-                'top_50': 50,
-                'top_100': 100
-            }
-
-            # 总分增加更多范围
+            # 定义要统计的名次范围
+            rank_ranges = [10, 20, 50, 100]
             if subject == 'total_score':
-                rank_ranges.update({
-                    'top_200': 200,
-                    'top_500': 500,
-                    'top_1250': 1250
-                })
+                rank_ranges.extend([200, 500, 1250])
 
-            # 如果指定了区县，添加level_type过滤条件
+            # 构建基础查询
+            base_query = rankings.filter(
+                total_score__gt=0
+            )
+
+            # 如果指定了区县，添加区县过滤
             if district_name:
-                logger.info(f"计算{district_name}的{subject}排名分布")
-                rankings = rankings.filter(level_type=district_name)
+                base_query = base_query.filter(district_name=district_name)
 
-            # 初始化学校排名统计
+            # 先排序并获取所有需要的数据
+            ordered_scores = list(base_query.order_by(
+                '-total_score',
+                '-math'
+            ).values('school_name'))
+
             school_rankings = {}
 
-            # 获取所有符合条件的学生记录
-            students = rankings.filter(
-                subject=subject,
-                raw_score_rank__lte=max(rank_ranges.values())  # 只获取最大范围内的记录
-            ).values('school_name', 'raw_score_rank')
+            # 对每个名次范围进行统计
+            for top_n in rank_ranges:
+                # 获取前 top_n 名的成绩
+                top_scores = ordered_scores[:top_n]
 
-            # 统计每个学校在各个范围的人数
-            for student in students:
-                school_name = student.get('school_name')
-                rank = student.get('raw_score_rank')
+                # 统计每个学校的人数
+                school_counts = {}
+                for score in top_scores:
+                    school_name = score['school_name']
+                    if school_name:
+                        school_counts[school_name] = school_counts.get(school_name, 0) + 1
 
-                if not school_name:
-                    continue
+                # 更新学校排名统计
+                for school_name, count in school_counts.items():
+                    if school_name not in school_rankings:
+                        school_rankings[school_name] = {}
+                    school_rankings[school_name][f'top_{top_n}'] = count
 
-                # 初始化学校数据
-                if school_name not in school_rankings:
-                    school_rankings[school_name] = {f'top_{n}': 0 for n in rank_ranges.values()}
-
-                # 更新各个范围的计数
-                for range_name, rank_limit in rank_ranges.items():
-                    if rank <= rank_limit:
-                        school_rankings[school_name][range_name] += 1
-
-            logger.info(f"计算{subject}排名分布成功")
-            return school_rankings
+            return {'school_rankings': school_rankings}
 
         except Exception as e:
-            logger.error(f"计算{subject}排名分布失败: error={str(e)}")
-            logger.error(f"rankings 数据: {rankings.query}")
+            logger.error(f"计算排名分布失败: error={str(e)}")
             raise
-
     def _calculate_threshold_stats(self, scores):
 
         """计算达线统计"""
@@ -404,9 +394,9 @@ class BaseStatisticsService:
                 logger.info(f"开始处理科目 {subject}")
 
                 # 打印该科目的原始数据
-                raw_scores = scores.values_list(field_name, flat=True)
-                logger.info(f"科目 {subject} 原始成绩数量: {raw_scores.count()}")
-                logger.info(f"科目 {subject} 成绩示例: {list(raw_scores[:5])}")
+                #raw_scores = scores.values_list(field_name, flat=True)
+                #logger.info(f"科目 {subject} 原始成绩数量: {raw_scores.count()}")
+                #logger.info(f"科目 {subject} 成绩示例: {list(raw_scores[:5])}")
 
                 # 获取该科目的所有分数（排除空值和零分）
                 subject_scores = list(scores.values_list(field_name, flat=True)
@@ -812,11 +802,26 @@ class BaseStatisticsService:
                     continue
 
                 # 获取该科目的排名分布，根据level_type决定是否传入区县名称
+                # 修改排名分布的计算逻辑
+                if level_type == '地市级':
+                    # 地市级：使用所有数据计算排名分布
+                    source_scores = ScoreStudentBasic.objects.filter(
+                        exam_id=exam_id,
+                        select_type=select_type
+                    )
+                else:
+                    # 区县级：只使用该区县的数据计算排名分布
+                    source_scores = ScoreStudentBasic.objects.filter(
+                        exam_id=exam_id,
+                        select_type=select_type,
+                        district_name=level_type
+                    )
+
                 rank_distributions = self._calculate_rank_distribution(
-                    rankings=rankings,
-                    subject=subject_name,
-                    district_name=None if level_type == '地市级' else level_type
-                )
+                    rankings=source_scores,
+                    subject=subject_name
+                    )
+
                 defaults = {
                     # 基础统计
                     'student_count': stats['basic_stats']['student_count'],
