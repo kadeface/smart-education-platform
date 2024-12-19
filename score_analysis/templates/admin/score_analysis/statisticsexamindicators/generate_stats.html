@@ -16,42 +16,51 @@
     </div>
 
     <!-- 市级数据 -->
-    <div class="summary-container">
-        <!-- 理科综述 -->
-        <div class="summary-section">
-            <h3>理科综述</h3>
-            <div class="summary-text">
-                本次考试，总计有<span class="number-highlight">{{ science_summary.school_count }}</span>所学校，
-                参考总人数<span class="number-highlight">{{ science_summary.student_count }}</span>人。
-                平均分为<span class="score-highlight">{{ science_summary.mean_score }}</span>分，
-                最高分为<span class="score-highlight">{{ science_summary.max_score }}</span>分，
-                归属于<span class="school-highlight">{{ science_summary.top_school }}</span>。
+<div class="summary-container">
+    <!-- 理科综述 -->
+    <div class="summary-section">
+        <h3>理科综述</h3>
+        <div class="summary-text">
+            本次考试，总计有<span class="number-highlight">{{ science_summary.school_count }}</span>所学校，
+            参考总人数<span class="number-highlight">{{ science_summary.student_count }}</span>人。
+            平均分为<span class="score-highlight">{{ science_summary.mean_score }}</span>分，
+            最高分为<span class="score-highlight">{{ science_summary.max_score }}</span>分，
+            归属于<span class="school-highlight">{{ science_summary.top_school }}</span>。
 
-                {% for key, line in science_summary.score_lines.items %}
+            {% for key, line in science_summary.score_lines.items %}
+                {% if line.count > 0 %}
                     {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
+                    {% if line.count > 0 %}
                     人数<span class="number-highlight">{{ line.count }}</span>人
                     （<span class="rate-highlight">{{ line.rate }}%</span>）
-                {% endfor %}
-            </div>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
         </div>
+    </div>
 
-        <!-- 文科综述 -->
-        <div class="summary-section">
-            <h3>文科综述</h3>
-            <div class="summary-text">
-                本次考试，总计有<span class="number-highlight">{{ arts_summary.school_count }}</span>所学校，
-                参考总人数<span class="number-highlight">{{ arts_summary.student_count }}</span>人。
-                平均分为<span class="score-highlight">{{ arts_summary.mean_score }}</span>分，
-                最高分为<span class="score-highlight">{{ arts_summary.max_score }}</span>分，
-                归属于<span class="school-highlight">{{ arts_summary.top_school }}</span>。
+    <!-- 文科综述 -->
+    <div class="summary-section">
+        <h3>文科综述</h3>
+        <div class="summary-text">
+            本次考试，总计有<span class="number-highlight">{{ arts_summary.school_count }}</span>所学校，
+            参考总人数<span class="number-highlight">{{ arts_summary.student_count }}</span>人。
+            平均分为<span class="score-highlight">{{ arts_summary.mean_score }}</span>分，
+            最高分为<span class="score-highlight">{{ arts_summary.max_score }}</span>分，
+            归属于<span class="school-highlight">{{ arts_summary.top_school }}</span>。
 
-                {% for key, line in arts_summary.score_lines.items %}
+            {% for key, line in arts_summary.score_lines.items %}
+                {% if line.count > 0 %}
                     {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
+                    {% if line.count > 0 %}
                     人数<span class="number-highlight">{{ line.count }}</span>人
                     （<span class="rate-highlight">{{ line.rate }}%</span>）
-                {% endfor %}
-            </div>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
         </div>
+    </div>
+</div>
 
         <!-- 区县数据（仅地市级考试显示） -->
         {% if level_type == '地市级' and district_data %}
