@@ -16,5 +16,8 @@ __all__ = [
     'ScoreDistributions',
     'BaseExamConfig',
     'BaseSubjectConfig',
-    'BaseSchoolInfo'
+    'BaseSchoolInfo',
+    'RegionLayerAnalysis',
+    'RegionCharacteristics',
+    'RegionProgress'
 ]

@@ -190,7 +190,8 @@ class StatisticsExamIndicators(models.Model):
         managed = False
         db_table = 'statistics_exam_indicators'
         unique_together = (('exam', 'subject', 'select_type', 'level_type'),)
-
+        verbose_name = '基础指标统计'
+        verbose_name_plural = '基础指标统计'
 
 # StatisticsPrecomputedMetrics模型的简化版本
 class StatisticsPrecomputedMetrics(models.Model):

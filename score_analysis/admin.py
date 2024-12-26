@@ -1,5 +1,6 @@
 #score_analysis/score_analysis.py:
 import json
+from django.utils.html import format_html
 from django.urls import path ,reverse
 from django.template.response import TemplateResponse  # 添加这行导入
 from django.db import connection
@@ -17,7 +18,8 @@ from .models.source import ScoreStudentBasic
 from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
 import logging
-
+from .models.region import LayerAnalysis, RegionLayerDetail
+from .services.region.layer_analysis import LayerAnalysisService
 # 获取 logger 实例
 logger = logging.getLogger('django')  # 使用 Django 的默认 logger
 class ExamScoreLinesForm(forms.ModelForm):
@@ -1303,4 +1305,125 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                     'zk_line': 0
                 }
             }
+
+
+@admin.register(LayerAnalysis)
+class LayerAnalysisAdmin(admin.ModelAdmin):
+    """总分层次分析管理"""
+    change_list_template = 'admin/score_analysis/layeranalysis/change_list.html'
+
+    def changelist_view(self, request, extra_context=None):
+        """自定义列表视图"""
+        # 获取所有考试信息，按考试ID降序排序
+        exams = BaseExamConfig.objects.all().order_by('-exam_id').values(
+            'exam_id',
+            'exam_name',
+            'exam_date'
+        )
+
+        # 获取已生成分层分析的考试ID列表
+        analyzed_exams = set(
+            LayerAnalysis.objects.values_list('exam_id', flat=True)
+            .distinct()
+        )
+
+        # 准备考试数据
+        exam_list = []
+        for exam in exams:
+            exam_data = {
+                'exam_id': exam['exam_id'],
+                'exam_name': exam['exam_name'],
+                'exam_date': self._get_exam_date(exam['exam_id']),
+                'has_analysis': exam['exam_id'] in analyzed_exams
+            }
+            exam_list.append(exam_data)
+
+        context = {
+            'title': '分层分析管理',
+            'exam_list': exam_list,
+            'has_add_permission': False,  # 禁用添加按钮
+            'has_change_permission': True,
+            'has_delete_permission': False,  # 禁用删除按钮
+            'has_view_permission': True,
+            'opts': self.model._meta,  # 添加模型元数据
+            **self.admin_site.each_context(request),
+            **(extra_context or {})
+        }
+
+        return TemplateResponse(request, self.change_list_template, context)
+
+    def get_urls(self):
+        """添加自定义URL"""
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'generate/<str:exam_id>/',
+                self.admin_site.admin_view(self.generate_analysis),
+                name='layer_analysis_generate'
+            ),
+            path(
+                'view/<str:exam_id>/',
+                self.admin_site.admin_view(self.view_analysis),
+                name='layer_analysis_view'
+            ),
+        ]
+        return custom_urls + urls
+
+    def generate_analysis(self, request, exam_id):
+        """生成分层分析"""
+        try:
+            service = LayerAnalysisService()
+            service.generate_layer_analysis(exam_id=exam_id)
+            messages.success(request, f'考试 {exam_id} 的分层分析数据已重新生成')
+
+        except Exception as e:
+            messages.error(request, f'生成分层分析失败: {str(e)}')
+            logger.error(f"生成分层分析失败: {str(e)}", exc_info=True)
+
+        return redirect('admin:score_analysis_layeranalysis_changelist')
+
+    def view_analysis(self, request, exam_id):
+        """查看分层分析结果"""
+        try:
+            analyses = LayerAnalysis.objects.filter(exam_id=exam_id)
+            if not analyses.exists():
+                messages.error(request, f'未找到考试 {exam_id} 的分层分析数据')
+                return redirect('admin:score_analysis_layeranalysis_changelist')
+
+            context = {
+                'title': f'考试 {exam_id} 分层分析结果',
+                'exam_id': exam_id,
+                'analyses': analyses,
+                **self.admin_site.each_context(request),
+            }
+
+            return TemplateResponse(
+                request,
+                'admin/score_analysis/layeranalysis/view_analysis.html',
+                context
+            )
+
+        except Exception as e:
+            messages.error(request, f'查看分析结果失败: {str(e)}')
+            return redirect('admin:score_analysis_layeranalysis_changelist')
+
+    def _get_exam_date(self, exam_id):
+        """从考试ID中提取年月"""
+        try:
+            if exam_id and len(exam_id) >= 6:
+                year = exam_id[:4]
+                month = exam_id[4:6]
+                return f"{year}年{month}月"
+        except Exception as e:
+            logger.error(f"解析考试日期失败: {str(e)}")
+        return ''
+
+    def has_add_permission(self, request):
+        """禁用添加功能"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """禁用删除功能"""
+        return False
+
 

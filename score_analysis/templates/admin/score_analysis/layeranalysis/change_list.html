@@ -1,0 +1,101 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" type="text/css" href="{% static "admin/css/changelists.css" %}">
+  <style>
+    .button {
+        display: inline-block;
+        padding: 5px 10px;
+        margin: 0 5px;
+        text-decoration: none;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+        background-color: #417690;
+    }
+    .status-icon {
+        font-size: 16px;
+        font-weight: bold;
+    }
+    .status-success {
+        color: #4caf50;
+    }
+    .status-pending {
+        color: #f44336;
+    }
+    .table-header {
+        background-color: #f8f8f8;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module filtered">
+        <div class="results">
+            <table id="result_list">
+                <thead>
+                    <tr class="table-header">
+                        <th scope="col">
+                            <div class="text">EXAM ID</div>
+                        </th>
+                        <th scope="col">
+                            <div class="text">考试名称</div>
+                        </th>
+                        <th scope="col">
+                            <div class="text">考试时间</div>
+                        </th>
+                        <th scope="col">
+                            <div class="text">已生成分层</div>
+                        </th>
+                        <th scope="col">
+                            <div class="text">操作</div>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exam in exam_list %}
+                    <tr class="{% cycle 'row1' 'row2' %}">
+                        <td>{{ exam.exam_id }}</td>
+                        <td>{{ exam.exam_name }}</td>
+                        <td>{{ exam.exam_date }}</td>
+                        <td style="text-align: center;">
+                            {% if exam.has_analysis %}
+                                <span class="status-icon status-success">✓</span>
+                            {% else %}
+                                <span class="status-icon status-pending">✗</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a class="button"
+                               href="{% url 'admin:layer_analysis_generate' exam.exam_id %}"
+                               onclick="return confirm('{% if exam.has_analysis %}确定要重新生成分层分析吗？这将删除现有的分析数据。{% else %}确定要生成分层分析吗？{% endif %}')">
+                                {% if exam.has_analysis %}
+                                    重新生成
+                                {% else %}
+                                    分层分析
+                                {% endif %}
+                            </a>
+                            {% if exam.has_analysis %}
+                            <a class="button"
+                               href="{% url 'admin:layer_analysis_view' exam.exam_id %}">
+                                查看结果
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center;">
+                            暂无考试数据
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
