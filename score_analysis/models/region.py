@@ -51,7 +51,7 @@ class RegionLayerDetail(models.Model):
     max_score = models.DecimalField(max_digits=10, decimal_places=2, help_text='最高分')
     min_score = models.DecimalField(max_digits=10, decimal_places=2, help_text='最低分')
     std_dev = models.DecimalField(max_digits=10, decimal_places=2, help_text='标准差')
-
+    school_stats = models.JSONField(verbose_name='学校统计数据', default=dict)
     # 差距分析
     city_diff = models.DecimalField(max_digits=10, decimal_places=2, help_text='与市平均分差距')
     district_diff = models.DecimalField(max_digits=10, decimal_places=2, null=True,

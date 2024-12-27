@@ -20,6 +20,7 @@ from django.db.models import Subquery, OuterRef
 import logging
 from .models.region import LayerAnalysis, RegionLayerDetail
 from .services.region.layer_analysis import LayerAnalysisService
+from .services.region.layer_view import LayerViewService
 # 获取 logger 实例
 logger = logging.getLogger('django')  # 使用 Django 的默认 logger
 class ExamScoreLinesForm(forms.ModelForm):
@@ -1385,25 +1386,54 @@ class LayerAnalysisAdmin(admin.ModelAdmin):
     def view_analysis(self, request, exam_id):
         """查看分层分析结果"""
         try:
+            # 检查数据是否存在
             analyses = LayerAnalysis.objects.filter(exam_id=exam_id)
             if not analyses.exists():
                 messages.error(request, f'未找到考试 {exam_id} 的分层分析数据')
                 return redirect('admin:score_analysis_layeranalysis_changelist')
 
+            # 获取请求参数
+            select_type = request.GET.get('select_type', '理科')
+            selected_districts = request.GET.getlist('districts')
+
+            # 使用服务类获取数据
+            service = LayerViewService()
+            exam_info = service.get_exam_info(exam_id)
+            district_analysis = service.get_district_analysis(exam_id, select_type)
+            school_analysis = service.get_school_analysis(exam_id, select_type, selected_districts)
+            all_districts = service.get_all_districts(exam_id)
+
+            # 构建URL
+            science_url = f"?select_type=理科"
+            liberal_url = f"?select_type=文科"
+            if selected_districts:
+                for district in selected_districts:
+                    science_url += f"&districts={district}"
+                    liberal_url += f"&districts={district}"
+
             context = {
                 'title': f'考试 {exam_id} 分层分析结果',
                 'exam_id': exam_id,
-                'analyses': analyses,
+                'exam_info': exam_info,
+                'select_type': select_type,
+                'district_analysis': district_analysis,
+                'school_analysis': school_analysis,
+                'all_districts': all_districts,
+                'selected_districts': selected_districts,
+                'science_url': science_url,
+                'liberal_url': liberal_url,
+                'is_city_exam': 'CITY' in exam_id.upper(),
                 **self.admin_site.each_context(request),
             }
 
             return TemplateResponse(
                 request,
-                'admin/score_analysis/layeranalysis/view_analysis.html',
+                'score_analysis/region/layer_analysis.html',
                 context
             )
 
         except Exception as e:
+            logger.error(f"查看分析结果失败: {str(e)}", exc_info=True)
             messages.error(request, f'查看分析结果失败: {str(e)}')
             return redirect('admin:score_analysis_layeranalysis_changelist')
 

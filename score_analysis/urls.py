@@ -11,6 +11,8 @@ from .views.client import (client_exam_list,
                       view_statistics_result
                     )
 from .views.api import StatisticsDataAPIView
+from .views.layer_view import LayerView
+
 app_name = 'score_analysis'
 urlpatterns = [
     path('', exam_list_view, name='exam_list'),
@@ -23,6 +25,7 @@ urlpatterns = [
     path('client/<str:exam_id>/', client_exam_detail, name='client_exam_detail'),  # 详情页
     #path('client/statistics/', view_statistics_result, name='view_statistics_result'),  # 统计结果
     path('statistics-result/<str:exam_id>/', view_statistics_result, name='view_statistics_result'),
+    path('region/layer/<str:exam_id>/', LayerView.as_view(), name='layer_view'),
  #   path('api/statistics/data/', StatisticsDataAPIView.as_view(), name='statistics-data'),
 ]
 

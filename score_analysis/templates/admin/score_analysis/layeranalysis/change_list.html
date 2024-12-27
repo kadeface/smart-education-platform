@@ -79,10 +79,11 @@
                                 {% endif %}
                             </a>
                             {% if exam.has_analysis %}
-                            <a class="button"
-                               href="{% url 'admin:layer_analysis_view' exam.exam_id %}">
-                                查看结果
-                            </a>
+                            <a href="{% url 'score_analysis:layer_view' exam.exam_id %}"
+                               class="button" target="_blank">查看结果</a>
+                            {% else %}
+                            <a href="{% url 'admin:layer_analysis_generate' exam.exam_id %}"
+                               class="button">生成分析</a>
                             {% endif %}
                         </td>
                     </tr>
