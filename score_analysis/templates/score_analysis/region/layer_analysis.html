@@ -1,5 +1,4 @@
 <!-- templates/score_analysis/region/layer_analysis.html -->
-
 {% extends "score_analysis/base.html" %}
 {% load static %}
 {% load region_filters %}
@@ -7,7 +6,7 @@
 {% block title %}层次分析 - {{ exam_info.exam_name }}{% endblock %}
 
 {% block analysis_css %}
-<link rel="stylesheet" href="{% static 'score_analysis/css/region/layer_analysis.css' %}">
+<link rel="stylesheet" href="{% static 'score_analysis/css/layer_analysis.css' %}">
 {% endblock %}
 
 {% block analysis_content %}
@@ -24,111 +23,136 @@
 
     <!-- 2. 文理科切换 -->
     <div class="type-tabs">
-        <a href="{{ science_url }}"
-           class="tab {% if select_type == '理科' %}active{% endif %}">理科</a>
-        <a href="{{ liberal_url }}"
-           class="tab {% if select_type == '文科' %}active{% endif %}">文科</a>
+        <a href="{{ science_url }}" {% if select_type == '理科' %}class="active"{% endif %}>理科</a>
+        <a href="{{ liberal_url }}" {% if select_type == '文科' %}class="active"{% endif %}>文科</a>
     </div>
 
-    {% if is_city_exam %}
     <!-- 3. 区县层次分析表格 -->
     <div class="district-analysis">
-        <h3>区县层次分析</h3>
+        <h3>1. 区县层次分析</h3>
         <table class="analysis-table">
             <thead>
                 <tr>
-                    <th rowspan="2">层次</th>
-                    <th colspan="3">市级统计</th>
-                    {% for district in district_analysis.district_stats.keys %}
-                    <th colspan="3">{{ district }}</th>
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <th>占比</th>
-                    <th>均分</th>
-                    <th>最低分</th>
-                    {% for district in district_analysis.district_stats.keys %}
-                    <th>人数</th>
-                    <th>占比</th>
-                    <th>均分</th>
+                    <th rowspan="2">区县</th>
+                    <th rowspan="2">指标</th>
+                    {% for layer_type in layer_types %}
+                    <th>{{ layer_type }}</th>
                     {% endfor %}
                 </tr>
             </thead>
             <tbody>
-                {% for layer_type, city_data in district_analysis.city_stats.items %}
+                <!-- 市级统计行 -->
                 <tr>
-                    <td>{{ layer_type }}</td>
-                    <td>{{ city_data.ratio|format_ratio }}</td>
+                    <td>市级统计</td>
+                    <td>均分</td>
+                    {% for layer_type in layer_types %}
+                    {% with city_data=district_analysis.city_stats|get_item:layer_type %}
                     <td>{{ city_data.avg_score|format_score }}</td>
-                    <td>{{ city_data.min_score|format_score }}</td>
-                    {% for district, dist_data in district_analysis.district_stats.items %}
-                    <td>{{ dist_data|get_item:layer_type|get_item:'count' }}</td>
+                    {% endwith %}
+                    {% endfor %}
+                </tr>
+
+                <!-- 区县统计行 -->
+                {% for district in district_analysis.district_stats.keys %}
+                <tr>
+                    <td rowspan="4">{{ district }}</td>
+                    <td>人数</td>
+                    {% with dist_data=district_analysis.district_stats|get_item:district %}
+                    {% for layer_type in layer_types %}
+                    <td>{{ dist_data|get_item:layer_type|get_item:'count'|default:'-' }}</td>
+                    {% endfor %}
+                    {% endwith %}
+                </tr>
+                <tr>
+                    <td>占比</td>
+                    {% with dist_data=district_analysis.district_stats|get_item:district %}
+                    {% for layer_type in layer_types %}
                     <td>{{ dist_data|get_item:layer_type|get_item:'ratio'|format_ratio }}</td>
+                    {% endfor %}
+                    {% endwith %}
+                </tr>
+                <tr>
+                    <td>均分</td>
+                    {% with dist_data=district_analysis.district_stats|get_item:district %}
+                    {% for layer_type in layer_types %}
                     <td>{{ dist_data|get_item:layer_type|get_item:'avg_score'|format_score }}</td>
                     {% endfor %}
+                    {% endwith %}
+                </tr>
+                <tr>
+                    <td>差值</td>
+                    {% with dist_data=district_analysis.district_stats|get_item:district %}
+                    {% for layer_type in layer_types %}
+                        <td {% if dist_data|get_item:layer_type|get_item:'diff' > 0 %}class="positive"{% elif dist_data|get_item:layer_type|get_item:'diff' < 0 %}class="negative"{% endif %}>
+                            {{ dist_data|get_item:layer_type|get_item:'diff'|format_diff }}
+                        </td>
+                    {% endfor %}
+                    {% endwith %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    {% endif %}
 
-    <!-- 4. 学校层次分析 -->
-    <div class="school-analysis">
-        <h3>学校层次分析</h3>
+    <!-- 4. 学校分析部分 -->
+<!-- 学校数据表格 -->
+<!-- 学校分析表格 -->
+<div class="school-analysis">
+    <h3>2. 学校分析</h3>
 
-        {% if is_city_exam %}
-        <!-- 区县多选 -->
-        <div class="district-selector">
-            <form method="get">
-                <input type="hidden" name="select_type" value="{{ select_type }}">
-                {% for district in all_districts %}
-                <label class="checkbox-label">
-                    <input type="checkbox" name="districts" value="{{ district }}"
-                           {% if district in selected_districts %}checked{% endif %}>
-                    {{ district }}
-                </label>
-                {% endfor %}
-                <button type="submit" class="submit-btn">确定</button>
-            </form>
-        </div>
-        {% endif %}
-
-        <!-- 学校数据表格 -->
-        <table class="analysis-table">
-            <thead>
-                <tr>
-                    <th>学校名称</th>
-                    <th>区县</th>
-                    {% with first_school=school_analysis.values|first %}
-                    {% for layer_type in first_school.layers.keys %}
-                    <th colspan="2">{{ layer_type }}</th>
-                    {% endfor %}
-                    {% endwith %}
-                </tr>
-                <tr>
-                    <th colspan="2"></th>
-                    {% with first_school=school_analysis.values|first %}
-                    {% for layer_type in first_school.layers.keys %}
-                    <th>人数</th>
-                    <th>均分</th>
-                    {% endfor %}
-                    {% endwith %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for school, data in school_analysis.items %}
-                <tr>
-                    <td>{{ school }}</td>
-                    <td>{{ data.district }}</td>
-                    {% for layer_type, layer_data in data.layers.items %}
-                    <td>{{ layer_data.count }}</td>
-                    <td>{{ layer_data.avg_score|format_score }}</td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- 分科切换 -->
+    <div class="type-tabs">
+        <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}"
+           class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
+        <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}"
+           class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
     </div>
+
+    <!-- 区县选择器 -->
+    <div class="district-filter">
+        <form method="get">
+            <input type="hidden" name="select_type" value="{{ select_type }}">
+            {% for district in all_districts %}
+            <label class="checkbox-label">
+                <input type="checkbox" name="districts" value="{{ district }}"
+                       {% if district in selected_districts %}checked{% endif %}>
+                {{ district }}
+            </label>
+            {% endfor %}
+            <button type="submit" class="filter-btn">确定</button>
+        </form>
+    </div>
+
+    <!-- 学校数据表格 -->
+    <table class="school-table">
+        <thead>
+            <tr>
+                <th rowspan="2">学校名称</th>
+                <th rowspan="2">区县</th>
+                {% for layer in layer_types %}
+                <th colspan="2">{{ layer }}</th>
+                {% endfor %}
+            </tr>
+            <tr>
+                {% for layer in layer_types %}
+                <th>市级</th>
+                <th>区县</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for school in school_analysis %}
+            <tr>
+                <td>{{ school.school_name }}</td>
+                <td>{{ school.district }}</td>
+                {% for layer in layer_types %}
+                <td>{{ school.layers|get_item:layer|get_item:'city' }}</td>
+                <td>{{ school.layers|get_item:layer|get_item:'district' }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 </div>
 {% endblock %}

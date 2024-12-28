@@ -1,0 +1,143 @@
+/* static/score_analysis/css/layer_analysis.css */
+
+/* 保留原有的基础样式 */
+.layer-analysis {
+    padding: 20px;
+}
+
+.exam-header {
+    margin-bottom: 20px;
+}
+
+.exam-info {
+    color: #666;
+}
+
+.exam-info span {
+    margin-right: 20px;
+}
+
+.type-tabs {
+    margin-bottom: 20px;
+}
+
+.type-tabs a {
+    padding: 8px 16px;
+    margin-right: 10px;
+    text-decoration: none;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.type-tabs a.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* 原有的表格样式 */
+.analysis-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+}
+
+.analysis-table th,
+.analysis-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+.analysis-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+/* 新增的表格样式 */
+.analysis-table tr td:first-child {
+    background-color: #f8f9fa;  /* 第一列背景色 */
+    font-weight: bold;
+}
+
+.analysis-table tr td:nth-child(2) {
+    background-color: #f8f9fa;  /* 第二列（指标）背景色 */
+}
+
+/* 差值的颜色样式 */
+.analysis-table td .positive {
+    color: #28a745;  /* 正值显示绿色 */
+}
+
+.analysis-table td .negative {
+    color: #dc3545;  /* 负值显示红色 */
+}
+
+/* 学校分析部分样式 */
+.school-analysis {
+    margin-top: 30px;
+}
+
+.district-filter {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.district-filter label {
+    margin-right: 15px;
+    cursor: pointer;
+}
+
+.district-filter input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+.district-filter button {
+    padding: 5px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.district-filter button:hover {
+    background-color: #0056b3;
+}
+
+.school-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.school-table th,
+.school-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+.school-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+/* 响应式布局 */
+@media screen and (max-width: 768px) {
+    .analysis-table,
+    .school-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .district-filter label {
+        display: block;
+        margin-bottom: 10px;
+    }
+}
