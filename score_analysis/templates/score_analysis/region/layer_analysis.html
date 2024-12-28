@@ -94,17 +94,15 @@
         </table>
     </div>
 
-    <!-- 4. 学校分析部分 -->
-<!-- 学校数据表格 -->
-<!-- 学校分析表格 -->
+<!-- 4. 学校分析部分 -->
 <div class="school-analysis">
-    <h3>2. 学校分析</h3>
+    <h3>2. 学校层次分析</h3>
 
     <!-- 分科切换 -->
     <div class="type-tabs">
-        <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}"
+        <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
            class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
-        <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}"
+        <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
            class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
     </div>
 
@@ -112,6 +110,9 @@
     <div class="district-filter">
         <form method="get">
             <input type="hidden" name="select_type" value="{{ select_type }}">
+            {% if sort_param %}
+            <input type="hidden" name="sort" value="{{ sort_param }}">
+            {% endif %}
             {% for district in all_districts %}
             <label class="checkbox-label">
                 <input type="checkbox" name="districts" value="{{ district }}"
@@ -130,7 +131,15 @@
                 <th rowspan="2">学校名称</th>
                 <th rowspan="2">区县</th>
                 {% for layer in layer_types %}
-                <th colspan="2">{{ layer }}</th>
+                <th colspan="2" class="sortable-header" data-layer="{{ layer }}">
+                    {{ layer }}
+                    <div class="sort-icons">
+                        <i class="fas fa-sort-up {% if sort_param == layer|add:'-asc' %}active{% endif %}"
+                           data-sort="asc"></i>
+                        <i class="fas fa-sort-down {% if sort_param == layer|add:'-desc' %}active{% endif %}"
+                           data-sort="desc"></i>
+                    </div>
+                </th>
                 {% endfor %}
             </tr>
             <tr>
@@ -146,8 +155,8 @@
                 <td>{{ school.school_name }}</td>
                 <td>{{ school.district }}</td>
                 {% for layer in layer_types %}
-                <td>{{ school.layers|get_item:layer|get_item:'city' }}</td>
-                <td>{{ school.layers|get_item:layer|get_item:'district' }}</td>
+                <td>{{ school.layers|get_item:layer|get_item:'city'|default:'-' }}</td>
+                <td>{{ school.layers|get_item:layer|get_item:'district'|default:'-' }}</td>
                 {% endfor %}
             </tr>
             {% endfor %}
@@ -155,4 +164,46 @@
     </table>
 </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('.sortable-header').click(function() {
+        const layer = $(this).data('layer');
+        const currentUrl = new URL(window.location.href);
+        const params = new URLSearchParams(currentUrl.search);
+
+        // 获取当前排序方式
+        const currentSort = params.get('sort') || '';
+        const [currentLayer, currentOrder] = currentSort.split('-');
+
+        // 决定新的排序方式
+        let newSort;
+        if (currentLayer === layer) {
+            // 如果点击的是当前排序的列，切换排序方向
+            newSort = currentOrder === 'desc' ? `${layer}-asc` : `${layer}-desc`;
+        } else {
+            // 如果点击新列，默认降序
+            newSort = `${layer}-desc`;
+        }
+
+        // 更新URL参数
+        params.set('sort', newSort);
+
+        // 保持其他参数不变
+        if (params.has('select_type')) {
+            params.set('select_type', params.get('select_type'));
+        }
+        if (params.has('districts')) {
+            params.set('districts', params.get('districts'));
+        }
+
+        currentUrl.search = params.toString();
+
+        // 跳转到新URL
+        window.location.href = currentUrl.toString();
+    });
+});
+</script>
 {% endblock %}
