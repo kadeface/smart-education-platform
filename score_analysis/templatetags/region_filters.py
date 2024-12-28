@@ -54,3 +54,4 @@ def format_diff(value):
         return f"{value:.2f}"
     except (ValueError, TypeError):
         return "-"
+

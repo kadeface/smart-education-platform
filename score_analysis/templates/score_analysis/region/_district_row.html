@@ -1,0 +1,28 @@
+<!-- templates/score_analysis/region/_district_row.html -->
+<tr>
+    <td rowspan="4">{{ district }}</td>
+    <td>人数</td>
+    {% for layer_type in layer_types %}
+    <td>{{ dist_data|get_item:layer_type|get_item:'count'|default:'-' }}</td>
+    {% endfor %}
+</tr>
+<tr>
+    <td>占比</td>
+    {% for layer_type in layer_types %}
+    <td>{{ dist_data|get_item:layer_type|get_item:'ratio'|format_ratio }}</td>
+    {% endfor %}
+</tr>
+<tr>
+    <td>均分</td>
+    {% for layer_type in layer_types %}
+    <td>{{ dist_data|get_item:layer_type|get_item:'avg_score'|format_score }}</td>
+    {% endfor %}
+</tr>
+<tr>
+    <td>差值</td>
+    {% for layer_type in layer_types %}
+    <td {% if dist_data|get_item:layer_type|get_item:'diff' > 0 %}class="positive"{% elif dist_data|get_item:layer_type|get_item:'diff' < 0 %}class="negative"{% endif %}>
+        {{ dist_data|get_item:layer_type|get_item:'diff'|format_diff }}
+    </td>
+    {% endfor %}
+</tr>

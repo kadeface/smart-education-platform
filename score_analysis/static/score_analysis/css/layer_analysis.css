@@ -1,185 +1,341 @@
-/* static/score_analysis/css/layer_analysis.css */
-
-/* 保留原有的基础样式 */
-.layer-analysis {
-    padding: 20px;
+/* 考试信息头部样式 */
+.exam-header h2 {
+    font-size: 32px;
+    color: #1d3557;
+    margin: 0;
+    font-weight: 500;
 }
 
-.exam-header {
-    margin-bottom: 20px;
-}
-
-.exam-info {
-    color: #666;
-}
-
-.exam-info span {
-    margin-right: 20px;
-}
-
-.type-tabs {
-    margin-bottom: 20px;
-}
-
-.type-tabs a {
-    padding: 8px 16px;
-    margin-right: 10px;
-    text-decoration: none;
-    color: #333;
-    border: 1px solid #ddd;
-}
-
-.type-tabs a.active {
-    background: #007bff;
-    color: white;
-    border-color: #007bff;
-}
-
-/* 原有的表格样式 */
-.analysis-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 20px 0;
+.exam-header .exam-info {
+    margin: 15px 0 30px;
+    color: #595959;
     font-size: 14px;
 }
 
-.analysis-table th,
+.exam-header .exam-info span {
+    margin-right: 30px;
+}
+/* 区县层次分析标题样式 */
+.district-analysis h3 {
+    position: relative;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.district-analysis h3::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #00bfa5;  /* 使用主题色绿色 */
+}
+/* 文理科切换标签样式 */
+.type-tabs {
+    margin: 20px 0;
+}
+
+.type-tabs a {
+    display: inline-block;
+    padding: 8px 20px;
+    margin-right: 10px;
+    border: 1px solid #00bfa5;
+    border-radius: 4px;
+    color: #00bfa5;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.type-tabs a.active {
+    background-color: #00bfa5;
+    color: white;
+}
+
+.type-tabs a:hover {
+    background-color: #e6f7ff;
+    text-decoration: none;
+}
+/* 区县层次分析表格样式 */
+.analysis-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+/* 表头样式 */
+.analysis-table th {
+    background-color: #00bfa5;
+    color: white;
+    padding: 12px;
+    text-align: center;
+    font-weight: 500;
+    border: 1px solid #e0e0e0;
+}
+
+/* 单元格基础样式 */
 .analysis-table td {
-    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+}
+/* 区县表格容器 */
+#district-table {
+    overflow-x: auto;
+    margin-top: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 4px;
+    position: relative;
+    max-height: 600px;  /* 设置最大高度，超出显示滚动条 */
+    overflow-y: auto;
+}
+
+/* 固定表头 */
+.analysis-table {
+    width: 100%;
+    border-collapse: separate;  /* 改为 separate 以支持固定表头 */
+    border-spacing: 0;
+    margin-top: 15px;
+    position: relative;
+}
+
+.analysis-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: #fff;
+}
+
+/* 确保表头底部边框可见 */
+.analysis-table th {
+    background-color: #00bfa5;
+    color: white;
+    padding: 12px;
+    text-align: center;
+    font-weight: 500;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);  /* 添加阴影效果 */
+}
+/* 区县名称列样式 */
+.analysis-table td:first-child {
+    font-weight: 500;
+    background-color: #f8f9fa;
+}
+
+/* 指标列样式 */
+.analysis-table td:nth-child(2) {
+    background-color: #f8f9fa;
+}
+
+/* 差值样式 */
+.analysis-table td.positive {
+    color: #4caf50;  /* 绿色 */
+    font-weight: 500;
+}
+
+.analysis-table td.negative {
+    color: #f44336;  /* 红色 */
+    font-weight: 500;
+}
+
+/* 人数样式 */
+.analysis-table tr:nth-child(4n-2) td:not(:first-child):not(:nth-child(2)) {
+    color: #2196f3;  /* 蓝色 */
+    background-color: #f3f8ff;
+}
+
+/* 占比样式 */
+.analysis-table tr:nth-child(4n-1) td:not(:first-child):not(:nth-child(2)) {
+    color: #00bcd4;  /* 青色 */
+    background-color: #e6fffb;
+}
+
+/* 均分样式 */
+.analysis-table tr:nth-child(4n) td:not(:first-child):not(:nth-child(2)) {
+    color: #e91e63;  /* 粉红色 */
+    background-color: #fff0f6;
+}
+
+
+
+/* 交替行背景色 */
+.analysis-table tbody tr:nth-child(4n+1),
+.analysis-table tbody tr:nth-child(4n+2),
+.analysis-table tbody tr:nth-child(4n+3),
+.analysis-table tbody tr:nth-child(4n+4) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* 鼠标悬停效果 */
+.analysis-table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+/* 学校层次分析部分样式 */
+.school-analysis {
+    margin-top: 40px;  /* 增加上边距 */
+}
+
+/* 标题样式保持不变 */
+.school-analysis h3 {
+    position: relative;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.school-analysis h3::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #00bfa5;
+}
+/* 学校层次分析表格样式 */
+.school-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+/* 表头样式 */
+.school-table th {
+    background-color: #00bfa5;
+    color: white;
+    padding: 12px 8px;
+    text-align: center;
+    font-weight: 500;
+    border: 1px solid #e0e0e0;
+    white-space: nowrap;
+}
+
+/* 单元格基础样式 */
+.school-table td {
     padding: 8px;
     text-align: center;
+    border: 1px solid #e0e0e0;
 }
 
-.analysis-table th {
-    background-color: #f8f9fa;
-    font-weight: bold;
+/* 学校名称列样式 */
+.school-table td:first-child {
+    text-align: left;
+    padding-left: 12px;
+    white-space: nowrap;
 }
 
-/* 新增的表格样式 */
-.analysis-table tr td:first-child {
-    background-color: #f8f9fa;  /* 第一列背景色 */
-    font-weight: bold;
+/* 区县列样式 */
+.school-table td:nth-child(2) {
+    white-space: nowrap;
 }
 
-.analysis-table tr td:nth-child(2) {
-    background-color: #f8f9fa;  /* 第二列（指标）背景色 */
+/* 数据单元格样式 */
+.school-table td:not(:first-child):not(:nth-child(2)) {
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-/* 差值的颜色样式 */
-.analysis-table td .positive {
-    color: #28a745;  /* 正值显示绿色 */
-}
 
-.analysis-table td .negative {
-    color: #dc3545;  /* 负值显示红色 */
-}
 
-/* 学校分析部分样式 */
-.school-analysis {
-    margin-top: 30px;
-}
 
+/* 区县筛选器样式 */
 .district-filter {
     margin: 20px 0;
     padding: 15px;
     background-color: #f8f9fa;
     border-radius: 4px;
+    border: 1px solid #e0e0e0;
 }
 
-.district-filter label {
+.checkbox-label {
+    display: inline-block;
     margin-right: 15px;
+    margin-bottom: 10px;
     cursor: pointer;
 }
 
-.district-filter input[type="checkbox"] {
+.checkbox-label input[type="checkbox"] {
     margin-right: 5px;
 }
 
-.district-filter button {
-    padding: 5px 15px;
-    background-color: #007bff;
+.filter-btn {
+    background-color: #00bfa5;
     color: white;
     border: none;
+    padding: 6px 15px;
     border-radius: 4px;
     cursor: pointer;
+    margin-left: 10px;
 }
 
-.district-filter button:hover {
-    background-color: #0056b3;
+.filter-btn:hover {
+    background-color: #00a896;
 }
 
-.school-table {
-    width: 100%;
-    border-collapse: collapse;
+/* 表头合并单元格样式 */
+.school-table th[colspan="2"] {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* 表格滚动容器 */
+#school-table {
+    overflow-x: auto;
     margin-top: 20px;
-    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 4px;
 }
 
-.school-table th,
-.school-table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: center;
+/* 类型切换标签样式 */
+.type-tabs {
+    margin-bottom: 20px;
 }
 
-.school-table th {
-    background-color: #f8f9fa;
-    font-weight: bold;
-}
-
-/* 响应式布局 */
-@media screen and (max-width: 768px) {
-    .analysis-table,
-    .school-table {
-        display: block;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-
-    .district-filter label {
-        display: block;
-        margin-bottom: 10px;
-    }
-}
-
-/* 排序相关样式 */
-.sortable-header {
-    position: relative;
-    cursor: pointer;
-}
-
-.sort-icons {
+.type-tabs .tab-item {
     display: inline-block;
-    margin-left: 5px;
+    padding: 8px 20px;
+    margin-right: 10px;
+    border: 1px solid #00bfa5;
+    border-radius: 4px;
+    color: #00bfa5;
+    text-decoration: none;
+    transition: all 0.3s;
 }
 
-.sort-icons i {
-    display: block;
-    font-size: 12px;
-    color: #999;
-    line-height: 8px;
+.type-tabs .tab-item.active {
+    background-color: #00bfa5;
+    color: white;
 }
 
-.sort-icons i.active {
-    color: #1890ff;
+.type-tabs .tab-item:hover {
+    background-color: #e6fffb;
+}
+/* 交替行背景色 */
+.school-table tbody > tr:nth-child(odd) {
+    background-color: #f3f8ff !important;  /* 浅蓝色 */
 }
 
-/* 确保图标垂直对齐 */
-.fa-sort-up {
+.school-table tbody > tr:nth-child(even) {
+    background-color: #fff0f6 !important;  /* 浅红色 */
+}
+
+/* 鼠标悬停效果 */
+.school-table tbody > tr:hover {
+    background-color: #e6f7ff !important;  /* 鼠标悬停时的浅蓝色 */
+}
+/* 区县和学校层次分析标题样式 */
+.district-analysis h3,
+.school-analysis h3 {
     position: relative;
-    top: 2px;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
 }
 
-.fa-sort-down {
-    position: relative;
-    bottom: 2px;
-}
-
-/* 排序图标悬停效果 */
-.sortable-header:hover .sort-icons i {
-    opacity: 0.8;
-}
-
-.sortable-header:hover {
-    background-color: #f5f5f5;
+.district-analysis h3::after,
+.school-analysis h3::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #00bfa5;  /* 使用主题色绿色 */
 }

@@ -21,15 +21,16 @@
         </div>
     </div>
 
-    <!-- 2. 文理科切换 -->
+
+
+   <!-- 3. 区县层次分析表格 -->
+    <div class="district-analysis">
+        <h3> 区县层次分析</h3>
+        <!-- 2. 文理科切换 -->
     <div class="type-tabs">
         <a href="{{ science_url }}" {% if select_type == '理科' %}class="active"{% endif %}>理科</a>
         <a href="{{ liberal_url }}" {% if select_type == '文科' %}class="active"{% endif %}>文科</a>
     </div>
-
-    <!-- 3. 区县层次分析表格 -->
-    <div class="district-analysis">
-        <h3>1. 区县层次分析</h3>
         <table class="analysis-table">
             <thead>
                 <tr>
@@ -94,116 +95,85 @@
         </table>
     </div>
 
-<!-- 4. 学校分析部分 -->
-<div class="school-analysis">
-    <h3>2. 学校层次分析</h3>
 
-    <!-- 分科切换 -->
-    <div class="type-tabs">
-        <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
-           class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
-        <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
-           class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
-    </div>
+    <!-- 4. 学校分析部分 -->
+    <div class="school-analysis">
+        <h3>学校层次分析</h3>
+
+        <!-- 分科切换 -->
+        <div class="type-tabs">
+            <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
+               class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
+            <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
+               class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
+        </div>
 
     <!-- 区县选择器 -->
-    <div class="district-filter">
-        <form method="get">
-            <input type="hidden" name="select_type" value="{{ select_type }}">
-            {% if sort_param %}
-            <input type="hidden" name="sort" value="{{ sort_param }}">
-            {% endif %}
-            {% for district in all_districts %}
-            <label class="checkbox-label">
-                <input type="checkbox" name="districts" value="{{ district }}"
-                       {% if district in selected_districts %}checked{% endif %}>
-                {{ district }}
-            </label>
-            {% endfor %}
-            <button type="submit" class="filter-btn">确定</button>
-        </form>
+        <!-- 区县选择器 -->
+        <div class="district-filter" id="district-filter">
+            <form method="get" action="{{ request.path }}#district-filter">
+                <input type="hidden" name="select_type" value="{{ select_type }}">
+                {% if sort_param %}
+                <input type="hidden" name="sort" value="{{ sort_param }}">
+                {% endif %}
+                {% if district_sort_param %}
+                <input type="hidden" name="district_sort" value="{{ district_sort_param }}">
+                {% endif %}
+                {% for district in all_districts %}
+                <label class="checkbox-label">
+                    <input type="checkbox" name="districts" value="{{ district }}"
+                           {% if district in selected_districts %}checked{% endif %}>
+                    {{ district }}
+                </label>
+                {% endfor %}
+                <button type="submit" class="filter-btn">确定</button>
+            </form>
+        </div>
+
+        <!-- 学校数据表格 -->
+        <div id="school-table">
+            <table class="school-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2">学校名称</th>
+                        <th rowspan="2">区县</th>
+                        {% for layer in layer_types %}
+                        <th colspan="2" class="sortable-header" data-layer="{{ layer }}">
+                            {{ layer }}
+                            <div class="sort-icons">
+                                <i class="fas fa-sort-up {% if sort_param == layer|add:'-asc' %}active{% endif %}"
+                                   data-sort="asc"></i>
+                                <i class="fas fa-sort-down {% if sort_param == layer|add:'-desc' %}active{% endif %}"
+                                   data-sort="desc"></i>
+                            </div>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        {% for layer in layer_types %}
+                        <th>市级</th>
+                        <th>区县</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for school in school_analysis %}
+                    <tr>
+                        <td>{{ school.school_name }}</td>
+                        <td>{{ school.district }}</td>
+                        {% for layer in layer_types %}
+                        <td>{{ school.layers|get_item:layer|get_item:'city'|default:'-' }}</td>
+                        <td>{{ school.layers|get_item:layer|get_item:'district'|default:'-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-
-    <!-- 学校数据表格 -->
-    <table class="school-table">
-        <thead>
-            <tr>
-                <th rowspan="2">学校名称</th>
-                <th rowspan="2">区县</th>
-                {% for layer in layer_types %}
-                <th colspan="2" class="sortable-header" data-layer="{{ layer }}">
-                    {{ layer }}
-                    <div class="sort-icons">
-                        <i class="fas fa-sort-up {% if sort_param == layer|add:'-asc' %}active{% endif %}"
-                           data-sort="asc"></i>
-                        <i class="fas fa-sort-down {% if sort_param == layer|add:'-desc' %}active{% endif %}"
-                           data-sort="desc"></i>
-                    </div>
-                </th>
-                {% endfor %}
-            </tr>
-            <tr>
-                {% for layer in layer_types %}
-                <th>市级</th>
-                <th>区县</th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for school in school_analysis %}
-            <tr>
-                <td>{{ school.school_name }}</td>
-                <td>{{ school.district }}</td>
-                {% for layer in layer_types %}
-                <td>{{ school.layers|get_item:layer|get_item:'city'|default:'-' }}</td>
-                <td>{{ school.layers|get_item:layer|get_item:'district'|default:'-' }}</td>
-                {% endfor %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-$(document).ready(function() {
-    $('.sortable-header').click(function() {
-        const layer = $(this).data('layer');
-        const currentUrl = new URL(window.location.href);
-        const params = new URLSearchParams(currentUrl.search);
 
-        // 获取当前排序方式
-        const currentSort = params.get('sort') || '';
-        const [currentLayer, currentOrder] = currentSort.split('-');
 
-        // 决定新的排序方式
-        let newSort;
-        if (currentLayer === layer) {
-            // 如果点击的是当前排序的列，切换排序方向
-            newSort = currentOrder === 'desc' ? `${layer}-asc` : `${layer}-desc`;
-        } else {
-            // 如果点击新列，默认降序
-            newSort = `${layer}-desc`;
-        }
 
-        // 更新URL参数
-        params.set('sort', newSort);
-
-        // 保持其他参数不变
-        if (params.has('select_type')) {
-            params.set('select_type', params.get('select_type'));
-        }
-        if (params.has('districts')) {
-            params.set('districts', params.get('districts'));
-        }
-
-        currentUrl.search = params.toString();
-
-        // 跳转到新URL
-        window.location.href = currentUrl.toString();
-    });
-});
-</script>
-{% endblock %}

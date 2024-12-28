@@ -3,7 +3,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}成绩分析系统{% endblock %}
+{% block title %}教学质量监测系统{% endblock %}
 
 {% block extra_css %}
 <!-- score_analysis 通用样式 -->
@@ -15,14 +15,14 @@
 <!-- score_analysis 通用导航 -->
 <div class="analysis-nav">
     <div class="nav-header">
-        <h1>成绩分析</h1>
+        <h1>教学评价</h1>
     </div>
     <div class="nav-menu">
         <a href="{% url 'admin:index' %}" class="nav-item">首页</a>
         <a href="{% url 'admin:score_analysis_layeranalysis_changelist' %}" class="nav-item">层次分析</a>
         <!-- 暂时注释掉其他未实现的链接 -->
-        {# <a href="{% url 'score_analysis:school' %}" class="nav-item">学校分析</a> #}
-        {# <a href="{% url 'score_analysis:subject' %}" class="nav-item">学科分析</a> #}
+        {#<a href="{% url 'score_analysis:school' %}" class="nav-item">学校分析</a> #}
+        {#<a href="{% url 'score_analysis:subject' %}" class="nav-item">学科分析</a> #}
     </div>
 </div>
 
