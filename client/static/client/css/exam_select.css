@@ -1,0 +1,133 @@
+/* static/score_analysis/css/exam_select.css */
+
+/* 页面头部样式 */
+.page-header {
+    background: #f8f9fa;
+    padding: 20px 40px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.page-header h1 {
+    color: #2c3e50;
+    font-size: 24px;
+    margin: 0;
+}
+
+.back-btn {
+    padding: 8px 20px;
+    background: #6c757d;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.back-btn:hover {
+    background: #5a6268;
+}
+
+/* 考试列表样式 */
+.exam-list {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 25px;
+    padding: 0 20px;
+}
+
+/* 考试卡片样式 */
+.exam-card {
+    background: white;
+    border-radius: 10px;
+    padding: 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    border: 1px solid #eee;
+}
+
+.exam-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.exam-card h3 {
+    color: #2c3e50;
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+/* 考试信息样式 */
+.exam-info {
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.exam-info p {
+    margin: 8px 0;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.exam-info i {
+    margin-right: 8px;
+    color: #00bfa5;
+    width: 16px;
+}
+
+/* 查看按钮样式 */
+.view-btn {
+    display: inline-block;
+    padding: 8px 24px;
+    background-color: #00bfa5;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    text-align: center;
+    font-weight: 500;
+}
+
+.view-btn:hover {
+    background-color: #00a693;
+    transform: translateY(-2px);
+}
+
+/* 无数据状态样式 */
+.no-exams {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 50px 20px;
+    color: #666;
+}
+
+.no-exams h2 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.no-exams p {
+    color: #666;
+    font-size: 16px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .exam-list {
+        grid-template-columns: 1fr;
+        padding: 0 15px;
+    }
+
+    .page-header {
+        padding: 15px 20px;
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+}

@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}广东省开平市中小学教学质量增值评价系统{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="{% static 'client/css/client_index.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="client-home">
+<!-- 功能卡片区域 -->
+<div class="feature-cards">
+    <!-- 质量监测 -->
+    <div class="feature-card">
+        <div class="card-icon">
+            <i class="fas fa-chart-pie"></i>
+        </div>
+        <h3>质量监测</h3>
+        <ul>
+            <li>考试成绩总体分析</li>
+            <li>各科成绩分布统计</li>
+            <li>及格率/优秀率分析</li>
+        </ul>
+        <a href="{% url 'client:grade_select' module_type='overview' %}" class="feature-btn">进入</a>
+    </div>
+
+    <!-- 区域分析 -->
+    <div class="feature-card">
+        <div class="card-icon">
+            <i class="fas fa-map-marked-alt"></i>
+        </div>
+        <h3>区域分析</h3>
+        <ul>
+            <li>学校间成绩对比</li>
+            <li>区域间学校对比</li>
+            <li>整体水平评估</li>
+        </ul>
+        <a href="{% url 'client:grade_select' module_type='area' %}" class="feature-btn">进入</a>
+    </div>
+
+    <!-- 增值评估 -->
+    <div class="feature-card">
+        <div class="card-icon">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <h3>增值评估</h3>
+        <ul>
+            <li>区县增值分析</li>
+            <li>学校增值分析</li>
+            <li>多次考试对比</li>
+        </ul>
+        <a href="{% url 'client:grade_select' module_type='value_added' %}" class="feature-btn">进入</a>
+    </div>
+
+    <!-- 发展跟踪 -->
+    <div class="feature-card">
+        <div class="card-icon">
+            <i class="fas fa-user-graduate"></i>
+        </div>
+        <h3>发展跟踪</h3>
+        <ul>
+            <li>个人成绩发展轨迹</li>
+            <li>学生进步情况分析</li>
+            <li>长期成长趋势图</li>
+        </ul>
+        <a href="{% url 'client:grade_select' module_type='tracking' %}" class="feature-btn">进入</a>
+    </div>
+</div>
+
+    <!-- 页脚 -->
+    <footer class="home-footer">
+        <div class="footer-content">
+            <p>开平市教师发展中心：廖作东</p>
+            <p>联系方式：382241106@qq.com</p>
+        </div>
+    </footer>
+</div>
+{% endblock %}

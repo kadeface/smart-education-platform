@@ -1,0 +1,41 @@
+<!-- templates/client/exam_select.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ grade }}届 - 考试列表{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="{% static 'client/css/exam_select.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ grade }}届{{ school_level }} - 考试列表</h1>
+    <a href="{% url 'client:grade_select' module_type=module_type %}" class="back-btn">
+        <i class="fas fa-arrow-left"></i> 返回
+    </a>
+</div>
+
+<div class="exam-list">
+    {% if exams %}
+        {% for exam in exams %}
+        <div class="exam-card">
+            <h3>{{ exam.exam_name }}</h3>
+            <div class="exam-info">
+                <p><i class="far fa-calendar-alt"></i> 考试日期：{{ exam.exam_date|date:"Y年m月d日" }}</p>
+                <p><i class="fas fa-tasks"></i> 考试类型：{{ exam.exam_type }}</p>
+                <p><i class="fas fa-graduation-cap"></i> 当前年级：{{ exam.current_grade }}</p>
+            </div>
+            <a href="{% url 'client:analysis_view' module_type=module_type grade=grade exam_id=exam.exam_id %}"
+               class="view-btn">查看分析</a>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="no-exams">
+            <h2>暂无考试数据</h2>
+            <p>该年级目前没有可用的考试信息</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

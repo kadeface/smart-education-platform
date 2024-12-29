@@ -1,262 +1,104 @@
-/* 基础样式 */
-body {
-    margin: 0;
-    padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    line-height: 1.6;
-    background-color: #f5f5f5;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
+/* score_analysis/static/score_analysis/css/exam_list.css */
 
-/* 头部导航样式 */
-.site-header {
-    background-color: #2c3e50;
-    padding: 1rem 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.main-nav {
-    max-width: 1200px;
-    margin: 0 auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.nav-brand {
-    color: #fff;
-    font-size: 1.5rem;
-    font-weight: bold;
-    text-decoration: none;
-}
-
-.nav-links {
-    display: flex;
-    gap: 20px;
-}
-
-.nav-links a {
-    color: #fff;
-    text-decoration: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    transition: background-color 0.3s ease;
-}
-
-.nav-links a:hover {
-    background-color: rgba(255,255,255,0.1);
-}
-
-/* 主内容区域包装 */
-.main-content {
-    flex: 1;
-    width: 100%;
-}
-
-/* 页脚样式 */
-.site-footer {
-    background-color: #2c3e50;
-    color: #fff;
-    text-align: center;
-    padding: 1rem;
-    margin-top: auto;  /* 推到底部 */
-}
-
-.site-footer p {
-    margin: 0;
-    font-size: 0.9rem;
-    opacity: 0.8;
-}
-
-/* 响应式导航 */
-@media (max-width: 768px) {
-    .main-nav {
-        flex-direction: column;
-        gap: 1rem;
-        text-align: center;
-    }
-
-    .nav-links {
-        flex-direction: column;
-    }
-
-    .nav-links a {
-        display: block;
-        padding: 0.5rem;
-    }
-}
-/* 容器样式 */
-.exam-list-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-/* 标题样式 */
-.exam-list-container h1 {
-    color: #333;
-    font-size: 24px;
-    margin-bottom: 30px;
-    padding-bottom: 10px;
-    border-bottom: 2px solid #eee;
-}
-
-/* 考试卡片网格布局 */
 .exam-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 20px;
     margin-top: 20px;
 }
 
-/* 考试卡片样式 */
 .exam-card {
     background: #fff;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     padding: 20px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
 }
 
 .exam-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-5px);
 }
 
-/* 考试信息样式 */
 .exam-info h2 {
-    color: #2c3e50;
+    color: #f5f5f5;
     font-size: 18px;
     margin: 0 0 15px 0;
-    font-weight: 600;
 }
 
-.exam-date, .exam-type {
+.exam-info p {
     color: #666;
+    margin: 8px 0;
     font-size: 14px;
-    margin: 5px 0;
+    display: flex;
+    align-items: center;
 }
 
-/* 操作按钮样式 */
+.exam-date:before {
+    content: '\f073';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    margin-right: 8px;
+    color: #00bfa5;
+}
+
+.exam-type:before {
+    content: '\f5fd';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 900;
+    margin-right: 8px;
+    color: #00bfa5;
+}
+
 .exam-actions {
+    text-align: center;
     margin-top: 20px;
-    text-align: right;
 }
 
 .view-stats-btn {
     display: inline-block;
-    padding: 8px 16px;
-    background-color: #3498db;
+    padding: 8px 20px;
+    background-color: #00bfa5;
     color: white;
     text-decoration: none;
     border-radius: 4px;
+    transition: background-color 0.3s;
     font-size: 14px;
-    transition: background-color 0.2s ease;
 }
 
 .view-stats-btn:hover {
-    background-color: #2980b9;
-    text-decoration: none;
+    background-color: #00a896;
     color: white;
+    text-decoration: none;
 }
 
-/* 无数据状态样式 */
 .no-data {
     grid-column: 1 / -1;
     text-align: center;
     padding: 40px;
-    background: #f8f9fa;
+    background: #fff;
     border-radius: 8px;
+    color: #666;
 }
 
-.no-data p {
-    color: #666;
-    font-size: 16px;
+.page-header {
+    margin-bottom: 30px;
+}
+
+.page-header h1 {
+    color: #1d3557;
+    font-size: 28px;
     margin: 0;
 }
 
-/* 响应式调整 */
+/* 响应式布局 */
+@media (max-width: 1024px) {
+    .exam-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
     .exam-grid {
         grid-template-columns: 1fr;
     }
-
-    .exam-card {
-        margin-bottom: 15px;
-    }
-
-    .exam-list-container {
-        padding: 15px;
-    }
-
-    .exam-list-container h1 {
-        font-size: 20px;
-        margin-bottom: 20px;
-    }
-}
-
-/* 加载动画 */
-.loading {
-    text-align: center;
-    padding: 20px;
-}
-
-.loading::after {
-    content: '';
-    display: inline-block;
-    width: 30px;
-    height: 30px;
-    border: 3px solid #f3f3f3;
-    border-top: 3px solid #3498db;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* 过滤器样式（如果需要） */
-.exam-filters {
-    margin-bottom: 20px;
-    padding: 15px;
-    background: #f8f9fa;
-    border-radius: 8px;
-}
-
-.exam-filters select,
-.exam-filters input {
-    margin-right: 10px;
-    padding: 6px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-/* 分页样式（如果需要） */
-.pagination {
-    margin-top: 30px;
-    text-align: center;
-}
-
-.pagination a {
-    display: inline-block;
-    padding: 8px 12px;
-    margin: 0 4px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    color: #333;
-    text-decoration: none;
-}
-
-.pagination a.active {
-    background-color: #3498db;
-    color: white;
-    border-color: #3498db;
-}
-
-.pagination a:hover:not(.active) {
-    background-color: #f5f5f5;
 }

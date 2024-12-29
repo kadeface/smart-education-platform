@@ -1,0 +1,234 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ module_name }} - 学段选择{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="{% static 'score_analysis/css/client_default.css' %}">
+<style>
+    /* 修改卡片布局为三列 */
+    .feature-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);  /* 改为3列 */
+        gap: 20px;  /* 减小间距 */
+        margin-top: 30px;
+    }
+
+    /* 调整卡片内边距 */
+    .feature-card {
+        padding: 20px;  /* 减小内边距 */
+    }
+
+    /* 学段标题样式 */
+    .section-header {
+        color: #00bfa5;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #00bfa5;
+    }
+
+    /* 教育阶段区域样式 */
+    .education-section {
+        margin-bottom: 40px;
+    }
+
+    /* 调整卡片内容大小 */
+    .feature-card h3 {
+        font-size: 18px;  /* 稍微减小标题大小 */
+    }
+
+    .feature-card ul {
+        font-size: 14px;  /* 减小列表文字大小 */
+    }
+
+    .card-icon {
+        font-size: 32px;  /* 减小图标大小 */
+        margin-bottom: 15px;
+    }
+
+    /* 调整按钮大小 */
+    .feature-btn {
+        padding: 6px 20px;  /* 减小按钮内边距 */
+        font-size: 14px;  /* 减小按钮文字大小 */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="education-sections">
+    <!-- 高中部分 -->
+    <div class="education-section">
+        <h2 class="section-header">高中</h2>
+        <div class="feature-cards">
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <h3>高三</h3>
+                <ul>
+                    <li>高三年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.高三 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高三 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <h3>高二</h3>
+                <ul>
+                    <li>高二年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.高二 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高二 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-graduation-cap"></i>
+                </div>
+                <h3>高一</h3>
+                <ul>
+                    <li>高一年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.高一 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高一 %}" class="feature-btn">进入</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 初中部分 -->
+    <div class="education-section">
+        <h2 class="section-header">初中</h2>
+        <div class="feature-cards">
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-school"></i>
+                </div>
+                <h3>初三</h3>
+                <ul>
+                    <li>初三年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.初三 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初三 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-school"></i>
+                </div>
+                <h3>初二</h3>
+                <ul>
+                    <li>初二年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.初二 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初二 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-school"></i>
+                </div>
+                <h3>初一</h3>
+                <ul>
+                    <li>初一年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.初一 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初一 %}" class="feature-btn">进入</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 小学部分 -->
+    <div class="education-section">
+        <h2 class="section-header">小学</h2>
+        <div class="feature-cards">
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h3>六年级</h3>
+                <ul>
+                    <li>六年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.六年级 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.六年级 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h3>五年级</h3>
+                <ul>
+                    <li>五年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.五年级 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.五年级 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h3>四年级</h3>
+                <ul>
+                    <li>四年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.四年级 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.四年级 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h3>三年级</h3>
+                <ul>
+                    <li>三年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.三年级 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.三年级 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h3>二年级</h3>
+                <ul>
+                    <li>二年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.二年级 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.二年级 %}" class="feature-btn">进入</a>
+            </div>
+
+            <div class="feature-card">
+                <div class="card-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h3>一年级</h3>
+                <ul>
+                    <li>一年级数据分析</li>
+                    <li>学科成绩统计</li>
+                    <li>{{ grade_years.一年级 }}届</li>
+                </ul>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.一年级 %}" class="feature-btn">进入</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

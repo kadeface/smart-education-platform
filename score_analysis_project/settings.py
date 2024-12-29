@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'score_analysis.apps.ScoreAnalysisConfig',  # 使用应用配置类
     'score_processor.apps.ScoreProcessorConfig',
+    'client',
 ]
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'score_analysis_project.settings')
 MIDDLEWARE = [
@@ -62,8 +63,8 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [os.path.join(BASE_DIR, 'score_processor', 'templates'),
-                 os.path.join(BASE_DIR, 'templates'),  ],  # 显式添加应用模板目录],
-        'APP_DIRS': True,
+                 os.path.join(BASE_DIR, 'client', 'templates'),],
+                 'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -130,10 +131,15 @@ USE_TZ = True
 # 静态文件配置
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'score_analysis', 'static'),
+    os.path.join(BASE_DIR, 'client', 'static'),
+]
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 ]
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 

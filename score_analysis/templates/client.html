@@ -1,0 +1,92 @@
+<!-- templates/client/index.html -->
+{% extends 'base.html' %}
+
+{% block title %}开平市高中教学质量增值评价系统{% endblock %}
+
+{% block content %}
+<div class="client-home">
+    <!-- 头部 -->
+    <header class="home-header">
+        <div class="header-title">
+            <h1>广东省开平市高中教学质量增值评价系统</h1>
+        </div>
+        <nav class="nav-menu">
+            <div class="nav-links">
+                <a href="#" class="active">总览</a>
+                <a href="#">区域评价</a>
+                <a href="#">增值评价</a>
+                <a href="#">跟踪监测</a>
+            </div>
+            <div class="user-info">
+                <span>{{ user.username }}</span>
+                <a href="{% url 'logout' %}">退出</a>
+            </div>
+        </nav>
+    </header>
+
+    <!-- 功能卡片区域 -->
+    <main class="home-content">
+        <div class="feature-cards">
+            <!-- 总览模块 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <h3>总览模块</h3>
+                <ul>
+                    <li>系统概况</li>
+                    <li>数据统计</li>
+                </ul>
+                <a href="#" class="btn">进入</a>
+            </div>
+
+            <!-- 区域评价 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-map-marked-alt"></i>
+                </div>
+                <h3>区域评价</h3>
+                <ul>
+                    <li>区域分析</li>
+                    <li>对比分析</li>
+                </ul>
+                <a href="#" class="btn">进入</a>
+            </div>
+
+            <!-- 增值评价 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h3>增值评价</h3>
+                <ul>
+                    <li>学校增值分析</li>
+                    <li>班级增值分析</li>
+                </ul>
+                <a href="#" class="btn">进入</a>
+            </div>
+
+            <!-- 跟踪监测 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-user-graduate"></i>
+                </div>
+                <h3>跟踪监测</h3>
+                <ul>
+                    <li>学生成长记录</li>
+                    <li>发展趋势分析</li>
+                </ul>
+                <a href="#" class="btn">进入</a>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="home-footer">
+        <div class="footer-content">
+            <p>开发者：廖作东</p>
+            <p>联系方式：382241106@qq.com</p>
+        </div>
+    </footer>
+</div>
+{% endblock %}

@@ -7,6 +7,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('score-analysis/',  include('score_analysis.urls', namespace='score_analysis')),
     path('score-processor/', include('score_processor.urls')),
+    path('', include('client.urls')),
 ]
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
