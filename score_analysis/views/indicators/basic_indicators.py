@@ -1,17 +1,14 @@
 # score_analysis/views/indicators/basic_indicators.py
 
 from django.shortcuts import render
-from django.contrib import admin
-from score_analysis.admin import StatisticsExamIndicatorsAdmin
-from score_analysis.models.statistics import StatisticsExamIndicators
 from score_analysis.services.indicators import IndicatorService
 
 
-def view_basic_indicators(request, module_type, grade, exam_id):
+def view_basic_indicators(request, module_type, exam_id):
     """查看基础指标统计"""
     try:
         # 初始化请求
-        IndicatorService.init_request(request, module_type, grade)
+        IndicatorService.init_request(request, module_type)
 
         # 获取统计数据
         return IndicatorService.get_statistics(request, exam_id)

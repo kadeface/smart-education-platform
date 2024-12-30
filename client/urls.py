@@ -14,7 +14,7 @@ urlpatterns = [
     path('exam-select/<str:module_type>/<str:grade>/', views.exam_select, name='exam_select'),
 
     # 分析页面
-    path('analysis/<str:module_type>/<str:grade>/<str:exam_id>/',
+    path('analysis/<str:module_type>/<str:exam_id>/',
          views.analysis_view,
          name='analysis_view'),
 ]

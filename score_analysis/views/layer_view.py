@@ -7,7 +7,12 @@ logger = logging.getLogger(__name__)
 class LayerView(View):
     """层次分析视图"""
 
-    def get(self, request, exam_id):
+    def get(self, request,module_type,exam_id):
+        """
+        @param module_type: 模块类型（这里不使用）
+        @param exam_id: 考试ID
+        """
+
         service = LayerViewService()
         select_type = request.GET.get('select_type', '理科')
         selected_districts = request.GET.getlist('districts', [])

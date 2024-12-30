@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">错误提示</h5>
+                </div>
+                <div class="card-body text-center">
+                    <p class="card-text">{{ error_message }}</p>
+                    <div class="mt-4">
+                        <a href="{% url 'score_analysis:exam_list' %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> 返回考试列表
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

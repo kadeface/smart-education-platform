@@ -17,16 +17,14 @@ class IndicatorService:
         )
 
     @classmethod
-    def init_request(cls, request, module_type=None, grade=None):
+    def init_request(cls, request, module_type=None):
         """初始化请求"""
-        # 设置前台标记
-        request.is_frontend = True
+
 
         # 存储额外信息到 session
         if module_type:
             request.session['current_module'] = module_type
-        if grade:
-            request.session['current_grade'] = grade
+
 
     @classmethod
     def get_statistics(cls, request, exam_id):

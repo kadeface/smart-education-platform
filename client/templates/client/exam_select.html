@@ -27,7 +27,7 @@
                 <p><i class="fas fa-tasks"></i> 考试类型：{{ exam.exam_type }}</p>
                 <p><i class="fas fa-graduation-cap"></i> 当前年级：{{ exam.current_grade }}</p>
             </div>
-            <a href="{% url 'client:analysis_view' module_type=module_type grade=grade exam_id=exam.exam_id %}"
+            <a href="{% url 'client:analysis_view' module_type=module_type exam_id=exam.exam_id %}"
                class="view-btn">查看分析</a>
         </div>
         {% endfor %}
