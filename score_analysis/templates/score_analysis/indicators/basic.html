@@ -1,0 +1,11 @@
+<!-- templates/score_analysis/indicators/basic.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="analysis-container">
+    <!-- 直接使用 admin 处理好的数据 -->
+    {{ science_summary }}
+    {{ arts_summary }}
+</div>
+{% endblock %}

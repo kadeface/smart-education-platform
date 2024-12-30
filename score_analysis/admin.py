@@ -1,8 +1,7 @@
 #score_analysis/score_analysis.py:
 import json
-from django.utils.html import format_html
 from django.urls import path ,reverse
-from django.template.response import TemplateResponse  # 添加这行导入
+from django.template.response import TemplateResponse
 from django.db import connection
 from django import forms
 from django.shortcuts import render
@@ -18,11 +17,12 @@ from .models.source import ScoreStudentBasic
 from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
 import logging
-from .models.region import LayerAnalysis, RegionLayerDetail
+from .models.region import LayerAnalysis
 from .services.region.layer_analysis import LayerAnalysisService
 from .services.region.layer_view import LayerViewService
 # 获取 logger 实例
 logger = logging.getLogger('django')  # 使用 Django 的默认 logger
+
 class ExamScoreLinesForm(forms.ModelForm):
     # 自定义表单字段
     exam_id = forms.ChoiceField(label='考试ID')

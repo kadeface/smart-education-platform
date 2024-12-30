@@ -10,7 +10,7 @@ from .views.client import (client_exam_list,
                      client_exam_detail,
                       view_statistics_result
                     )
-from .views.api import StatisticsDataAPIView
+from score_analysis.views.indicators import basic_indicators
 from .views.layer_view import LayerView
 
 app_name = 'score_analysis'
@@ -26,6 +26,11 @@ urlpatterns = [
     #path('client/statistics/', view_statistics_result, name='view_statistics_result'),  # 统计结果
     path('statistics-result/<str:exam_id>/', view_statistics_result, name='view_statistics_result'),
     path('region/layer/<str:exam_id>/', LayerView.as_view(), name='layer_view'),
+
+    path('indicators/basic/<str:module_type>/<str:grade>/<str:exam_id>/',
+         basic_indicators.view_basic_indicators,
+         name='view_basic_indicators'),
+
 
  #   path('api/statistics/data/', StatisticsDataAPIView.as_view(), name='statistics-data'),
 ]

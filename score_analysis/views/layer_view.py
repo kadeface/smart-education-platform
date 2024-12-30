@@ -1,16 +1,9 @@
 # views/layer_view.py
-from django.db.models import Count
 from django.views import View
 from django.shortcuts import render
-from django.http import JsonResponse
-
-from score_analysis.models.region import LayerAnalysis
 from score_analysis.services.region.layer_view import LayerViewService
 import logging
-
 logger = logging.getLogger(__name__)
-
-
 class LayerView(View):
     """层次分析视图"""
 
