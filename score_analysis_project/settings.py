@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'score_analysis.apps.ScoreAnalysisConfig',  # 使用应用配置类
     'score_processor.apps.ScoreProcessorConfig',
     'client',
+    'basic.apps.BasicConfig',
 ]
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'score_analysis_project.settings')
 MIDDLEWARE = [
@@ -144,3 +145,32 @@ STATICFILES_FINDERS = [
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': 'debug.log',  # 日志文件路径
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'score_analysis': {  # 你的应用名称
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}

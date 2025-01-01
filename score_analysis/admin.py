@@ -17,9 +17,14 @@ from .models.source import ScoreStudentBasic
 from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
 import logging
+from django.db import models
 from .models.region import LayerAnalysis
 from .services.region.layer_analysis import LayerAnalysisService
 from .services.region.layer_view import LayerViewService
+from .models.Tracking import TrackingRecord
+from .services.tracking.tracking_generator import TrackingGenerator
+from .services.tracking.statistics_calculator import StatisticsCalculator
+from .services.tracking.ranking_calculator import RankingCalculator
 # 获取 logger 实例
 logger = logging.getLogger('django')  # 使用 Django 的默认 logger
 
@@ -1456,4 +1461,132 @@ class LayerAnalysisAdmin(admin.ModelAdmin):
         """禁用删除功能"""
         return False
 
+@admin.register(TrackingRecord)
+class TrackingAdmin(admin.ModelAdmin):
 
+    change_list_template = "admin/tracking/tracking.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('tracking/', self.tracking_view, name='tracking-view'),
+            path('tracking/generate/', self.generate_tracking, name='generate-tracking'),
+        ]
+        return custom_urls + urls
+
+    def changelist_view(self, request, extra_context=None):
+        """重定向到 tracking 视图"""
+        print("==== changelist_view called ====")
+        return self.tracking_view(request)
+
+    def tracking_view(self, request):
+        """显示发展跟踪生成页面"""
+        logger.info("Entering tracking_view")  # 调试日志
+
+        # 获取考试列表，按学段和年级分组
+        try:
+            print("==== exams data:")  # 打印 2
+            exams = self.get_exams_by_level()
+            logger.info(f"Retrieved exams: {exams}")  # 调试日志
+            print("==== exams data:")  # 打印 2
+            context = {
+                **self.admin_site.each_context(request),
+                'title': '发展跟踪生成',
+                'exams': exams,
+            }
+            logger.info("Context prepared")  # 调试日志
+
+            return TemplateResponse(request, "admin/tracking/tracking.html", context)
+
+        except Exception as e:
+            logger.error(f"Error in tracking_view: {e}")  # 错误日志
+            raise
+
+    def generate_tracking(self, request):
+        """处理生成请求"""
+        if request.method == 'POST':
+            exam_ids = request.POST.getlist('exams')
+            generate_t_score = request.POST.get('t_score') == 'on'
+            generate_rank = request.POST.get('rank') == 'on'
+
+            if not exam_ids:
+                messages.error(request, '请选择至少一个考试')
+                return self.tracking_view(request)
+
+            try:
+                generator = TrackingGenerator()
+                for exam_id in exam_ids:
+                    generator.generate(
+                        exam_id=exam_id,
+                        generate_t_score=generate_t_score,
+                        generate_rank=generate_rank
+                    )
+
+                messages.success(request, f'成功处理 {len(exam_ids)} 个考试的发展跟踪数据')
+
+            except Exception as e:
+                messages.error(request, f'处理发展跟踪数据时出错: {str(e)}')
+
+            return self.tracking_view(request)
+
+    def get_exams_by_level(self):
+        """获取按学段和毕业年份分组的考试列表"""
+        with connection.cursor() as cursor:
+            # 简化SQL，只检查 tracking_records 是否存在记录
+            sql = """
+                SELECT 
+                    e.exam_id,
+                    e.exam_name,
+                    e.semester,
+                    e.exam_type,
+                    CASE WHEN tr.exam_id IS NOT NULL THEN 1 ELSE 0 END as has_tracking
+                FROM base_exam_config e
+                LEFT JOIN (
+                    SELECT DISTINCT exam_id 
+                    FROM tracking_records
+                ) tr ON e.exam_id = tr.exam_id
+                WHERE e.status IN ('draft', 'published')
+                ORDER BY e.exam_id DESC
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+
+            # 初始化结果字典：学段 -> 毕业年份 -> 考试列表
+            exams = {
+                'H': {},  # 高中
+                'M': {},  # 初中
+                'P': {}  # 小学
+            }
+
+            for row in rows:
+                exam_id, exam_name, semester, exam_type, has_tracking = row
+
+                # 确定学段
+                if semester and semester.startswith('高'):
+                    level = 'H'
+                elif semester and semester.startswith('初'):
+                    level = 'M'
+                elif semester and semester.startswith('小'):
+                    level = 'P'
+                else:
+                    continue
+
+                # 从考试ID中提取毕业年份（最后4位）
+                grad_year = exam_id[-4:]
+
+                # 初始化该学段下的毕业年份（如果不存在）
+                if grad_year not in exams[level]:
+                    exams[level][grad_year] = []
+
+                # 添加考试信息，包含跟踪状态
+                exams[level][grad_year].append({
+                    'id': exam_id,
+                    'name': f"{exam_name} ({exam_type})",
+                    'has_tracking': bool(has_tracking)
+                })
+
+            # 对每个学段内的毕业年份进行排序
+            for level in exams:
+                exams[level] = dict(sorted(exams[level].items(), reverse=True))
+
+            return exams

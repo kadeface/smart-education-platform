@@ -1,5 +1,6 @@
 # score_analysis/models/__init__.py
 from .source import ScoreStudentBasic
+from .Tracking import TrackingGroup, TrackingStudent
 from .statistics import (
     SubjectTScore,
     SubjectStatistics,
@@ -17,7 +18,4 @@ __all__ = [
     'BaseExamConfig',
     'BaseSubjectConfig',
     'BaseSchoolInfo',
-    'RegionLayerAnalysis',
-    'RegionCharacteristics',
-    'RegionProgress'
 ]
