@@ -13,6 +13,7 @@ import openpyxl
 from django.contrib import messages
 # 在 oldviews.py 或 score_analysis.py 中
 from score_processor.services.score_processor import ScoreProcessorService
+
 def score_list(request):
     # 获取所有成绩记录
     scores = ScoreStudentBasic.objects.all()[:10]  # 先只取前10条数据

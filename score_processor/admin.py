@@ -39,11 +39,12 @@ if admin.site.is_registered(ExamUpload):
 
 @admin.register(ExamUpload)
 class ExamUploadAdmin(admin.ModelAdmin):
-    list_display = ['exam_id', 'uploaded_at', 'get_status', 'error_message']
-    list_filter = ['status']
+    list_display = ['exam_id', 'uploaded_at', 'get_status', 'error_message', 'get_school_level']
+    list_filter = ['status', 'school_level']  # 添加学段过滤
     search_fields = ['exam_id']
-    readonly_fields = ['uploaded_at', 'status', 'error_message']
+    readonly_fields = ['uploaded_at', 'status', 'error_message', 'school_level']
     change_list_template = 'admin/score_processor/examupload/upload_list.html'
+    ordering = ['-uploaded_at']  # 负号表示倒序，最新的在最上面
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
@@ -69,7 +70,10 @@ class ExamUploadAdmin(admin.ModelAdmin):
                  self.admin_site.admin_view(self.generate_mapping),
                  name='score_processor_examupload_mapping'),
         ]
-        return custom_urls + urls
+        print("=== URL Patterns ===")
+        for url in custom_urls + urls:
+            print(f"Pattern: {url.pattern}, Name: {getattr(url, 'name', 'unnamed')}")
+        return  custom_urls+urls
 
     def get_status(self, obj):
         status_colors = {
@@ -87,22 +91,57 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
     get_status.short_description = '状态'
 
+    def get_base_subject_config(self, obj):
+        """显示考试配置信息"""
+        if obj.base_subject_config:
+            return f"{obj.base_subject_config.exam_name} ({obj.base_subject_config.get_semester_display()})"  # 使用 exam_name
+        return '-'
+    get_base_subject_config.short_description = '考试配置'
+
+    def get_school_level(self, obj):
+        """显示学段信息"""
+        level_names = {
+            'H': '高中',
+            'M': '初中',
+            'P': '小学'
+        }
+        return level_names.get(obj.school_level, '未知')
+
+    get_school_level.short_description = '学段'
+
     def upload_scores(self, request):
         """处理成绩文件上传"""
-        upload = None
+        print("上传文件入口")
+        upload = None  # 在最外层初始化 upload 变量
+
         if request.method == 'POST':
             form = ScoreUploadForm(request.POST, request.FILES)
             if form.is_valid():
                 try:
+                    # 从表单获取考试配置对象
+                    base_subject_config = form.cleaned_data['base_subject_config']
+                    exam_id = base_subject_config.exam_id
+
+                    # 检查是否已存在相同考试ID的上传记录
+                    if ExamUpload.objects.filter(exam_id=exam_id, status='PROCESSING').exists():
+                        messages.error(request, f"考试 {exam_id} 已有正在处理的记录")
+                        return redirect('admin:score_processor_examupload_changelist')
+
                     # 创建上传记录
                     upload = ExamUpload(
                         file=request.FILES['file'],
-                        exam_id=form.cleaned_data['exam_id'],
+                        exam_id=exam_id,
+                        base_subject_config=base_subject_config,
+                        school_level=exam_id[12],  # 确保索引正确
                         status='PENDING'
                     )
                     upload.save()
+
                     # 初始化处理器
-                    processor = ScoreProcessorService()
+                    processor = ScoreProcessorService(
+                        exam_id=exam_id,
+                        base_subject_config=base_subject_config
+                    )
 
                     # 加载并验证文件
                     success, error = processor.load_file(request.FILES['file'])
@@ -110,46 +149,58 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         upload.status = 'PROCESSING'
                         upload.save()
                         messages.success(request, "文件上传成功，请预览数据")
+                        # 成功后直接跳转到预览页面
                         return redirect('admin:score_processor_examupload_preview', upload_id=upload.id)
                     else:
                         upload.status = 'FAILED'
                         upload.error_message = error
                         upload.save()
                         messages.error(request, f"文件验证失败: {error}")
+                        return redirect('admin:score_processor_examupload_changelist')
+
+                except IndexError:
+                    # 处理考试ID格式错误
+                    if upload:
+                        upload.status = 'FAILED'
+                        upload.error_message = "考试ID格式错误"
+                        upload.save()
+                    messages.error(request, "考试ID格式错误，无法获取学段信息")
+                    return redirect('admin:score_processor_examupload_changelist')
 
                 except Exception as e:
-                    if  upload:
+                    # 处理其他所有异常
+                    if upload:
                         upload.status = 'FAILED'
                         upload.error_message = str(e)
                         upload.save()
                     messages.error(request, f"上传失败: {str(e)}")
+                    # 打印详细错误信息以便调试
+                    import traceback
+                    print(traceback.format_exc())
+                    return redirect('admin:score_processor_examupload_changelist')
 
-                return redirect('admin:score_processor_examupload_changelist')
             else:
-                # 表单验证失败的处理
+                # 表单验证失败
                 for field, errors in form.errors.items():
                     for error in errors:
                         messages.error(request, f"{field}: {error}")
                 return redirect('admin:score_processor_examupload_changelist')
 
-            # POST请求的默认重定向
+        # GET请求直接返回
         return redirect('admin:score_processor_examupload_changelist')
-        form = ScoreUploadForm()
-        context = {
-            'form': form,
-            'title': '上传成绩文件',
-            'subtitle': '请选择Excel文件并选择考试ID，前提是你要先建立考试',
-            'opts': self.model._meta,
-            'is_popup': False,
-            'has_view_permission': True,
-        }
-        return render(request, 'score_processor/upload.html', context)
-
     def preview_scores(self, request, upload_id):
         """预览成绩数据"""
         try:
+
+
             upload = self.get_object(request, upload_id)
-            processor = ScoreProcessorService()
+            base_subject_config = BaseExamConfig.objects.get(exam_id=upload.exam_id)
+
+            # 初始化处理器（传入考试ID和科目配置）
+            processor = ScoreProcessorService(
+                exam_id=upload.exam_id,
+                base_subject_config=base_subject_config
+            )
 
             # 加载文件
             success, error = processor.load_file(upload.file.path)
@@ -166,6 +217,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
                     'data': preview_result['data'],
                     'stats': preview_result['stats'],
                     'upload': upload,
+                    'school_level': upload.school_level,  # 添加学段信息
                     'has_view_permission': True,
                 }
                 return render(request, 'score_processor/preview.html', context)
@@ -176,7 +228,6 @@ class ExamUploadAdmin(admin.ModelAdmin):
             messages.error(request, f"预览失败: {str(e)}")
 
         return redirect('admin:score_processor_examupload_changelist')
-
     def process_scores(self, request, upload_id):
         """处理成绩数据"""
         if request.method == 'POST':
@@ -263,11 +314,16 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         upload.error_message = error_message
                         upload.save()
                         messages.error(request, f"清洗失败: {error_message}")
+                        # 修正这里：添加 upload_id
+                        return redirect('admin:score_processor_examupload_mapping', upload_id=upload.id)
+
                 except Exception as clean_error:
                     upload.status = 'FAILED'
                     upload.error_message = str(clean_error)
                     upload.save()
                     messages.error(request, f"清洗过程出错: {str(clean_error)}")
+                    # 修正这里：添加 upload_id
+                    return redirect('admin:score_processor_examupload_mapping', upload_id=upload.id)
 
             # GET请求显示清洗页面
             context = {
@@ -281,7 +337,8 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
         except Exception as e:
             messages.error(request, f"清洗数据失败: {str(e)}")
-            return redirect('admin:score_processor_examupload_mapping')
+            # 修正这里：添加 upload_id
+            return redirect('admin:score_processor_examupload_mapping', upload_id=upload_id)
 
     def generate_mapping(self, request, upload_id):
         """生成统一考号映射"""

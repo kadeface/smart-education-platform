@@ -98,32 +98,39 @@ class StudentMapping(models.Model):
         verbose_name_plural = verbose_name
 
 
-
 class ExamUpload(models.Model):
-    STATUS_CHOICES = (
-        ('PENDING', '等待处理'),
+    SCHOOL_LEVEL_CHOICES = [
+        ('H', '高中'),
+        ('M', '初中'),
+        ('P', '小学'),
+    ]
+
+    STATUS_CHOICES = [
+        ('PENDING', '待处理'),
         ('PROCESSING', '处理中'),
         ('COMPLETED', '已完成'),
-        ('FAILED', '失败')
-    )
+        ('FAILED', '失败'),
+    ]
 
-    file = models.FileField(upload_to='exam_uploads/')
-    exam_id = models.CharField(max_length=50, verbose_name='考试ID')
-    uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='上传时间')
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='PENDING',
-        verbose_name='状态'
+    exam_id = models.CharField('考试ID', max_length=20)
+    file = models.FileField('文件', upload_to='uploads/')
+    uploaded_at = models.DateTimeField('上传时间', auto_now_add=True)
+    status = models.CharField('状态', max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    error_message = models.TextField('错误信息', blank=True, null=True)
+    school_level = models.CharField('学段', max_length=1, choices=SCHOOL_LEVEL_CHOICES, default='H')
+    base_subject_config = models.ForeignKey(
+        'BaseExamConfig',
+        to_field='exam_id',  # 指定关联到 exam_id 字段
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name='考试配置',
+        db_column='base_subject_config_id'
     )
-    error_message = models.TextField(blank=True, verbose_name='错误信息')
-
     class Meta:
-        db_table = 'exam_uploads'  # 保持原有表名
+        verbose_name = '成绩上传'
+        verbose_name_plural = '成绩上传'
         managed = False
-        verbose_name = '成绩上传及记录处理'
-        verbose_name_plural = verbose_name
-        ordering = ['-uploaded_at']
+        db_table = 'exam_uploads'
 
     def __str__(self):
         return f"{self.exam_id} ({self.get_status_display()})"
