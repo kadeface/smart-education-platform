@@ -64,7 +64,8 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [os.path.join(BASE_DIR, 'score_processor', 'templates'),
-                 os.path.join(BASE_DIR, 'client', 'templates'),],
+                 os.path.join(BASE_DIR, 'client', 'templates'),
+                 ],
                  'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

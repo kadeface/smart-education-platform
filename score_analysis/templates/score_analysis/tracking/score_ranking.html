@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load score_analysis_tags %}  {# 加载自定义模板过滤器 #}
+
+{% block title %}成绩排名查询{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'score_analysis/css/score_ranking.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="tracking-content">
+    <!-- 搜索区域 -->
+    <div class="search-section">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label for="student_id" class="form-label">学号</label>
+                <input type="text" class="form-control" id="student_id"
+                       name="student_id" value="{{ search_student_id }}"
+                       placeholder="输入学号搜索">
+            </div>
+            <div class="col-md-3">
+                <label for="student_name" class="form-label">姓名</label>
+                <input type="text" class="form-control" id="student_name"
+                       name="student_name" value="{{ search_student_name }}"
+                       placeholder="输入姓名搜索">
+            </div>
+            <div class="col-md-3">
+                <label for="sort_by" class="form-label">排序方式</label>
+                <select class="form-select" id="sort_by" name="sort_by">
+                    {% for option in sort_options %}
+                    <option value="{{ option.value }}" {% if sort_by == option.value %}selected{% endif %}>
+                        {{ option.label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">搜索</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-cards">
+        <div class="stats-card">
+            <div class="value">{{ stats.total_students }}</div>
+            <div class="label">总人数</div>
+        </div>
+        <div class="stats-card">
+            <div class="value">{{ stats.avg_score|floatformat:1 }}</div>
+            <div class="label">平均分</div>
+        </div>
+        <div class="stats-card">
+            <div class="value">{{ stats.avg_t_score|floatformat:1 }}</div>
+            <div class="label">平均T分</div>
+        </div>
+        <div class="stats-card">
+            <div class="value">{{ stats.rank_changes.improved }}</div>
+            <div class="label">进步人数</div>
+        </div>
+    </div>
+
+<!-- 表格部分 -->
+<div class="table-section">
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered">
+            <thead>
+                <tr>
+                    <th rowspan="2">学号</th>
+                    <th rowspan="2">姓名</th>
+                    <th rowspan="2">区域</th>
+                    <th rowspan="2">学校</th>
+                    {% if school_level == 'H' %}
+                    <th rowspan="2">科类</th>
+                    {% endif %}
+                    <th colspan="3">排名</th>
+                    <th colspan="{{ subjects|length }}">各科成绩</th>
+                    <th rowspan="2">总分</th>
+                    <th rowspan="2">总T分</th>
+                    <th colspan="2">进步情况</th>
+                </tr>
+                <tr>
+                    <th>市</th>
+                    <th>区</th>
+                    <th>校</th>
+                    {% for subject in subjects %}
+                    <th>{{ subject.name }}</th>
+                    {% endfor %}
+                    <th>进步分</th>
+                    <th>T分进步</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in current_page %}
+                <tr>
+                    <td>{{ record.student_id }}</td>
+                    <td>{{ record.student_name }}</td>
+                    <td>{{ record.district_name }}</td>
+                    <td>{{ record.school_name }}</td>
+                    {% if school_level == 'H' %}
+                    <td>
+                        <span class="select-type {{ record.select_type }}">
+                            {{ record.select_type }}
+                        </span>
+                    </td>
+                    {% endif %}
+                    <td>{{ record.city_rank }}</td>
+                    <td>{{ record.district_rank }}</td>
+                    <td>{{ record.school_rank }}</td>
+                    {% for subject in subjects %}
+                    <td>{{ record|get_attr:subject.field|default_if_none:'-' }}</td>
+                    {% endfor %}
+                    <td class="fw-bold">{{ record.total_score }}</td>
+                    <td>{{ record.total_t_score }}</td>
+                    <td>{{ record.improvement }}</td>
+                    <td>{{ record.t_improvement }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+        <!-- 分页导航 -->
+        {% if current_page.paginator.num_pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination">
+                {% if current_page.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if search_student_id %}&student_id={{ search_student_id }}{% endif %}{% if search_student_name %}&student_name={{ search_student_name }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}">&laquo; 首页</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ current_page.previous_page_number }}{% if search_student_id %}&student_id={{ search_student_id }}{% endif %}{% if search_student_name %}&student_name={{ search_student_name }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}">上一页</a>
+                </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        {{ current_page.number }} / {{ current_page.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if current_page.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ current_page.next_page_number }}{% if search_student_id %}&student_id={{ search_student_id }}{% endif %}{% if search_student_name %}&student_name={{ search_student_name }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}">下一页</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ current_page.paginator.num_pages }}{% if search_student_id %}&student_id={{ search_student_id }}{% endif %}{% if search_student_name %}&student_name={{ search_student_name }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}">末页 &raquo;</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 排序功能
+    $('th').click(function() {
+        var sort_by = $(this).data('sort');
+        if (sort_by) {
+            var current_order = '{{ order }}';
+            var new_order = current_order === 'desc' ? 'asc' : 'desc';
+            window.location.href = '?sort_by=' + sort_by +
+                '&order=' + new_order +
+                '{% if search_student_id %}&student_id={{ search_student_id }}{% endif %}' +
+                '{% if search_student_name %}&student_name={{ search_student_name }}{% endif %}';
+        }
+    });
+});
+</script>
+{% endblock %}
