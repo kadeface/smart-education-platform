@@ -1,0 +1,139 @@
+<!-- templates/admin/score_processor/studentmapping/upload.html -->
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block content %}
+    <div id="content-main">
+        <div class="module upload-form">
+            <h2>上传学生数据</h2>
+
+            <!-- 使用普通的HTML表单提交 -->
+            <form method="post"
+                  enctype="multipart/form-data"
+                  action="{% url 'admin:student-mapping-upload' %}">
+                {% csrf_token %}
+                <div class="form-row">
+                    <p>
+                        <label for="exam_id">考试:</label>
+                        <select name="exam_id" id="exam_id" required>
+                            <option value="">请选择考试</option>
+                            {% for eid, ename in exam_ids %}
+                            <option value="{{ eid }}">{{ ename }} ({{ eid }})</option>
+                            {% endfor %}
+                        </select>
+                    </p>
+                    <p>
+                        <label for="file">选择文件:</label>
+                        <input type="file" name="file" id="file" accept=".xlsx,.xls" required>
+                    </p>
+                </div>
+                <div class="submit-row">
+                    <input type="submit" class="default" value="上传处理"/>
+                </div>
+            </form>
+        </div>
+
+        <!-- 显示消息 -->
+        {% if messages %}
+        <ul class="messagelist">
+            {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- 显示处理结果 -->
+        {% if stats %}
+        <div class="module">
+            <h2>处理结果</h2>
+            <table>
+                <tr><th>总记录数:</th><td>{{ stats.total }}</td></tr>
+                <tr><th>新生成:</th><td>{{ stats.new }}</td></tr>
+                <tr><th>学籍号匹配:</th><td>{{ stats.student_id_match }}</td></tr>
+                <tr><th>身份证号匹配:</th><td>{{ stats.id_number_match }}</td></tr>
+                <tr><th>姓名学校匹配:</th><td>{{ stats.name_school_match }}</td></tr>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- 显示预览数据 -->
+        {% if preview %}
+        <div class="module">
+            <h2>最新记录预览</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>统一考号</th>
+                        <th>姓名</th>
+                        <th>学校</th>
+                        <th>班级</th>
+                        <th>匹配方式</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in preview %}
+                    <tr>
+                        <td>{{ record.unified_id }}</td>
+                        <td>{{ record.student_name }}</td>
+                        <td>{{ record.school_name }}</td>
+                        <td>{{ record.class_name }}</td>
+                        <td>{{ record.match_type }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .upload-form {
+        padding: 20px;
+        margin-bottom: 20px;
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 4px;
+    }
+    .form-row {
+        padding: 10px 0;
+    }
+    .form-row p {
+        margin-bottom: 10px;
+    }
+    .form-row label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    .form-row select,
+    .form-row input[type="file"] {
+        width: 100%;
+        padding: 6px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .submit-row {
+        padding: 12px;
+        margin-top: 10px;
+        text-align: right;
+        background: #f8f8f8;
+        border-top: 1px solid #eee;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+    }
+    th, td {
+        padding: 8px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+    th {
+        background: #f5f5f5;
+    }
+</style>
+{% endblock %}

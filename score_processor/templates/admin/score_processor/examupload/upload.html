@@ -1,0 +1,142 @@
+<!-- templates/admin/score_processor/studentmapping/upload.html -->
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block content %}
+    <div id="content-main">
+        <!-- 上传表单 -->
+        <div class="module upload-form">
+            <h2>上传学生数据</h2>
+            <div style="margin-bottom: 20px;">
+                <a href="{% url 'admin:student-mapping-template' %}" class="button">
+                    下载Excel模板
+                </a>
+            </div>
+
+            <form method="post"
+                  enctype="multipart/form-data"
+                  id="upload-form">
+                {% csrf_token %}
+                <div class="form-row">
+                    <p>
+                        <label for="exam_id">考试:</label>
+                        <select name="exam_id" id="exam_id" required>
+                            <option value="">请选择考试</option>
+                            {% for eid, ename in exam_ids %}
+                            <option value="{{ eid }}">{{ ename }} ({{ eid }})</option>
+                            {% endfor %}
+                        </select>
+                    </p>
+                    <p>
+                        <label for="file">选择文件:</label>
+                        <input type="file" name="file" id="file" accept=".xlsx,.xls" required>
+                    </p>
+                </div>
+                <div class="submit-row">
+                    <input type="submit" class="default" value="上传处理"/>
+                </div>
+            </form>
+        </div>
+
+        <!-- 处理结果 -->
+        <div id="results" class="module" style="display:none;">
+            <h2>处理结果</h2>
+            <div id="stats" class="results"></div>
+
+            <div id="preview">
+                <h3>最新10条记录</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>统一考号</th>
+                            <th>姓名</th>
+                            <th>学校</th>
+                            <th>班级</th>
+                            <th>匹配方式</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .upload-form {
+        padding: 20px;
+        margin-bottom: 20px;
+        background: #fff;
+        border: 1px solid #eee;
+        border-radius: 4px;
+    }
+    /* ... 其他样式 ... */
+</style>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script type="text/javascript">
+(function($) {
+    $(document).ready(function() {
+        const form = $('#upload-form');
+        const submitButton = form.find('input[type="submit"]');
+
+        form.on('submit', function(e) {
+            e.preventDefault();
+            submitButton.val('处理中...').prop('disabled', true);
+
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: '{% url "admin:student-mapping-upload" %}',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // 显示统计信息
+                        $('#stats').html(`
+                            <table>
+                                <tr><th>总记录数:</th><td>${response.stats.total}</td></tr>
+                                <tr><th>新生成:</th><td>${response.stats.new}</td></tr>
+                                <tr><th>学籍号匹配:</th><td>${response.stats.student_id_match}</td></tr>
+                                <tr><th>身份证号匹配:</th><td>${response.stats.id_number_match}</td></tr>
+                                <tr><th>姓名学校匹配:</th><td>${response.stats.name_school_match}</td></tr>
+                            </table>
+                        `);
+
+                        // 显示预览数据
+                        var previewHtml = '';
+                        response.preview.forEach(function(record) {
+                            previewHtml += `
+                                <tr>
+                                    <td>${record.unified_id}</td>
+                                    <td>${record.student_name}</td>
+                                    <td>${record.school_name}</td>
+                                    <td>${record.class_name}</td>
+                                    <td>${record.match_type}</td>
+                                </tr>
+                            `;
+                        });
+                        $('#previewBody').html(previewHtml);
+                        $('#results').show();
+                    } else {
+                        alert('处理失败: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('上传失败，请重试');
+                },
+                complete: function() {
+                    submitButton.val('上传处理').prop('disabled', false);
+                }
+            });
+        });
+    });
+})(django.jQuery);
+</script>
+{% endblock %}

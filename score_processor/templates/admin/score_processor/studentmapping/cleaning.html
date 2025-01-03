@@ -1,0 +1,86 @@
+{% extends "admin/score_processor/cleaning.html" %}
+{% load i18n admin_urls static %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>{{ title }}</h2>
+        <p class="description">{{ subtitle }}</p>
+        
+        {% if messages %}
+        <ul class="messagelist">
+            {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if cleaning_stats %}
+        <!-- 显示清洗统计 -->
+        <div class="results">
+            <h3>清洗结果统计</h3>
+            <table>
+                <tr>
+                    <th>原始记录数：</th>
+                    <td>{{ cleaning_stats.原始记录数 }}</td>
+                </tr>
+                {% if cleaning_stats.英语听说统计 %}
+                <tr>
+                    <th colspan="2">英语听说统计</th>
+                </tr>
+                <tr>
+                    <th>有效成绩数：</th>
+                    <td>{{ cleaning_stats.英语听说统计.有效成绩数 }}</td>
+                </tr>
+                <tr>
+                    <th>缺考人数：</th>
+                    <td>{{ cleaning_stats.英语听说统计.缺考人数 }}</td>
+                </tr>
+                {% endif %}
+                
+                <!-- 显示必修科目缺考情况 -->
+                {% if cleaning_stats.必修科目缺考 %}
+                <tr>
+                    <th colspan="2">必修科目缺考</th>
+                </tr>
+                {% for subject, count in cleaning_stats.必修科目缺考.items %}
+                <tr>
+                    <th>{{ subject }}：</th>
+                    <td>{{ count }}人</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+                
+                <!-- 显示选考科目未选情况 -->
+                {% if cleaning_stats.选考科目未选 %}
+                <tr>
+                    <th colspan="2">选考科目未选</th>
+                </tr>
+                {% for subject, count in cleaning_stats.选考科目未选.items %}
+                <tr>
+                    <th>{{ subject }}：</th>
+                    <td>{{ count }}人</td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- 操作按钮 -->
+        <div class="submit-row">
+            {% if cleaning_stats %}
+            <!-- 如果有清洗结果，显示下一步按钮 -->
+            <a href="{% url 'score_analysis:score_processor_examupload_mapping' upload.id %}" class="button default">生成统一考号</a>
+            {% else %}
+            <!-- 如果没有清洗结果，显示开始清洗按钮 -->
+            <form method="post">
+                {% csrf_token %}
+                <input type="submit" value="开始清洗" class="default" />
+            </form>
+            {% endif %}
+            <a href="{% url 'score_analysis:score_processor_examupload_changelist' %}" class="closelink">返回列表</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

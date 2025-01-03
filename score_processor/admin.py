@@ -16,6 +16,14 @@ from .forms import ScoreUploadForm
 from .services.data_cleaner import DataCleanerService
 from .services.student_mapper import StudentMapperService
 from score_analysis.services.ranking_service import RankingService
+from .models import StudentMapping
+from .services.StudentIDMapper import StudentIDMapper
+import io
+from django.http import HttpResponse, JsonResponse
+from django.template.response import TemplateResponse
+from django.db import models
+
+
 class ExamInfoAdmin(admin.ModelAdmin):
     list_display = ('exam_id', 'exam_name', 'exam_date', 'exam_type', 'status')
     list_filter = ('exam_type', 'status')
@@ -28,10 +36,146 @@ class ScoreStudentBasicAdmin(admin.ModelAdmin):
     list_filter = ['exam_id', 'select_type', 'school_name']
     search_fields = ['student_name', 'student_id', 'school_name']
 
+
+@admin.register(StudentMapping)
 class StudentMappingAdmin(admin.ModelAdmin):
-    list_display = ('exam_id','unified_id', 'original_student_id', 'student_name', 'school_name', 'class_name')
-    list_filter = ('exam_id','school_name' )
-    search_fields = ('unified_id', 'student_name', 'school_name')
+    list_display = ['unified_id', 'exam_id', 'student_name', 'school_name',
+                    'class_name', 'match_type', 'is_new']
+    list_filter = ['exam_id', 'school_name', 'match_type', 'is_new']
+    search_fields = ['unified_id', 'student_name', 'original_student_id']
+    date_hierarchy = 'create_time'
+
+    change_list_template = 'admin/score_processor/studentmapping/change_list.html'
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('upload/', self.upload_view, name='student-mapping-upload'),
+            path('template/', self.download_template, name='student-mapping-template'),
+           # path('preview/<str:exam_id>/', self.preview_results, name='student-mapping-preview'),
+        ]
+        return custom_urls + urls
+
+    def download_template(self, request):
+        """下载Excel模板"""
+        # 创建模板数据
+        template_data = {
+            'student_name': ['张三', '李四'],
+            'school_name': ['示例中学', '示例中学'],
+            'class_name': ['高三(1)班', '高三(2)班'],
+            'original_student_id': ['2024001', '2024002'],
+            'student_id': ['S20240001', 'S20240002'],  # 可选
+            'id_number': ['', ''],  # 可选
+        }
+        df = pd.DataFrame(template_data)
+
+        # 创建Excel文件
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='数据模板')
+
+            # 获取工作表
+            worksheet = writer.sheets['数据模板']
+
+            # 添加说明
+            worksheet.insert_rows(0, 5)
+            worksheet['A1'] = '填表说明：'
+            worksheet['A2'] = '1. student_name, school_name, class_name, original_student_id 为必填项'
+            worksheet['A3'] = '2. student_id(学籍号), id_number（身份证号） 为选填项，用于匹配已有统一考号'
+            worksheet['A4'] = '3. 请勿修改字段名称'
+
+        # 设置响应头
+        output.seek(0)
+        response = HttpResponse(output.read(),
+                                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename=student_mapping_template.xlsx'
+        return response
+
+    def upload_view(self, request):
+        """处理文件上传"""
+        if request.method == 'POST':
+            try:
+                exam_file = request.FILES['file']
+                exam_id = request.POST['exam_id']
+
+                # 实例化处理器
+                mapper = StudentIDMapper()
+
+                # 处理数据
+                stats = mapper.process_exam_data(exam_file, exam_id)
+
+                # 获取最新10条记录作为预览
+                recent_records = StudentMapping.objects.filter(
+                    exam_id=exam_id
+                ).order_by('-create_time')[:10]
+
+                # 获取统计信息
+                db_stats = StudentMapping.objects.filter(exam_id=exam_id).aggregate(
+                    total=models.Count('id'),
+                    new=models.Count('id', filter=models.Q(is_new=True)),
+                    student_id_match=models.Count('id', filter=models.Q(match_type='student_id')),
+                    id_number_match=models.Count('id', filter=models.Q(match_type='id_number')),
+                    name_school_match=models.Count('id', filter=models.Q(match_type='name_school'))
+                )
+
+                # 添加成功消息
+                messages.success(request, '文件处理成功！')
+
+                # 返回同一个页面，但包含处理结果
+                context = {
+                    **self.admin_site.each_context(request),
+                    'title': '上传学生数据',
+                    'exam_ids': BaseExamConfig.objects.filter(
+                        status='published'
+                    ).values_list('exam_id', 'exam_name').order_by('-exam_id'),
+                    'opts': self.model._meta,
+                    'stats': db_stats,
+                    'preview': recent_records,
+                    'success': True
+                }
+                return TemplateResponse(
+                    request,
+                    'admin/score_processor/studentmapping/upload.html',
+                    context
+                )
+
+            except Exception as e:
+                messages.error(request, f'处理失败: {str(e)}')
+
+        # GET 请求或处理失败时显示上传表单
+        context = {
+            **self.admin_site.each_context(request),
+            'title': '上传学生数据',
+            'exam_ids': BaseExamConfig.objects.filter(
+                status='published'
+            ).values_list('exam_id', 'exam_name').order_by('-exam_id'),
+            'opts': self.model._meta,
+        }
+        return TemplateResponse(
+            request,
+            'admin/score_processor/studentmapping/upload.html',
+            context
+        )
+    def preview_results(self, request, exam_id):
+        """预览处理结果"""
+        # 获取统计信息
+        stats = StudentMapping.objects.filter(exam_id=exam_id).aggregate(
+            total=models.Count('id'),
+            new=models.Count('id', filter=models.Q(is_new=True)),
+            student_id_match=models.Count('id', filter=models.Q(match_type='student_id')),
+            id_number_match=models.Count('id', filter=models.Q(match_type='id_number')),
+            name_school_match=models.Count('id', filter=models.Q(match_type='name_school'))
+        )
+
+        # 获取最新10条记录
+        recent_records = StudentMapping.objects.filter(exam_id=exam_id).order_by('-create_time')[:10]
+
+        return JsonResponse({
+            'stats': stats,
+            'preview': list(recent_records.values(
+                'unified_id', 'student_name', 'school_name', 'class_name', 'match_type'
+            ))
+        })
 # 先检查是否已注册，如果是则取消注册
 if admin.site.is_registered(ExamUpload):
     admin.site.unregister(ExamUpload)
@@ -280,7 +424,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
                 try:
                     result = cleaner.clean_data(processor.df)
                     if result['success']:
-                        upload.status = 'PROCESSING'  # 继续处理
+                        upload.status = 'PROCESSING'
                         upload.save()
 
                         # 将清洗统计转换为普通Python类型
@@ -293,10 +437,11 @@ class ExamUploadAdmin(admin.ModelAdmin):
                                     if isinstance(v, np.int64):
                                         value[k] = int(v)
 
-                        # 获取有效成绩统计并转换类型
+                        # 获取有效成绩统计
                         score_stats = cleaner.get_valid_scores_stats(result['cleaned_df'])
 
                         context = {
+                            **self.admin_site.each_context(request),  # 添加管理站点上下文
                             'title': '数据清洗',
                             'subtitle': '数据清洗完成',
                             'opts': self.model._meta,
@@ -307,14 +452,17 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         }
 
                         messages.success(request, "数据清洗完成")
-                        return render(request, 'score_processor/cleaning.html', context)
+                        return TemplateResponse(
+                            request,
+                            'admin/score_processor/cleaning_result.html',  # 修改模板路径
+                            context
+                        )
                     else:
                         error_message = result.get('error', '未知错误')
                         upload.status = 'FAILED'
                         upload.error_message = error_message
                         upload.save()
                         messages.error(request, f"清洗失败: {error_message}")
-                        # 修正这里：添加 upload_id
                         return redirect('admin:score_processor_examupload_mapping', upload_id=upload.id)
 
                 except Exception as clean_error:
@@ -322,8 +470,26 @@ class ExamUploadAdmin(admin.ModelAdmin):
                     upload.error_message = str(clean_error)
                     upload.save()
                     messages.error(request, f"清洗过程出错: {str(clean_error)}")
-                    # 修正这里：添加 upload_id
                     return redirect('admin:score_processor_examupload_mapping', upload_id=upload.id)
+
+            # GET请求显示清洗页面
+            context = {
+                **self.admin_site.each_context(request),  # 添加管理站点上下文
+                'title': '数据清洗',
+                'subtitle': '点击开始清洗按钮进行数据清洗',
+                'opts': self.model._meta,
+                'upload': upload,
+                'has_view_permission': True,
+            }
+            return TemplateResponse(
+                request,
+                'admin/score_processor/cleaning.html',  # 修改模板路径
+                context
+            )
+
+        except Exception as e:
+            messages.error(request, f"清洗数据失败: {str(e)}")
+            return redirect('admin:score_processor_examupload_mapping', upload_id=upload_id)d_id=upload.id)
 
             # GET请求显示清洗页面
             context = {
@@ -345,7 +511,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
         try:
             upload = self.get_object(request, upload_id)
             processor = ScoreProcessorService()
-            mapper = StudentMapperService()
+            mapper = StudentIDMapper()
 
             if request.method == 'POST':
                 # 加载文件
@@ -354,25 +520,25 @@ class ExamUploadAdmin(admin.ModelAdmin):
                     messages.error(request, f"文件加载失败: {error}")
                     return redirect('admin:score_processor_examupload_changelist')
 
-                # 生成映射
-                result = mapper.process_exam_data(processor.df, upload.exam_id)
-                if result['success']:
+                print("\n=== 开始生成统一考号 ===")
+                print(f"考试ID: {upload.exam_id}")
+                print(f"文件路径: {upload.file.path}")
+
+                # 直接传递文件对象和考试ID
+                stats = mapper.process_exam_data(
+                    file=upload.file,  # 直接传递文件对象
+                    exam_id=upload.exam_id
+                )
+
+                if stats:  # 如果返回了统计信息，说明处理成功
                     # 更新状态
                     upload.status = 'COMPLETED'
                     upload.save()
 
-                    # 处理预览数据
-                    preview_rows = []
-                    if isinstance(result.get('preview_df'), pd.DataFrame):
-                        df = result['preview_df']
-                        if not df.empty:
-                            # 选择要显示的列
-                            display_columns = ['市区', '学校', '姓名', '考号', '班级',
-                                               '语文', '数学', '英语', '统一ID']
-                            preview_df = df[display_columns].head(10)
-
-                            # 转换为列表
-                            preview_rows = preview_df.to_dict('records')
+                    # 获取最新的10条记录作为预览
+                    preview_records = StudentMapping.objects.filter(
+                        exam_id=upload.exam_id
+                    ).order_by('-create_time')[:10]
 
                     # 准备显示结果
                     context = {
@@ -381,22 +547,17 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         'opts': self.model._meta,
                         'upload': upload,
                         'has_view_permission': True,
-                        'preview_data': preview_rows,
-                        'columns': display_columns,
-                        'stats': {
-                            '总记录数': result['total_count'],
-                            '新生成ID数': result['new_count'],
-                            '复用ID数': result['reused_count']
-                        }
+                        'preview_data': preview_records,
+                        'stats': stats
                     }
                     messages.success(request, "统一考号生成完成")
                     return render(request, 'score_processor/mapping_result.html', context)
                 else:
                     upload.status = 'FAILED'
-                    upload.error_message = result.get('error', '未知错误')
+                    upload.error_message = '生成统一考号失败'
                     upload.save()
-                    messages.error(request, f"生成统一考号失败: {result.get('error', '未知错误')}")
-                    return redirect('admin:score_processor_examupload_mapping', upload_id=upload.id)
+                    messages.error(request, "生成统一考号失败")
+                    return redirect('admin:score_processor_examupload_changelist')
 
             # GET请求显示映射页面
             context = {
@@ -409,9 +570,15 @@ class ExamUploadAdmin(admin.ModelAdmin):
             return render(request, 'score_processor/mapping.html', context)
 
         except Exception as e:
+            print(f"\n=== 生成统一考号出错 ===")
+            print(f"错误信息: {str(e)}")
+            import traceback
+            print("详细错误:")
+            print(traceback.format_exc())
+
             messages.error(request, f"生成统一考号失败: {str(e)}")
-            return redirect('admin:score_processor_examupload_mapping', upload_id=upload.id)
+            return redirect('admin:score_processor_examupload_changelist')
 
 # Register models
 admin.site.register(BaseExamConfig, ExamInfoAdmin)
-admin.site.register(StudentMapping, StudentMappingAdmin)
+

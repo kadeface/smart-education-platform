@@ -1,0 +1,16 @@
+<!-- templates/admin/score_processor/studentmapping/change_list.html -->
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block object-tools %}
+    {% if has_add_permission %}
+        <ul class="object-tools">
+            <li>
+                <a href="{% url 'admin:student-mapping-upload' %}" class="addlink">
+                    上传学生数据
+                </a>
+            </li>
+            {{ block.super }}
+        </ul>
+    {% endif %}
+{% endblock %}

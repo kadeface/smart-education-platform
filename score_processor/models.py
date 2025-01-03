@@ -85,16 +85,28 @@ class StudentMapping(models.Model):
     unified_id = models.CharField(max_length=11, db_comment='统一考号(11位)')
     exam_id = models.CharField(max_length=50, db_comment='考试ID')
     original_student_id = models.CharField(max_length=50, db_comment='原始考号')
+    # 新增字段
+    student_id = models.CharField(max_length=50, null=True, blank=True, db_comment='学籍号')
+    id_number = models.CharField(max_length=18, null=True, blank=True, db_comment='身份证号')
+    exam_number = models.CharField(max_length=50, null=True, blank=True, db_comment='考号')
+    # 原有字段
     student_name = models.CharField(max_length=50, db_comment='学生姓名')
     school_name = models.CharField(max_length=100, db_comment='学校名称')
     class_name = models.CharField(max_length=50, db_comment='班级名称')
+    # 新增字段
+    school_level = models.CharField(max_length=1, null=True, blank=True, db_comment='学段(H高中/M初中/P小学)')
+    match_type = models.CharField(max_length=20, null=True, blank=True, db_comment='匹配类型')
+    is_new = models.BooleanField(null=True, blank=True, db_comment='是否新记录')
+    # 原有字段
     create_time = models.DateTimeField(blank=True, null=True)
+    # 新增字段
+    update_time = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'student_mapping'
         unique_together = (('exam_id', 'original_student_id'),)
-        verbose_name = '学号映射表'
+        verbose_name = '学生统一考号映射表'
         verbose_name_plural = verbose_name
 
 
