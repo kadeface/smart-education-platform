@@ -1,0 +1,82 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block content %}
+<div id="content-main">
+    <div class="module">
+        <h2>{{ title }}</h2>
+        <p class="description">{{ subtitle }}</p>
+
+        {% if messages %}
+        <ul class="messagelist">
+            {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- 显示统计信息 -->
+        {% if stats %}
+        <div class="results">
+            <h3>处理统计</h3>
+            <table>
+                <tr>
+                    <th>总记录数：</th>
+                    <td>{{ stats.total }}</td>
+                </tr>
+                <tr>
+                    <th>新生成：</th>
+                    <td>{{ stats.new }}</td>
+                </tr>
+                <tr>
+                    <th>学籍号匹配：</th>
+                    <td>{{ stats.student_id_match }}</td>
+                </tr>
+                <tr>
+                    <th>身份证匹配：</th>
+                    <td>{{ stats.id_number_match }}</td>
+                </tr>
+                <tr>
+                    <th>姓名学校匹配：</th>
+                    <td>{{ stats.name_school_match }}</td>
+                </tr>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- 显示预览数据 -->
+        {% if preview_data %}
+        <div class="results">
+            <h3>数据预览（最新10条记录）</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>统一考号</th>
+                        <th>学校</th>
+                        <th>姓名</th>
+                        <th>班级</th>
+                        <th>匹配方式</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in preview_data %}
+                    <tr>
+                        <td>{{ record.unified_id }}</td>
+                        <td>{{ record.school_name }}</td>
+                        <td>{{ record.student_name }}</td>
+                        <td>{{ record.class_name }}</td>
+                        <td>{{ record.match_type }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- 操作按钮 -->
+        <div class="submit-row">
+            <a href="{% url 'admin:score_processor_examupload_changelist' %}" class="button default">返回列表</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

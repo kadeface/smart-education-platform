@@ -1,102 +1,35 @@
-{% extends "score_analysis/base_site.html" %}
+{# admin/score_processor/cleaning_result.html #}
+{% extends "admin/base_site.html" %}
 {% load i18n admin_urls static %}
 
 {% block content %}
 <div id="content-main">
     <div class="module">
-        <h2>{{ title }}</h2>
-        <p class="description">{{ subtitle }}</p>
-        
-        {% if messages %}
-        <ul class="messagelist">
-            {% for message in messages %}
-            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        <h2>{{ subtitle }}</h2>
+
+        <h3>清洗统计</h3>
+        <table>
+            {% for key, value in cleaning_stats.items %}
+            <tr>
+                <th>{{ key }}</th>
+                <td>{{ value }}</td>
+            </tr>
             {% endfor %}
-        </ul>
-        {% endif %}
+        </table>
 
-        <!-- 显示统计信息 -->
-        {% if stats %}
-        <div class="results">
-            <h3>处理结果统计</h3>
-            <table>
-                {% for key, value in stats.items %}
-                <tr>
-                    <th>{{ key }}：</th>
-                    <td>{{ value }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-        {% endif %}
+        <h3>成绩统计</h3>
+        <table>
+            {% for key, value in score_stats.items %}
+            <tr>
+                <th>{{ key }}</th>
+                <td>{{ value }}</td>
+            </tr>
+            {% endfor %}
+        </table>
 
-        <!-- 显示预览数据 -->
-        {% if preview_data %}
-        <div class="results">
-            <h3>数据预览（前10条）</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>市区</th>
-                        <th>学校</th>
-                        <th>姓名</th>
-                        <th>考号</th>
-                        <th>班级</th>
-                        <th>语文</th>
-                        <th>数学</th>
-                        <th>英语</th>
-                        <th>统一ID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in preview_data %}
-                    <tr class="{% cycle 'row1' 'row2' %}">
-                        <td>{{ row.市区 }}</td>
-                        <td>{{ row.学校 }}</td>
-                        <td>{{ row.姓名 }}</td>
-                        <td>{{ row.考号 }}</td>
-                        <td>{{ row.班级 }}</td>
-                        <td>{{ row.语文 }}</td>
-                        <td>{{ row.数学 }}</td>
-                        <td>{{ row.英语 }}</td>
-                        <td>{{ row.统一ID }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% endif %}
-
-        <!-- 操作按钮 -->
         <div class="submit-row">
-            <a href="{% url 'score_analysis:score_processor_examupload_changelist' %}" class="button default">完成</a>
+            <a href="{% url 'admin:score_processor_examupload_mapping' upload.id %}" class="button">继续处理</a>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extrahead %}
-{{ block.super }}
-<style>
-    .results table {
-        width: 100%;
-        margin: 10px 0;
-    }
-    .results table th,
-    .results table td {
-        padding: 8px;
-        text-align: left;
-        border-bottom: 1px solid #eee;
-    }
-    .results table th {
-        font-weight: bold;
-        background-color: #f8f8f8;
-    }
-    .row1 {
-        background-color: #fff;
-    }
-    .row2 {
-        background-color: #f9f9f9;
-    }
-</style>
 {% endblock %}

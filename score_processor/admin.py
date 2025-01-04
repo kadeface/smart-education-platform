@@ -3,26 +3,22 @@ import numpy as np
 import pandas as pd
 # Register your models here.
 from django.contrib import admin
-from django.urls import path, reverse
+from django.urls import path
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from django import forms
 from .models import ScoreStudentBasic, StudentMapping, BaseExamConfig
 from django.utils.html import format_html
 from .models import ExamUpload
 from score_processor.services.score_processor import ScoreProcessorService
-from django.core.files.storage import FileSystemStorage
 from .forms import ScoreUploadForm
 from .services.data_cleaner import DataCleanerService
-from .services.student_mapper import StudentMapperService
-from score_analysis.services.ranking_service import RankingService
-from .models import StudentMapping
+from .services.MappingGenerator import MappingGenerator
 from .services.StudentIDMapper import StudentIDMapper
 import io
 from django.http import HttpResponse, JsonResponse
 from django.template.response import TemplateResponse
 from django.db import models
-
+from django.core.cache import cache
 
 class ExamInfoAdmin(admin.ModelAdmin):
     list_display = ('exam_id', 'exam_name', 'exam_date', 'exam_type', 'status')
@@ -414,16 +410,14 @@ class ExamUploadAdmin(admin.ModelAdmin):
                 # 加载文件
                 success, error = processor.load_file(upload.file.path)
                 if not success:
-                    upload.status = 'FAILED'
-                    upload.error_message = error
-                    upload.save()
-                    messages.error(request, f"文件加载失败: {error}")
-                    return redirect('admin:score_processor_examupload_changelist')
+                    raise ValueError(f"文件加载失败: {error}")
 
                 # 清洗数据
                 try:
                     result = cleaner.clean_data(processor.df)
                     if result['success']:
+                        cache_key = f"cleaned_data_{upload_id}"
+                        cache.set(cache_key, result['cleaned_df'].to_dict('records'), timeout=3600)  # 1小时过期
                         upload.status = 'PROCESSING'
                         upload.save()
 
@@ -454,7 +448,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         messages.success(request, "数据清洗完成")
                         return TemplateResponse(
                             request,
-                            'admin/score_processor/cleaning_result.html',  # 修改模板路径
+                            'admin/score_processor/studentmapping/cleaning_result.html',  # 修改模板路径
                             context
                         )
                     else:
@@ -483,54 +477,54 @@ class ExamUploadAdmin(admin.ModelAdmin):
             }
             return TemplateResponse(
                 request,
-                'admin/score_processor/cleaning.html',  # 修改模板路径
+                'admin/score_processor/studentmapping/cleaning.html',  # 修改模板路径
                 context
             )
 
         except Exception as e:
             messages.error(request, f"清洗数据失败: {str(e)}")
-            return redirect('admin:score_processor_examupload_mapping', upload_id=upload_id)d_id=upload.id)
-
-            # GET请求显示清洗页面
-            context = {
-                'title': '数据清洗',
-                'subtitle': '点击开始清洗按钮进行数据清洗',
-                'opts': self.model._meta,
-                'upload': upload,
-                'has_view_permission': True,
-            }
-            return render(request, 'score_processor/cleaning.html', context)
-
-        except Exception as e:
-            messages.error(request, f"清洗数据失败: {str(e)}")
-            # 修正这里：添加 upload_id
             return redirect('admin:score_processor_examupload_mapping', upload_id=upload_id)
 
     def generate_mapping(self, request, upload_id):
         """生成统一考号映射"""
         try:
             upload = self.get_object(request, upload_id)
-            processor = ScoreProcessorService()
-            mapper = StudentIDMapper()
+            mapper = MappingGenerator()  # 使用新的 MappingGenerator 类
 
             if request.method == 'POST':
-                # 加载文件
-                success, error = processor.load_file(upload.file.path)
-                if not success:
-                    messages.error(request, f"文件加载失败: {error}")
-                    return redirect('admin:score_processor_examupload_changelist')
+                # 检查上传状态
+                if upload.status != 'PROCESSING':
+                    messages.error(request, "请先完成数据清洗")
+                    return redirect('admin:score_processor_examupload_clean', upload_id=upload.id)
 
-                print("\n=== 开始生成统一考号 ===")
+                # 从缓存获取已清洗的数据
+                cache_key = f"cleaned_data_{upload_id}"
+                cleaned_data = cache.get(cache_key)
+
+                if not cleaned_data:
+                    messages.error(request, "清洗数据已过期，请重新清洗")
+                    return redirect('admin:score_processor_examupload_clean', upload_id=upload.id)
+
+                # 将数据转换为DataFrame（如果还不是DataFrame）
+                if not isinstance(cleaned_data, pd.DataFrame):
+                    cleaned_data = pd.DataFrame(cleaned_data)
+
+                # 打印调试信息
+                print(f"\n=== 数据处理调试信息 ===")
+                print(f"DataFrame列名: {cleaned_data.columns.tolist()}")
+                print(f"数据形状: {cleaned_data.shape}")
                 print(f"考试ID: {upload.exam_id}")
-                print(f"文件路径: {upload.file.path}")
 
-                # 直接传递文件对象和考试ID
-                stats = mapper.process_exam_data(
-                    file=upload.file,  # 直接传递文件对象
+                # 使用新的 generate 方法
+                success = mapper.generate(
+                    cleaned_data=cleaned_data,
                     exam_id=upload.exam_id
                 )
 
-                if stats:  # 如果返回了统计信息，说明处理成功
+                # 处理完成后删除缓存
+                cache.delete(cache_key)
+
+                if success:
                     # 更新状态
                     upload.status = 'COMPLETED'
                     upload.save()
@@ -542,16 +536,20 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
                     # 准备显示结果
                     context = {
+                        **self.admin_site.each_context(request),
                         'title': '考号映射结果',
                         'subtitle': '统一考号生成完成',
                         'opts': self.model._meta,
                         'upload': upload,
                         'has_view_permission': True,
-                        'preview_data': preview_records,
-                        'stats': stats
+                        'preview_data': preview_records
                     }
                     messages.success(request, "统一考号生成完成")
-                    return render(request, 'score_processor/mapping_result.html', context)
+                    return TemplateResponse(
+                        request,
+                        'admin/score_processor/studentmapping/mapping_result.html',
+                        context
+                    )
                 else:
                     upload.status = 'FAILED'
                     upload.error_message = '生成统一考号失败'
@@ -561,13 +559,18 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
             # GET请求显示映射页面
             context = {
+                **self.admin_site.each_context(request),
                 'title': '生成统一考号',
                 'subtitle': '点击开始按钮生成统一考号',
                 'opts': self.model._meta,
                 'upload': upload,
                 'has_view_permission': True,
             }
-            return render(request, 'score_processor/mapping.html', context)
+            return TemplateResponse(
+                request,
+                'admin/score_processor/studentmapping/mapping.html',
+                context
+            )
 
         except Exception as e:
             print(f"\n=== 生成统一考号出错 ===")
@@ -578,7 +581,3 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
             messages.error(request, f"生成统一考号失败: {str(e)}")
             return redirect('admin:score_processor_examupload_changelist')
-
-# Register models
-admin.site.register(BaseExamConfig, ExamInfoAdmin)
-

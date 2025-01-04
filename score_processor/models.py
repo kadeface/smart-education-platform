@@ -60,7 +60,7 @@ class ScoreStudentBasic(models.Model):
     student_name = models.CharField(max_length=50)
     district_name = models.CharField(max_length=50)
     school_name = models.CharField(max_length=100)
-    class_field = models.CharField(db_column='class', max_length=50)  # Field renamed because it was a Python reserved word.
+    class_field = models.CharField(db_column='class_name', max_length=50)
     select_type = models.CharField(max_length=10, db_comment='文科/理科/未确定')
     chinese = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
     math = models.DecimalField(max_digits=5, decimal_places=2, blank=True, null=True)
@@ -96,6 +96,7 @@ class StudentMapping(models.Model):
     # 新增字段
     school_level = models.CharField(max_length=1, null=True, blank=True, db_comment='学段(H高中/M初中/P小学)')
     match_type = models.CharField(max_length=20, null=True, blank=True, db_comment='匹配类型')
+    name_tag = models.CharField(max_length=20, null=True, blank=True, db_comment='同名标记')
     is_new = models.BooleanField(null=True, blank=True, db_comment='是否新记录')
     # 原有字段
     create_time = models.DateTimeField(blank=True, null=True)
