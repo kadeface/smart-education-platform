@@ -3,6 +3,24 @@
 {% load i18n admin_urls static %}
 
 {% block content %}
+    <!-- 添加模板下载部分 -->
+    <div style="margin-bottom: 20px;">
+        <form method="get" action="{% url 'admin:score_processor_examupload_upload' %}" style="margin-bottom: 10px;">
+            <label style="margin-right: 10px;">选择学段：</label>
+            <select name="school_level" style="padding: 5px;">
+                <option value="P">小学</option>
+                <option value="M">初中</option>
+                <option value="H">高中</option>
+            </select>
+            <input type="hidden" name="action" value="download_template">
+            <button type="submit" class="button" style="margin-left: 10px; padding: 5px 10px;">
+                下载导入模板
+            </button>
+        </form>
+        <div style="color: #666; font-size: 12px;">
+            提示：可以下载模板填写，也可以直接上传符合格式的Excel文件
+        </div>
+    </div>
     <div id="content-main">
         <!-- 上传表单 -->
         <div class="module upload-form">
@@ -102,4 +120,5 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
 {% endblock %}

@@ -1,7 +1,7 @@
 #from django.contrib import score_analysis
 import numpy as np
 import pandas as pd
-# Register your models here.
+from urllib.parse import quote
 from django.contrib import admin
 from django.urls import path
 from django.shortcuts import render, redirect
@@ -19,6 +19,7 @@ from django.http import HttpResponse, JsonResponse
 from django.template.response import TemplateResponse
 from django.db import models
 from django.core.cache import cache
+
 
 class ExamInfoAdmin(admin.ModelAdmin):
     list_display = ('exam_id', 'exam_name', 'exam_date', 'exam_type', 'status')
@@ -186,6 +187,51 @@ class ExamUploadAdmin(admin.ModelAdmin):
     change_list_template = 'admin/score_processor/examupload/upload_list.html'
     ordering = ['-uploaded_at']  # 负号表示倒序，最新的在最上面
 
+    def __init__(self, model, admin_site):
+        super().__init__(model, admin_site)
+        # 基础字段映射（所有学段通用）
+        self.base_mapping = {
+            '市(区)': 'district_name',
+            '学校': 'school_name',
+            '姓名': 'student_name',
+            '考号': 'exam_number',
+            '班级': 'class_name',
+            '总分': 'total_score'
+        }
+
+        # 不同学段的科目映射
+        self.subject_mapping = {
+            'P': {  # 小学
+                '语文': 'chinese',
+                '数学': 'math',
+                '英语': 'english',
+                '科学': 'science'
+            },
+            'M': {  # 初中
+                '语文': 'chinese',
+                '数学': 'math',
+                '英语': 'english',
+                '物理': 'physics',
+                '化学': 'chemistry',
+                '政治': 'politics',
+                '历史': 'history',
+                '生物': 'biology',
+                '地理': 'geography'
+            },
+            'H': {  # 高中
+                '语文': 'chinese',
+                '数学': 'math',
+                '英语': 'english',
+                '物理': 'physics',
+                '化学': 'chemistry',
+                '政治': 'politics',
+                '历史': 'history',
+                '生物': 'biology',
+                '地理': 'geography'
+            }
+        }
+        super().__init__(model, admin_site)
+
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         extra_context['upload_form'] = ScoreUploadForm()
@@ -249,7 +295,31 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
     get_school_level.short_description = '学段'
 
+
     def upload_scores(self, request):
+        """处理成绩文件上传和模板下载"""
+        print("处理成绩文件请求")
+        # 处理模板下载请求
+        if request.method == 'GET' and request.GET.get('action') == 'download_template':
+            try:
+                school_level = request.GET.get('school_level')
+                if not school_level:
+                    messages.error(request, "请选择学段")
+                    return redirect('admin:score_processor_examupload_changelist')
+
+                if school_level not in ['P', 'M', 'H']:
+                    messages.error(request, "无效的学段")
+                    return redirect('admin:score_processor_examupload_changelist')
+
+                print(f"开始生成{school_level}学段的模板")
+                mapping_generator = MappingGenerator()
+                return mapping_generator.generate_score_template(school_level)
+            except Exception as e:
+                print(f"模板下载失败: {str(e)}")
+                messages.error(request, str(e))
+                return redirect('admin:score_processor_examupload_changelist')
+
+
         """处理成绩文件上传"""
         print("上传文件入口")
         upload = None  # 在最外层初始化 upload 变量
@@ -581,3 +651,5 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
             messages.error(request, f"生成统一考号失败: {str(e)}")
             return redirect('admin:score_processor_examupload_changelist')
+
+

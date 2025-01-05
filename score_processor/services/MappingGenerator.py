@@ -8,11 +8,13 @@ import pandas as pd
 import logging
 from django.core.cache import cache
 from django.db.models import Q
-
+from django.http import HttpResponse
 from ..models import StudentMapping, ScoreStudentBasic,BaseSchoolInfo
 from django.db import connection, transaction
-from django.utils import timezone
-
+import openpyxl
+from openpyxl.styles import NamedStyle, Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+from urllib.parse import quote
 class MappingGenerator:
     def __init__(self):
         """初始化映射生成器"""
@@ -64,7 +66,73 @@ class MappingGenerator:
                 '地理': 'geography'
             }
         }
+    def generate_score_template(self, school_level: str) -> HttpResponse:
+        """生成成绩导入模板"""
+        try:
+            if school_level not in ['P', 'M', 'H']:
+                raise ValueError("无效的学段")
 
+            # 创建Excel文件
+            wb = openpyxl.Workbook()
+            ws = wb.active
+
+            # 获取表头
+            headers = []
+            # 添加基础字段
+            for zh_name, en_name in self.base_mapping.items():
+                headers.append(zh_name)
+
+            # 添加学段对应的科目
+            for zh_name, en_name in self.subject_mapping[school_level].items():
+                headers.append(zh_name)
+
+            # 写入表头
+            for col, header in enumerate(headers, 1):
+                ws.cell(row=1, column=col, value=header)
+
+            # 设置列宽和样式
+            for col in range(1, len(headers) + 1):
+                ws.column_dimensions[get_column_letter(col)].width = 15
+
+            # 添加表头样式
+            header_style = NamedStyle(name='header_style')
+            header_style.font = Font(bold=True)
+            header_style.fill = PatternFill(start_color='CCCCCC', end_color='CCCCCC', fill_type='solid')
+            header_style.alignment = Alignment(horizontal='center')
+
+            for cell in ws[1]:
+                cell.style = header_style
+
+            # 添加示例数据
+            example_data = {
+                'P': ['某区', '某小学', '张三', '20250001', '三年级1班', '95', '92', '88', '90', '365'],
+                'M': ['某区', '某初中', '张三', '20250001', '初一1班',
+                      '95', '92', '88', '85', '87', '86', '89', '88', '86', '796'],
+                'H': ['某区', '某高中', '张三', '20250001', '高一1班',
+                      '95', '92', '88', '85', '87', '86', '89', '88', '86', '796']
+            }
+
+            # 写入示例数据
+            for col, value in enumerate(example_data[school_level], 1):
+                ws.cell(row=2, column=col, value=value)
+
+            # 创建响应
+            response = HttpResponse(
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+
+            # 设置文件名
+            level_names = {'P': '小学', 'M': '初中', 'H': '高中'}
+            filename = f"{level_names[school_level]}成绩导入模板.xlsx"
+            response['Content-Disposition'] = f'attachment; filename="{quote(filename)}"'
+
+            # 保存到响应
+            wb.save(response)
+            return response
+
+        except Exception as e:
+            print(f"生成模板文件失败: {str(e)}")
+            raise ValueError(f"生成模板文件失败: {str(e)}")
     def process_data(self, cleaned_data: pd.DataFrame, school_level: str) -> pd.DataFrame:
         """
         处理数据并根据学段映射相应科目
@@ -407,6 +475,9 @@ class MappingGenerator:
     def _update_score_records(self, data: pd.DataFrame, mapping_results: List[Dict], exam_id: str):
         """更新成绩记录"""
         try:
+            # 获取学段
+            school_level = exam_id.split('-')[2]  # H/M/P
+
             # 将映射结果转换为DataFrame
             mapping_df = pd.DataFrame(mapping_results)
 
@@ -427,12 +498,30 @@ class MappingGenerator:
                 self.logger.error(unmatched[['student_name', 'school_name', 'exam_number']].to_string())
                 raise ValueError("存在未匹配的成绩记录")
 
+            # 获取当前学段的科目映射
+            current_subjects = self.subject_mapping[school_level]
+
             # 批量创建成绩记录
             score_records = []
 
             for _, row in merged_data.iterrows():
-                # 确定分科类型
-                select_type = self._determine_select_type(row, exam_id)
+                # 设置所有科目成绩默认值为0
+                subject_scores = {
+                    'chinese': 0, 'math': 0, 'english': 0,
+                    'physics': 0, 'chemistry': 0, 'biology': 0,
+                    'history': 0, 'politics': 0, 'geography': 0
+                }
+
+                # 根据学段更新实际的科目成绩
+                for subject_name, field_name in current_subjects.items():
+                    if field_name == 'science':
+                        # 如果是科学，存入physics字段
+                        subject_scores['physics'] = row.get(field_name, 0)
+                    else:
+                        subject_scores[field_name] = row.get(field_name, 0)
+
+                # 确定分科类型（仅高中需要）
+                select_type = self._determine_select_type(row, exam_id) if school_level == 'H' else '未确定'
 
                 # 创建成绩记录
                 score_records.append(ScoreStudentBasic(
@@ -442,16 +531,8 @@ class MappingGenerator:
                     district_name=row['district_name'],
                     school_name=row['school_name'],
                     class_field=row['class_name'],
-                    select_type=select_type,  # 使用中文分科类型
-                    chinese=row.get('chinese', 0),
-                    math=row.get('math', 0),
-                    english=row.get('english', 0),
-                    physics=row.get('physics', 0),
-                    chemistry=row.get('chemistry', 0),
-                    biology=row.get('biology', 0),
-                    history=row.get('history', 0),
-                    politics=row.get('politics', 0),
-                    geography=row.get('geography', 0),
+                    select_type=select_type,
+                    **subject_scores,  # 展开所有科目成绩
                     total_score=row.get('total_score', 0)
                 ))
 
@@ -465,6 +546,15 @@ class MappingGenerator:
                     '未确定': select_types.count('未确定')
                 }
                 self.logger.info(f"分科统计: {stats}")
+
+                # 输出科目成绩统计
+                subject_stats = {}
+                for subject in current_subjects.values():
+                    if subject != 'science':  # 跳过science，因为它已经映射到physics
+                        count = sum(1 for r in score_records if getattr(r, subject, 0) > 0)
+                        if count > 0:
+                            subject_stats[subject] = count
+                self.logger.info(f"科目成绩统计: {subject_stats}")
 
                 self.logger.info(f"开始创建 {len(score_records)} 条成绩记录")
                 with transaction.atomic():
