@@ -1,0 +1,40 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block content %}
+<div class="alert alert-warning" style="padding: 20px; margin: 20px; border: 1px solid #ba2121;">
+    <h2 style="color: #ba2121;">{{ title }}</h2>
+    
+    <div style="margin: 20px 0;">
+        <p>发现以下已存在的记录：</p>
+        <ul>
+            <li>成绩记录：{{ score_count }} 条</li>
+            <li>映射记录：{{ mapping_count }} 条</li>
+        </ul>
+    </div>
+
+    <div style="margin: 20px 0; padding: 10px; background-color: #fff3cd; border: 1px solid #ba2121;">
+        <p style="color: #ba2121; font-weight: bold;">
+            警告：继续操作将删除上述所有记录！此操作不可撤销！
+        </p>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="hidden" name="force_update" value="true">
+        
+        <div style="margin-top: 20px;">
+            <input type="submit" 
+                   value="清空并重新导入" 
+                   style="background-color: #ba2121; color: white; padding: 10px 20px; border: none; cursor: pointer; margin-right: 10px;"
+                   onclick="return confirm('确定要清空已有数据并重新导入吗？此操作不可撤销！')">
+            
+            <a href="{% url 'admin:score_processor_examupload_changelist' %}" 
+               style="background-color: #79aec8; color: white; padding: 10px 20px; text-decoration: none;">
+                取消
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
