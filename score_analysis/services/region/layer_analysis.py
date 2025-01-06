@@ -21,11 +21,7 @@ class LayerAnalysisService:
             '文科': ['top10', 'top50', 'top100', 'top200', 'top300','top350', 'top400'],
             '理科': ['top10', 'top50', 'top100', 'top200', 'top350','top400', 'top1250']
         }
-        # 未分科情况的配置
-        self.undivided_layer_types = {
-            'city': ['top10', 'top50', 'top100', 'top200', 'top600', 'top1200', 'top1600', 'top3000'],
-            'district': ['top10', 'top50', 'top100', 'top200', 'top350', 'top600', 'top1200', 'top1600']
-        }
+        
         # 层次学生数配置
         self.layer_student_counts = {
             '文科': {
@@ -50,71 +46,38 @@ class LayerAnalysisService:
                 'top3000': 3000, #江门市理科优分层
                 'top9500': 9500  #江门市理科本科层
             }
-
-        }
-        # 未分科情况的学生数配置
-        self.undivided_student_counts = {
-            'top10': 10,
-            'top50': 50,
-            'top100': 100,
-            'top200': 200,
-            'top350': 350,
-            'top600': 600,
-            'top1200': 1200,
-            'top1600': 1600,
-            'top3000': 3000
         }
 
     def _get_layer_types(self, exam_id: str, select_type: str) -> List[str]:
         """根据考试ID获取对应的层次类型配置"""
-        # 获取考试信息
-        exam_info = self._get_exam_info(exam_id)
-        is_divided = self._is_stream_divided(exam_info)
-
-        # 根据是否分科返回不同的层次配置
-        if is_divided and select_type:
-            # 分科情况，使用原有逻辑
-            if 'CITY' in exam_id.upper():
-                return list(set(
-                    self.city_layer_types[select_type] +
-                    self.district_layer_types[select_type]
-                ))
-            else:
-                return self.district_layer_types[select_type]
+        # 对于市级考试，返回所有层次（市级+区县）
+        if 'CITY' in exam_id.upper():
+            return list(set(
+                self.city_layer_types[select_type] +  # 市级层次
+                self.district_layer_types[select_type]  # 区县层次
+            ))
         else:
-            # 未分科情况，使用新配置
-            if 'CITY' in exam_id.upper():
-                return list(set(
-                    self.undivided_layer_types['city'] +
-                    self.undivided_layer_types['district']
-                ))
-            else:
-                return self.undivided_layer_types['district']
+            return self.district_layer_types[select_type]
 
     def _get_student_count(self, select_type: str, layer_type: str) -> int:
         """获取层次对应的学生数量"""
         return self.layer_student_counts[select_type][layer_type]
 
-    def _get_exam_scores(self, exam_id: str, select_type: str=None) -> Dict:
+    def _get_exam_scores(self, exam_id: str, select_type: str) -> Dict:
         """获取并预处理考试成绩数据"""
         try:
             logger.info(f"开始获取考试 {exam_id} {select_type} 的成绩数据")
 
-            # 构建基础查询条件
-            query_params = {'exam_id': exam_id}
-
-            # 只有在分科时才添加select_type条件
-            if select_type:
-                query_params['select_type'] = select_type
-
-            # 获取总体排序后的成绩
+            # 1. 获取总体排序后的成绩
             query = ScoreStudentBasic.objects.filter(
-                **query_params
+                exam_id=exam_id,
+                select_type=select_type
             ).order_by(
                 '-total_score',
                 '-math',
                 '-chinese'
             )
+
             # 打印SQL查询
             logger.debug(f"成绩查询SQL: {str(query.query)}")
 
@@ -186,27 +149,23 @@ class LayerAnalysisService:
             logger.error(f"获取考试成绩数据失败: {str(e)}", exc_info=True)
             raise
 
-    def _generate_base_layer_analysis(self, exam_id: str, select_type: str = None,
-                                      scores: Dict = None) -> List[LayerAnalysis]:
+    def _generate_base_layer_analysis(self, exam_id: str, select_type: str,
+                                      scores: Dict) -> List[LayerAnalysis]:
         """生成基础层次分析"""
         try:
-            # 1. 获取考试信息和分科状态
-            exam_info = self._get_exam_info(exam_id)
-            is_divided = self._is_stream_divided(exam_info)
+            # 1. 删除已有的分析数据
+            LayerAnalysis.objects.filter(
+                exam_id=exam_id,
+                select_type=select_type
+            ).delete()
 
-            # 2. 删除已有的分析数据
-            query = LayerAnalysis.objects.filter(exam_id=exam_id)
-            if is_divided and select_type:
-                query = query.filter(select_type=select_type)
-            query.delete()
-
-            # 3. 生成排名
+            # 2. 生成排名
             all_scores = scores['all_scores']
             sorted_scores = sorted(all_scores,
                                    key=lambda x: (float(x['total_score']),
-                                                  float(x.get('math', 0)),
-                                                  float(x.get('chinese', 0)),
-                                                  x['student_id']),
+                                                  float(x.get('math', 0)),  # 总分相同，按数学成绩
+                                                  float(x.get('chinese', 0)),  # 数学相同，按语文成绩
+                                                  x['student_id']),  # 保证排序稳定性
                                    reverse=True)
 
             # 添加排名信息
@@ -225,19 +184,13 @@ class LayerAnalysisService:
                 student['rank'] = current_rank
                 student['same_rank_count'] = same_rank_count
 
-            # 4. 获取层次类型和学生数量配置
-            if is_divided and select_type:
-                layer_types = self._get_layer_types(exam_id, select_type)
-                student_counts = self.layer_student_counts[select_type]
-            else:
-                layer_types = self.undivided_layer_types['city' if 'CITY' in exam_id.upper() else 'district']
-                student_counts = self.undivided_student_counts
-
-            # 5. 生成新的分析数据
+            # 3. 生成新的分析数据
             layer_analyses = []
+            layer_types = self._get_layer_types(exam_id, select_type)
+
             for layer_type in layer_types:
                 # 获取该层次的学生数量
-                student_count = student_counts[layer_type]
+                student_count = self.layer_student_counts[select_type][layer_type]
 
                 # 获取该层次的学生（按排名）
                 layer_students = sorted_scores[:student_count]
@@ -263,7 +216,7 @@ class LayerAnalysisService:
                 best_rank = min(s['rank'] for s in layer_students)
                 worst_rank = max(s['rank'] for s in layer_students)
 
-                # 按学校分组统计（保持原有逻辑）
+                # 按学校分组统计
                 school_stats = {}
                 for student in layer_students:
                     school_key = f"{student['district_name']}_{student['school_name']}"
@@ -302,7 +255,7 @@ class LayerAnalysisService:
                         'std_dev': round(std_dev, 2),
                         'best_rank': best_rank,
                         'worst_rank': worst_rank,
-                        'plan_count': student_counts[layer_type],
+                        'plan_count': self.layer_student_counts[select_type][layer_type],
                         'actual_count': len(layer_students)
                     },
                     'school_distribution': school_stats
@@ -310,7 +263,7 @@ class LayerAnalysisService:
 
                 logger.debug(f"""层次分析统计:
                     层次类型: {layer_type}
-                    计划人数: {student_counts[layer_type]}
+                    计划人数: {self.layer_student_counts[select_type][layer_type]}
                     实际人数: {len(layer_students)}
                     最低分: {min_score}
                     最低排名: {worst_rank}
@@ -320,7 +273,7 @@ class LayerAnalysisService:
                 # 创建层次分析对象
                 layer = LayerAnalysis(
                     exam_id=exam_id,
-                    select_type=select_type,  # 未分科时为None
+                    select_type=select_type,
                     layer_type=layer_type,
                     student_count=len(layer_scores),
                     mean_score=Decimal(str(round(mean_score, 2))),
@@ -332,14 +285,14 @@ class LayerAnalysisService:
 
                 layer_analyses.append(layer)
 
-            # 6. 批量保存并获取保存后的对象
+            # 4. 批量保存并获取保存后的对象
             layers = LayerAnalysis.objects.bulk_create(layer_analyses)
 
-            # 7. 重新查询以获取完整的对象
-            query = LayerAnalysis.objects.filter(exam_id=exam_id)
-            if is_divided and select_type:
-                query = query.filter(select_type=select_type)
-            layers = query.order_by('layer_id')
+            # 5. 重新查询以获取完整的对象（包括主键）
+            layers = LayerAnalysis.objects.filter(
+                exam_id=exam_id,
+                select_type=select_type
+            ).order_by('layer_id')
 
             return list(layers)
 
@@ -386,54 +339,30 @@ class LayerAnalysisService:
             logger.error(f"生成分层分析失败: {str(e)}", exc_info=True)
             raise
 
-    def _generate_analysis_by_type(self, exam_id: str, select_type: str = None) -> bool:
-        """
-        生成地市级分析
-        Args:
-            exam_id: 考试ID
-            select_type: 科类（文科/理科/None）
-        """
+    def _generate_analysis_by_type(self, exam_id: str, select_type: str) -> bool:
+        """生成地市级分析"""
         try:
-            # 获取考试信息
-            exam_info = self._get_exam_info(exam_id)
-            is_divided = self._is_stream_divided(exam_info)
+            logger.info(f"开始生成地市级分析: {exam_id} {select_type}")
 
-            if is_divided and select_type:
-                # 分科情况，使用原有逻辑
-                logger.info(f"开始生成分科地市级分析: {exam_id} {select_type}")
+            # 1. 获取成绩数据
+            scores = self._get_exam_scores(exam_id, select_type)
+            if not scores:
+                logger.warning(f"未找到考试成绩数据: {exam_id} {select_type}")
+                return False
 
-                # 1. 获取成绩数据（分科）
-                scores = self._get_exam_scores(exam_id, select_type)
-                if not scores:
-                    logger.warning(f"未找到考试成绩数据: {exam_id} {select_type}")
-                    return False
-
-            else:
-                # 未分科情况
-                logger.info(f"开始生成未分科地市级分析: {exam_id}")
-
-                # 1. 获取成绩数据（不分科）
-                scores = self._get_exam_scores(exam_id)
-                if not scores:
-                    logger.warning(f"未找到考试成绩数据: {exam_id}")
-                    return False
-
-            # 2. 生成基础层次分析（统一调用方式）
+            # 2. 生成基础层次分析
             layer_analyses = self._generate_base_layer_analysis(
                 exam_id, select_type, scores
             )
 
-            # 3. 生成区县层次详情（包含学校统计）- 通用逻辑
+            # 3. 生成区县层次详情（包含学校统计）
             self._generate_district_layer_details(layer_analyses, scores)
 
-            logger.info(f"地市级分析生成完成: {exam_id} {select_type if select_type else '未分科'}")
+            logger.info(f"地市级分析生成完成: {exam_id} {select_type}")
             return True
 
         except Exception as e:
-            logger.error(
-                f"地市级分析生成失败: {exam_id} {select_type if select_type else '未分科'} - {str(e)}",
-                exc_info=True
-            )
+            logger.error(f"地市级分析生成失败: {exam_id} {select_type} - {str(e)}", exc_info=True)
             raise
 
     def _generate_district_layer_details(self, layer_analyses: List[LayerAnalysis], scores: Dict) -> None:
@@ -441,24 +370,14 @@ class LayerAnalysisService:
         try:
             print(f"开始处理，原始层次数量: {len(layer_analyses)}")
 
-            # 1. 获取考试信息和分科状态
-            exam_id = layer_analyses[0].exam_id
-            exam_info = self._get_exam_info(exam_id)
-            is_divided = self._is_stream_divided(exam_info)
-            select_type = layer_analyses[0].select_type if is_divided else None
-
-            # 2. 删除已有的区县层次详情数据
+            # 1. 删除已有的区县层次详情数据
             RegionLayerDetail.objects.filter(
                 layer__in=layer_analyses
             ).delete()
 
-            # 3. 获取区县层次配置
-            if is_divided and select_type:
-                district_layers = self.district_layer_types[select_type]
-                student_counts = self.layer_student_counts[select_type]
-            else:
-                district_layers = self.undivided_layer_types['district']
-                student_counts = self.undivided_student_counts
+            # 2. 获取科类和区县层次配置
+            select_type = layer_analyses[0].select_type
+            district_layers = self.district_layer_types[select_type]
 
             print(f"""
                 层次信息:
@@ -466,7 +385,7 @@ class LayerAnalysisService:
                 - 区县层次: {district_layers}
             """)
 
-            # 4. 生成总排名
+            # 3. 生成总排名
             sorted_scores = sorted(scores['all_scores'],
                                    key=lambda x: (float(x['total_score']),
                                                   float(x.get('math', 0)),
@@ -474,7 +393,7 @@ class LayerAnalysisService:
                                                   x['student_id']),
                                    reverse=True)
 
-            # 5. 添加排名信息
+            # 4. 添加排名信息
             current_rank = 1
             current_score = None
             for i, student in enumerate(sorted_scores):
@@ -484,7 +403,7 @@ class LayerAnalysisService:
                     current_score = score
                 student['rank'] = current_rank
 
-            # 6. 按区县分组所有学生
+            # 5. 按区县分组所有学生
             district_all_scores = {}
             for student in sorted_scores:
                 district = student['district_name']
@@ -492,7 +411,7 @@ class LayerAnalysisService:
                     district_all_scores[district] = []
                 district_all_scores[district].append(student)
 
-            # 7. 计算每个区县的实际层次
+            # 6. 计算每个区县的实际层次
             district_details = []
 
             for district, district_scores in district_all_scores.items():
@@ -509,7 +428,7 @@ class LayerAnalysisService:
                 # 处理每个层次
                 for layer_type in district_layers:
                     # 获取该层次的学生数量
-                    student_count = student_counts[layer_type]
+                    student_count = self.layer_student_counts[select_type][layer_type]
 
                     print(f"  层次 {layer_type}: 总人数 {total_students}, 计划人数 {student_count}")
 
@@ -608,7 +527,7 @@ class LayerAnalysisService:
 
                     print(f"    实际入选人数: {len(layer_students)}, 学校数量: {len(school_groups)}")
 
-            # 8. 计算市级差异
+            # 7. 计算市级差异
             for layer_type in set(d.layer.layer_type for d in district_details):
                 layer_details = [d for d in district_details if d.layer.layer_type == layer_type]
                 if layer_details:
@@ -616,7 +535,7 @@ class LayerAnalysisService:
                     for detail in layer_details:
                         detail.city_diff = round(float(detail.mean_score) - city_mean, 2)
 
-            # 9. 批量保存
+            # 8. 批量保存
             created = RegionLayerDetail.objects.bulk_create(district_details)
             print(f"\n总共创建记录数: {len(created)}")
 
@@ -626,54 +545,3 @@ class LayerAnalysisService:
             print(f"错误: {str(e)}")
             logger.error(f"生成区县层次详情失败: {str(e)}", exc_info=True)
             raise
-
-    def _get_exam_info(self, exam_id: str) -> dict:
-        """
-        获取考试基本信息
-        Args:
-            exam_id: 考试ID
-        Returns:
-            dict: 考试信息字典
-        """
-        try:
-            exam_info = BaseExamConfig.objects.filter(exam_id=exam_id).values(
-                'exam_id',
-                'exam_name',
-                'school_level',  # P/M/H (小学/初中/高中)
-                'semester',  # 学期 例如：H1-1 表示高一上
-                'exam_date'
-            ).first()
-
-            if not exam_info:
-                logger.error(f"未找到考试 {exam_id} 的配置信息")
-                return {}
-
-            return exam_info
-
-        except Exception as e:
-            logger.error(f"获取考试信息失败: {str(e)}")
-            return {}
-
-    def _is_stream_divided(self, exam_info: dict) -> bool:
-        """
-        判断是否为分科考试
-        Args:
-            exam_info: 考试信息字典
-        Returns:
-            bool: 是否分科
-        """
-        try:
-            # 只有高中才可能分科
-            if exam_info.get('school_level') != 'H':
-                return False
-
-            # 高一上学期不分科
-            if exam_info.get('semester') == 'H1-1':
-                return False
-
-            # 其他高中年级都分科
-            return True
-
-        except Exception as e:
-            logger.error(f"判断分科状态失败: {str(e)}")
-            return False

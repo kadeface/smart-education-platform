@@ -10,18 +10,16 @@
 {% endblock %}
 
 {% block analysis_content %}
-<div class="exam-header">
-    <h2>{{ exam_info.exam_name }}</h2>
-    <div class="exam-info">
-        <span>考试ID: {{ exam_info.exam_id }}</span>
-        {% if is_divided %}
+<div class="layer-analysis">
+    <!-- 1. 考试信息头部 -->
+    <div class="exam-header">
+        <h2>{{ exam_info.exam_name }}</h2>
+        <div class="exam-info">
+            <span>考试ID: {{ exam_info.exam_id }}</span>
             <span>理科总人数: {{ exam_info.total_students.理科|default:0 }}</span>
             <span>文科总人数: {{ exam_info.total_students.文科|default:0 }}</span>
-        {% else %}
-            <span>总人数: {{ exam_info.total_students|default:0 }}</span>
-        {% endif %}
+        </div>
     </div>
-</div>
 
 
 
@@ -29,12 +27,10 @@
     <div class="district-analysis">
         <h3> 区县层次分析</h3>
         <!-- 2. 文理科切换 -->
-            {% if is_divided %}
-                <div class="type-tabs">
-                    <a href="{{ science_url }}" {% if select_type == '理科' %}class="active"{% endif %}>理科</a>
-                    <a href="{{ liberal_url }}" {% if select_type == '文科' %}class="active"{% endif %}>文科</a>
-                </div>
-            {% endif %}
+    <div class="type-tabs">
+        <a href="{{ science_url }}" {% if select_type == '理科' %}class="active"{% endif %}>理科</a>
+        <a href="{{ liberal_url }}" {% if select_type == '文科' %}class="active"{% endif %}>文科</a>
+    </div>
         <table class="analysis-table">
             <thead>
                 <tr>
@@ -105,14 +101,12 @@
         <h3>学校层次分析</h3>
 
         <!-- 分科切换 -->
-            {% if is_divided %}
-                <div class="type-tabs">
-                    <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
-                       class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
-                    <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
-                       class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
-                </div>
-            {% endif %}
+        <div class="type-tabs">
+            <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
+               class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
+            <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
+               class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
+        </div>
 
     <!-- 区县选择器 -->
         <!-- 区县选择器 -->

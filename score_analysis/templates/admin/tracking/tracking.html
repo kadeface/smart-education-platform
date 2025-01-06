@@ -1,22 +1,9 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
-{% block extrastyle %}
-{{ block.super }}
-<link rel="stylesheet" type="text/css" href="{% static 'score_analysis/css/tracking.css' %}">
-{% endblock %}
+
 {% block content %}
-<form method="post" action="{% url 'admin:generate-tracking' %}" id="tracking-form">
+<form method="post" action="{% url 'admin:generate-tracking' %}">
     {% csrf_token %}
 
-    {% if messages %}
-    <div class="messagelist">
-        {% for message in messages %}
-        <div class="message {% if message.tags %}{{ message.tags }}{% endif %}">{{ message }}</div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- 考试列表部分 -->
     {% if exams.H %}
     <div class="module">
         <h2>高中</h2>
@@ -25,8 +12,8 @@
             <h3>{{ grad_year }}届毕业</h3>
             {% for exam in exam_list %}
             <div class="form-row">
-                <input type="checkbox" name="exams" value="{{ exam.id }}" id="{{ exam.id }}">
-                <label for="{{ exam.id }}">{{ exam.name }}</label>
+                <input type="checkbox" name="exams" value="{{ exam.id }}">
+                {{ exam.name }}
                 {% if exam.has_tracking %}
                     <span class="status-tag">已生成</span>
                 {% endif %}
@@ -45,8 +32,8 @@
             <h3>{{ grad_year }}届毕业</h3>
             {% for exam in exam_list %}
             <div class="form-row">
-                <input type="checkbox" name="exams" value="{{ exam.id }}" id="{{ exam.id }}">
-                <label for="{{ exam.id }}">{{ exam.name }}</label>
+                <input type="checkbox" name="exams" value="{{ exam.id }}">
+                {{ exam.name }}
                 {% if exam.has_tracking %}
                     <span class="status-tag">已生成</span>
                 {% endif %}
@@ -65,8 +52,8 @@
             <h3>{{ grad_year }}届毕业</h3>
             {% for exam in exam_list %}
             <div class="form-row">
-                <input type="checkbox" name="exams" value="{{ exam.id }}" id="{{ exam.id }}">
-                <label for="{{ exam.id }}">{{ exam.name }}</label>
+                <input type="checkbox" name="exams" value="{{ exam.id }}">
+                {{ exam.name }}
                 {% if exam.has_tracking %}
                     <span class="status-tag">已生成</span>
                 {% endif %}
@@ -80,12 +67,12 @@
     <div class="module">
         <h2>生成选项</h2>
         <div class="form-row">
-            <input type="checkbox" name="t_score" id="t_score" checked>
-            <label for="t_score">生成T分</label>
+            <input type="checkbox" name="t_score" checked>
+            生成T分
         </div>
         <div class="form-row">
-            <input type="checkbox" name="rank" id="rank" checked>
-            <label for="rank">生成排名</label>
+            <input type="checkbox" name="rank" checked>
+            生成排名
         </div>
     </div>
 
@@ -94,13 +81,65 @@
     </div>
 </form>
 
-<script>
-document.getElementById('tracking-form').addEventListener('submit', function(e) {
-    const selectedExams = document.querySelectorAll('input[name="exams"]:checked');
-    if (selectedExams.length === 0) {
-        e.preventDefault();
-        alert('请选择至少一个考试');
-    }
-});
-</script>
+<style>
+.grad-year-group {
+    margin-bottom: 20px;
+}
+.grad-year-group h3 {
+    color: #666;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+}
+.form-row {
+    padding: 8px;
+    border-bottom: 1px solid #f5f5f5;
+    display: flex;
+    align-items: center;
+}
+.status-tag {
+    background: #28a745;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: auto;
+    font-size: 12px;
+}
+.module {
+    margin-bottom: 20px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.module h2 {
+    background: #79aec8;
+    color: #fff;
+    padding: 8px 10px;
+    margin: -10px -10px 10px -10px;
+    border-radius: 4px 4px 0 0;
+}
+input[type="checkbox"] {
+    margin-right: 10px;
+}
+.submit-row {
+    padding: 12px 14px;
+    margin: 20px 0;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: right;
+}
+.submit-row input[type="submit"] {
+    background: #417690;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+}
+.submit-row input[type="submit"]:hover {
+    background: #205067;
+}
+</style>
 {% endblock %}

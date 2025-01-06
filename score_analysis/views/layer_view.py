@@ -19,7 +19,6 @@ class LayerView(View):
 
         # 获取基础数据
         exam_info = service.get_exam_info(exam_id)
-        is_divided = service._is_stream_divided(exam_info)
         layer_types = service.get_layer_types(exam_id, select_type)
         district_analysis = service.get_district_analysis(exam_id, select_type)
 
@@ -35,7 +34,6 @@ class LayerView(View):
 
         context = {
             'exam_info': exam_info,
-            'is_divided': is_divided,
             'select_type': select_type,
             'layer_types': layer_types,
             'district_analysis': district_analysis,

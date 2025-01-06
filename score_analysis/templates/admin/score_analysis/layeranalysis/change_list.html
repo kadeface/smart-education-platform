@@ -79,7 +79,7 @@
                                 {% endif %}
                             </a>
                             {% if exam.has_analysis %}
-                                <a href="{% url 'score_analysis:layer_view' 'region' exam.exam_id %}"
+                            <a href="{% url 'score_analysis:layer_view' exam.exam_id %}"
                                class="button" target="_blank">查看结果</a>
                             {% else %}
                             <a href="{% url 'admin:layer_analysis_generate' exam.exam_id %}"

@@ -104,7 +104,7 @@ class StreamTypeFilter(SimpleListFilter):
         return [
             ('文科', '文科'),
             ('理科', '理科'),
-            ('未确定', '未确定'),
+
         ]
 
     def queryset(self, request, queryset):
@@ -1508,7 +1508,6 @@ class TrackingAdmin(admin.ModelAdmin):
             exam_ids = request.POST.getlist('exams')
             generate_t_score = request.POST.get('t_score') == 'on'
             generate_rank = request.POST.get('rank') == 'on'
-            force_update = request.POST.get('force_update') == 'true'  # 新增参数
 
             if not exam_ids:
                 messages.error(request, '请选择至少一个考试')
@@ -1516,59 +1515,18 @@ class TrackingAdmin(admin.ModelAdmin):
 
             try:
                 generator = TrackingGenerator()
-                existing_exams = []
-                success_exams = []
-
-                # 第一次尝试生成
                 for exam_id in exam_ids:
-                    result = generator.generate(
+                    generator.generate(
                         exam_id=exam_id,
                         generate_t_score=generate_t_score,
                         generate_rank=generate_rank
                     )
 
-                    if result == "EXISTS":
-                        existing_exams.append(exam_id)
-                    else:
-                        success_exams.append(exam_id)
-
-                # 如果有已存在数据的考试
-                if existing_exams:
-                    if not force_update:
-                        # 返回确认信息
-                        context = {
-                            **self.admin_site.each_context(request),
-                            'title': '发展跟踪生成',
-                            'exams': self.get_exams_by_level(),
-                            'existing_exams': existing_exams,
-                            'success_exams': success_exams,
-                            'generate_t_score': generate_t_score,
-                            'generate_rank': generate_rank,
-                            'show_confirm': True
-                        }
-                        return TemplateResponse(request, "admin/tracking/tracking.html", context)
-                    else:
-                        # 用户确认重新生成
-                        for exam_id in existing_exams:
-                            generator._clear_existing_data(exam_id)
-                            generator.generate(
-                                exam_id=exam_id,
-                                generate_t_score=generate_t_score,
-                                generate_rank=generate_rank
-                            )
-                            success_exams.append(exam_id)
-
-                messages.success(request, f'成功处理 {len(success_exams)} 个考试的发展跟踪数据')
+                messages.success(request, f'成功处理 {len(exam_ids)} 个考试的发展跟踪数据')
 
             except Exception as e:
                 messages.error(request, f'处理发展跟踪数据时出错: {str(e)}')
 
-            # 重新获取考试列表并返回
-            context = {
-                **self.admin_site.each_context(request),
-                'title': '发展跟踪生成',
-                'exams': self.get_exams_by_level(),  # 重新获取考试列表
-            }
             return self.tracking_view(request)
 
     def get_exams_by_level(self):

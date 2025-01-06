@@ -5,7 +5,7 @@ from ..models.Tracking import (
     TrackingStudent,
     TrackingExam,
     TrackingRecord,
-
+    TrackingAnalysis
 )
 
 

@@ -17,7 +17,7 @@ from .services.StudentIDMapper import StudentIDMapper
 import io
 from django.http import HttpResponse, JsonResponse
 from django.template.response import TemplateResponse
-from django.db import models, transaction
+from django.db import models
 from django.core.cache import cache
 
 
@@ -295,43 +295,10 @@ class ExamUploadAdmin(admin.ModelAdmin):
 
     get_school_level.short_description = '学段'
 
-    def check_existing_exam(self, exam_id: str, force_update: bool = False) -> tuple:
-        """检查考试数据是否存在，如果force_update为True则清空已有数据"""
-        try:
-            # 检查是否存在已有记录
-            existing_scores = ScoreStudentBasic.objects.filter(exam_id=exam_id)
-            existing_mappings = StudentMapping.objects.filter(exam_id=exam_id)
-
-            score_count = existing_scores.count()
-            mapping_count = existing_mappings.count()
-
-            if (score_count > 0 or mapping_count > 0):
-                if not force_update:
-                    return False, None, {
-                        'title': f'发现考试 {exam_id} 的已有记录',
-                        'message': f'成绩记录：{score_count} 条\n映射记录：{mapping_count} 条',
-                        'exam_id': exam_id,
-                        'score_count': score_count,
-                        'mapping_count': mapping_count
-                    }
-
-                # 强制更新，清空已有数据
-                try:
-                    with transaction.atomic():
-                        deleted_scores = existing_scores.delete()
-                        deleted_mappings = existing_mappings.delete()
-                        return True, f"已清空考试 {exam_id} 的原有数据", None
-
-                except Exception as e:
-                    return False, None, {'message': f"清空数据失败: {str(e)}"}
-
-            return True, None, None  # 没有已存在的数据，可以继续
-
-        except Exception as e:
-            return False, None, {'message': f"检查数据时出错: {str(e)}"}
 
     def upload_scores(self, request):
         """处理成绩文件上传和模板下载"""
+        print("处理成绩文件请求")
         # 处理模板下载请求
         if request.method == 'GET' and request.GET.get('action') == 'download_template':
             try:
@@ -344,48 +311,28 @@ class ExamUploadAdmin(admin.ModelAdmin):
                     messages.error(request, "无效的学段")
                     return redirect('admin:score_processor_examupload_changelist')
 
+                print(f"开始生成{school_level}学段的模板")
                 mapping_generator = MappingGenerator()
                 return mapping_generator.generate_score_template(school_level)
             except Exception as e:
+                print(f"模板下载失败: {str(e)}")
                 messages.error(request, str(e))
                 return redirect('admin:score_processor_examupload_changelist')
 
+
         """处理成绩文件上传"""
-        upload = None
+        print("上传文件入口")
+        upload = None  # 在最外层初始化 upload 变量
 
         if request.method == 'POST':
             form = ScoreUploadForm(request.POST, request.FILES)
             if form.is_valid():
                 try:
+                    # 从表单获取考试配置对象
                     base_subject_config = form.cleaned_data['base_subject_config']
                     exam_id = base_subject_config.exam_id
-                    force_update = request.POST.get('force_update') == 'true'
 
-                    # 检查已有数据
-                    can_continue, success_msg, error_info = self.check_existing_exam(
-                        exam_id,
-                        force_update
-                    )
-
-                    if not can_continue:
-                        if error_info.get('title'):  # 发现已有数据
-                            context = {
-                                'form': form,
-                                **error_info
-                            }
-                            return render(
-                                request,
-                                'admin/score_processor/examupload/confirm_override.html',
-                                context
-                            )
-                        else:  # 发生错误
-                            messages.error(request, error_info['message'])
-                            return redirect('admin:score_processor_examupload_changelist')
-
-                    if success_msg:
-                        messages.warning(request, success_msg)
-
-                    # 检查是否有正在处理的记录
+                    # 检查是否已存在相同考试ID的上传记录
                     if ExamUpload.objects.filter(exam_id=exam_id, status='PROCESSING').exists():
                         messages.error(request, f"考试 {exam_id} 已有正在处理的记录")
                         return redirect('admin:score_processor_examupload_changelist')
@@ -395,7 +342,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         file=request.FILES['file'],
                         exam_id=exam_id,
                         base_subject_config=base_subject_config,
-                        school_level=exam_id[12],
+                        school_level=exam_id[12],  # 确保索引正确
                         status='PENDING'
                     )
                     upload.save()
@@ -412,6 +359,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         upload.status = 'PROCESSING'
                         upload.save()
                         messages.success(request, "文件上传成功，请预览数据")
+                        # 成功后直接跳转到预览页面
                         return redirect('admin:score_processor_examupload_preview', upload_id=upload.id)
                     else:
                         upload.status = 'FAILED'
@@ -421,6 +369,7 @@ class ExamUploadAdmin(admin.ModelAdmin):
                         return redirect('admin:score_processor_examupload_changelist')
 
                 except IndexError:
+                    # 处理考试ID格式错误
                     if upload:
                         upload.status = 'FAILED'
                         upload.error_message = "考试ID格式错误"
@@ -429,19 +378,25 @@ class ExamUploadAdmin(admin.ModelAdmin):
                     return redirect('admin:score_processor_examupload_changelist')
 
                 except Exception as e:
+                    # 处理其他所有异常
                     if upload:
                         upload.status = 'FAILED'
                         upload.error_message = str(e)
                         upload.save()
                     messages.error(request, f"上传失败: {str(e)}")
+                    # 打印详细错误信息以便调试
+                    import traceback
+                    print(traceback.format_exc())
                     return redirect('admin:score_processor_examupload_changelist')
 
             else:
+                # 表单验证失败
                 for field, errors in form.errors.items():
                     for error in errors:
                         messages.error(request, f"{field}: {error}")
                 return redirect('admin:score_processor_examupload_changelist')
 
+        # GET请求直接返回
         return redirect('admin:score_processor_examupload_changelist')
     def preview_scores(self, request, upload_id):
         """预览成绩数据"""
