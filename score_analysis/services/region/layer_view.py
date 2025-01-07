@@ -1,10 +1,10 @@
 # score_analysis/services/layer_view.py
 
-from django.db.models import Avg, Count, Min, Sum
+from django.db.models import  Count
 from score_analysis.models.region import LayerAnalysis, RegionLayerDetail
 from score_processor.models import ScoreStudentBasic
 import logging
-
+from score_processor.models import BaseExamConfig
 logger = logging.getLogger(__name__)
 
 
@@ -340,16 +340,6 @@ class LayerViewService:
 
         return school_analysis
 
-    def get_all_districts(self, exam_id: str) -> list:
-        """获取考试涉及的所有区县"""
-        try:
-            districts = RegionLayerDetail.objects.filter(
-                layer__exam_id=exam_id
-            ).values_list('district_name', flat=True).distinct()
-            return list(districts)
-        except Exception as e:
-            logger.error(f"获取区县列表失败: {str(e)}", exc_info=True)
-            return []
 
     def _format_city_stats(self, city_stats) -> dict:
         """格式化市级统计数据"""
@@ -478,3 +468,22 @@ class LayerViewService:
             logger.error(f"获取区县列表失败: {str(e)}", exc_info=True)
             return []
 
+    def _is_stream_divided(self, exam_id: str) -> bool:
+        """
+        判断是否为分科考试
+        Args:
+            exam_id: 考试ID
+        Returns:
+            bool: 是否分科
+        """
+        try:
+            # 获取考试配置
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+
+            # 判断学期
+            divided_semesters = ['高一下', '高二上', '高二下', '高三上', '高三下']
+            return exam.semester in divided_semesters
+
+        except Exception as e:
+            logger.error(f"判断分科状态失败: {str(e)}")
+            return False

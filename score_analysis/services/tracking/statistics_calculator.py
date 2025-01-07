@@ -1,8 +1,10 @@
-from typing import List, Dict, Any
+import logging
+from typing import List, Dict
 from decimal import Decimal
 import math
 from enum import Enum
 from django.db import connection
+
 
 class StudentType(Enum):
     UNKNOWN = 'UNKNOWN'  # 未分科
@@ -18,6 +20,7 @@ class SubjectType(Enum):
 class StatisticsCalculator:
     # 定义各学段科目和满分标准
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
         self._load_subject_config()
 
     def _load_subject_config(self):
@@ -32,9 +35,6 @@ class StatisticsCalculator:
                 FROM base_subject_config
             """)
 
-            # 构建配置字典
-            self.subjects_config = {}
-
             # 定义各学段主科目满分映射
             main_subject_scores = {
                 'H': 150,  # 高中主科满分150
@@ -45,62 +45,48 @@ class StatisticsCalculator:
             # 定义主科目列表
             main_subjects = ['chinese', 'math', 'english']
 
+            # 构建配置字典
+            self.subjects_config = {
+                'P': {'subjects': {}, 'total': 0},
+                'M': {'subjects': {}, 'total': 0},
+                'H': {
+                    'ALL': {'subjects': {}, 'total': 0},
+                    'SCIENCE': {'subjects': {}, 'total': 0},
+                    'LIBERAL': {'subjects': {}, 'total': 0},
+                    'UNKNOWN': {'subjects': {}, 'total': 0}
+                }
+            }
+
             for row in cursor.fetchall():
                 code, full_score, subject_types, is_required = row
                 subject_type = 'REQUIRED' if is_required else 'OPTIONAL'
 
                 # 解析学段列表
-                levels = subject_types.split('-')  # 例如：'高中-初中-小学' -> ['高中', '初中', '小学']
+                levels = []
+                if '小学' in subject_types:
+                    levels.append('P')
+                if '初中' in subject_types:
+                    levels.append('M')
+                if '高中' in subject_types:
+                    levels.append('H')
 
-                # 映射中文学段到代码
-                level_map = {
-                    '高中': 'H',
-                    '初中': 'M',
-                    '小学': 'P'
-                }
-
-                # 为每个适用的学段添加配置
-                for level_cn in levels:
-                    level = level_map.get(level_cn)
-                    if not level:
-                        continue
-
+                for level in levels:
                     # 根据学段和科目调整满分
-                    if code in main_subjects:
-                        adjusted_score = main_subject_scores[level]
-                    else:
-                        adjusted_score = full_score
+                    adjusted_score = main_subject_scores[level] if code in main_subjects else full_score
 
-                    # 初始化学段
-                    if level not in self.subjects_config:
-                        self.subjects_config[level] = {}
-
-                    # 如果是高中，需要按学生类型分类
                     if level == 'H':
-                        # 为每个学生类型初始化配置
-                        for student_type in ['SCIENCE', 'LIBERAL', 'UNKNOWN']:
-                            if student_type not in self.subjects_config[level]:
-                                self.subjects_config[level][student_type] = {
-                                    'subjects': {},
-                                    'total': 0
-                                }
+                        for student_type in ['ALL', 'SCIENCE', 'LIBERAL', 'UNKNOWN']:
                             self.subjects_config[level][student_type]['subjects'][code] = {
                                 'score': adjusted_score,
                                 'type': subject_type
                             }
-                            # 更新总分（只计算必考科目）
                             if subject_type == 'REQUIRED':
                                 self.subjects_config[level][student_type]['total'] += adjusted_score
                     else:
-                        # 初中和小学的处理
-                        if 'subjects' not in self.subjects_config[level]:
-                            self.subjects_config[level]['subjects'] = {}
-                            self.subjects_config[level]['total'] = 0
                         self.subjects_config[level]['subjects'][code] = {
                             'score': adjusted_score,
                             'type': subject_type
                         }
-                        # 更新总分（只计算必考科目）
                         if subject_type == 'REQUIRED':
                             self.subjects_config[level]['total'] += adjusted_score
 
@@ -194,77 +180,108 @@ class StatisticsCalculator:
 
     def calculate_subject_t_scores(self, scores: List[Dict], subject: str,
                                    group_by: str = None, school_level: str = 'H',
-                                   student_type: str = 'UNKNOWN',
-                                   selected_subjects: List[str] = None) -> Dict[str, float]:
-        """计算科目T分（包括总分）
-        分数为-3时（未参与考试），T分也设为-3
-        """
+                                   student_type: str = 'UNKNOWN') -> Dict[str, float]:
+        """计算科目T分"""
+        if not scores:
+            return {}
 
-        def _calculate_group_subject_t_scores(score_list: List[Dict]) -> Dict[str, float]:
+        def _calculate_group_t_scores(score_list: List[Dict]) -> Dict[str, float]:
             if not score_list:
                 return {}
 
-            # 获取科目满分
-            full_score = self.get_full_score(school_level, subject, student_type)
+            try:
+                # 获取科目满分
+                full_score = self.get_full_score(school_level, subject, student_type)
 
-            # 提取有效分数（排除-3的情况）
-            valid_scores = []
-            t_scores = {}
-            for s in score_list:
-                score_value = float(s.get(subject, -3))
+                # 提取有效分数
+                valid_scores = []
+                t_scores = {}
 
-                # 如果分数是-3，直接设置T分为-3
-                if score_value == -3:
-                    t_scores[s['student_id']] = -3
-                    continue
+                # 使用列表推导式优化，添加错误处理
+                invalid_scores = {}
+                valid_scores = []
 
-                valid_scores.append((s['student_id'], score_value))
+                for s in score_list:
+                    try:
+                        student_id = s.get('student_id')
+                        if not student_id:
+                            continue
 
-            if not valid_scores:
+                        score_value = float(s.get(subject, -3))
+                        if score_value == -3:
+                            invalid_scores[student_id] = -3
+                        else:
+                            valid_scores.append((student_id, score_value))
+                    except (ValueError, TypeError) as e:
+                        self.logger.warning(f"处理学生成绩时出错: {str(e)}, 数据: {s}")
+                        continue
+
+                if not valid_scores:
+                    return invalid_scores
+
+                # 使用numpy优化计算（如果可用）
+                try:
+                    import numpy as np
+                    scores_array = np.array([score for _, score in valid_scores])
+                    mean = np.mean(scores_array)
+                    std_dev = np.std(scores_array) if len(scores_array) > 1 else 0
+                except ImportError:
+                    scores_only = [score for _, score in valid_scores]
+                    mean = sum(scores_only) / len(scores_only)
+                    squared_diff_sum = sum((score - mean) ** 2 for score in scores_only)
+                    std_dev = (squared_diff_sum / len(scores_only)) ** 0.5 if len(scores_only) > 1 else 0
+                except Exception as e:
+                    self.logger.error(f"计算平均值和标准差时出错: {str(e)}")
+                    return invalid_scores
+
+                # 计算T分
+                t_scores = invalid_scores.copy()
+                for student_id, score in valid_scores:
+                    try:
+                        if std_dev == 0:
+                            t_score = mean
+                        else:
+                            t_score = ((score - mean) / std_dev * (full_score * 0.2) + (full_score * 0.5))
+                            t_score = round(max(0, min(full_score, t_score)), 2)
+                        t_scores[student_id] = t_score
+                    except Exception as e:
+                        self.logger.error(f"计算学生 {student_id} 的T分时出错: {str(e)}")
+                        t_scores[student_id] = 0
+
                 return t_scores
 
-            # 计算平均值和标准差（只使用有效分数）
-            scores_only = [score for _, score in valid_scores]
-            mean = sum(scores_only) / len(scores_only)
+            except Exception as e:
+                self.logger.error(f"计算分组T分时出错: {str(e)}")
+                return {}
 
-            squared_diff_sum = sum((score - mean) ** 2 for score in scores_only)
-            std_dev = (squared_diff_sum / len(scores_only)) ** 0.5 if len(scores_only) > 1 else 0
+        try:
+            if group_by:
+                # 使用字典推导式优化分组，添加错误处理
+                groups = {}
+                for score in scores:
+                    try:
+                        group_value = score.get(group_by)
+                        if group_value is not None:
+                            groups.setdefault(group_value, []).append(score)
+                    except Exception as e:
+                        self.logger.warning(f"处理分组数据时出错: {str(e)}, 数据: {score}")
+                        continue
 
-            # 计算T分（对齐到原始分数范围）
-            for student_id, score in valid_scores:
-                if std_dev == 0:
-                    t_score = mean
-                else:
-                    # 计算标准化的T分（中心值为满分的50%）
-                    t_score = ((score - mean) / std_dev * (full_score * 0.2) + (full_score * 0.5))
-                    # 限制在0到满分范围内
-                    t_score = round(max(0, min(full_score, t_score)), 2)
-                t_scores[student_id] = t_score
+                # 合并所有组的T分
+                all_t_scores = {}
+                for group_scores in groups.values():
+                    all_t_scores.update(_calculate_group_t_scores(group_scores))
+                return all_t_scores
+            else:
+                return _calculate_group_t_scores(scores)
 
-            return t_scores
-
-        if group_by:
-            # 按组计算T分
-            groups = {}
-            for score in scores:
-                group_value = score[group_by]
-                if group_value not in groups:
-                    groups[group_value] = []
-                groups[group_value].append(score)
-
-            # 合并所有组的T分
-            t_scores = {}
-            for group_scores in groups.values():
-                t_scores.update(_calculate_group_subject_t_scores(group_scores))
-            return t_scores
-        else:
-            # 计算总体T分
-            return _calculate_group_subject_t_scores(scores)
+        except Exception as e:
+            self.logger.error(f"计算T分时出错: {str(e)}")
+            return {}
 
     def calculate_statistics(self, scores: List[Dict], subject: str,
                              group_by: str = None, school_level: str = 'H',
-                             student_type: str = 'UNKNOWN',
-                             selected_subjects: List[str] = None) -> Dict:
+                             student_type: str = 'UNKNOWN') -> Dict:
         """计算统计指标"""
 
         def _calculate_group_statistics(score_list: List[Dict]) -> Dict:
@@ -273,63 +290,60 @@ class StatisticsCalculator:
 
             # 提取有效分数
             valid_scores = []
-            for s in score_list:
-                if subject == 'total':
-                    score_value = self.calculate_total_score(s, school_level, student_type, selected_subjects)
-                else:
-                    score_value = float(s.get(subject, 0)) if s.get(subject) is not None else None
-
-                if score_value is not None:
-                    valid_scores.append(score_value)
+            if subject == 'total':
+                valid_scores = [self.calculate_total_score(s, school_level, student_type)
+                                for s in score_list if s.get('total_score') is not None]
+            else:
+                valid_scores = [float(s.get(subject, 0))
+                                for s in score_list if s.get(subject) is not None]
 
             if not valid_scores:
                 return {}
 
-            # 获取满分
-            full_score = self.get_full_score(school_level, subject, student_type)
+            # 使用numpy优化计算（如果可用）
+            try:
+                import numpy as np
+                scores_array = np.array(valid_scores)
+                stats = {
+                    'count': len(scores_array),
+                    'max': float(np.max(scores_array)),
+                    'min': float(np.min(scores_array)),
+                    'mean': float(np.mean(scores_array)),
+                    'median': float(np.median(scores_array)),
+                    'std_dev': float(np.std(scores_array)) if len(scores_array) > 1 else 0,
+                    'full_score': self.get_full_score(school_level, subject, student_type)
+                }
+            except ImportError:
+                # 降级为普通计算
+                stats = {
+                    'count': len(valid_scores),
+                    'max': max(valid_scores),
+                    'min': min(valid_scores),
+                    'mean': sum(valid_scores) / len(valid_scores),
+                    'full_score': self.get_full_score(school_level, subject, student_type)
+                }
 
-            # 计算统计指标
-            stats = {
-                'count': len(valid_scores),
-                'max': max(valid_scores),
-                'min': min(valid_scores),
-                'mean': sum(valid_scores) / len(valid_scores),
-                'full_score': full_score
-            }
+                # 计算标准差
+                squared_diff_sum = sum((score - stats['mean']) ** 2 for score in valid_scores)
+                stats['std_dev'] = math.sqrt(squared_diff_sum / len(valid_scores)) if len(valid_scores) > 1 else 0
 
-            # 计算标准差
-            squared_diff_sum = sum((score - stats['mean']) ** 2 for score in valid_scores)
-            stats['std_dev'] = math.sqrt(squared_diff_sum / len(valid_scores)) if len(valid_scores) > 1 else 0
+                # 计算中位数
+                sorted_scores = sorted(valid_scores)
+                mid = len(sorted_scores) // 2
+                stats['median'] = (sorted_scores[mid - 1] + sorted_scores[mid]) / 2 if len(sorted_scores) % 2 == 0 else \
+                sorted_scores[mid]
 
-            # 计算中位数
-            sorted_scores = sorted(valid_scores)
-            mid = len(sorted_scores) // 2
-            if len(sorted_scores) % 2 == 0:
-                stats['median'] = (sorted_scores[mid - 1] + sorted_scores[mid]) / 2
-            else:
-                stats['median'] = sorted_scores[mid]
-
-            # 所有数值保留2位小数
-            for key, value in stats.items():
-                if isinstance(value, (float, Decimal)):
-                    stats[key] = round(value, 2)
-
-            return stats
+            return {k: round(v, 2) if isinstance(v, (float, Decimal)) else v
+                    for k, v in stats.items()}
 
         if group_by:
-            # 按组计算统计指标
+            # 使用字典推导式优化分组
             groups = {}
             for score in scores:
                 group_value = score[group_by]
-                if group_value not in groups:
-                    groups[group_value] = []
-                groups[group_value].append(score)
+                groups.setdefault(group_value, []).append(score)
 
-            # 计算每个组的统计指标
-            statistics = {}
-            for group_name, group_scores in groups.items():
-                statistics[group_name] = _calculate_group_statistics(group_scores)
-            return statistics
+            return {group_name: _calculate_group_statistics(group_scores)
+                    for group_name, group_scores in groups.items()}
         else:
-            # 计算总体统计指标
             return _calculate_group_statistics(scores)
