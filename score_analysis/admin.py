@@ -780,23 +780,33 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             school_count = len(json.loads(stats.school_distribution)) if stats.school_distribution else 0
             thresholds = json.loads(stats.threshold_stats) if stats.threshold_stats else {}
 
-            # 2. 获取第一名学校信息
+            # 构建基础查询
+            query = ScoreStudentBasic.objects.filter(
+                exam_id=stats.exam_id,
+                select_type=stats.select_type
+            )
+
+            # 根据层级添加筛选条件
             if stats.level_type == '地市级':
-                top_student = ScoreRankings.objects.filter(
-                    exam_id=stats.exam_id,
-                    subject_id='total_score',
-                    select_type=stats.select_type,
-                    raw_score=stats.max_score
-                ).exclude(
-                    level_type='地市级'
-                ).order_by('-raw_score').first()
-            else:
-                top_student = ScoreRankings.objects.filter(
-                    exam_id=stats.exam_id,
-                    subject_id='total_score',
-                    select_type=stats.select_type,
-                    level_type=stats.level_type
-                ).order_by('-raw_score').first()
+                # 地市级查询最高分的学校
+                query = query.filter(total_score=stats.max_score)
+            elif stats.level_type == '区县级':
+                # 区县级只看指定区县的学校
+                query = query.filter(district_name=stats.district_name)
+           # else:  # 学校级
+                # 学校级只看指定学校
+           #     query = query.filter(school_name=stats.school_name)
+
+            # 获取最高分记录
+            top_student = query.order_by(
+                '-total_score'
+            ).values(
+                'student_id',
+                'student_name',
+                'school_name',
+                'total_score',
+                'district_name'
+            ).first()
 
             # 3. 处理分数线数据
             score_lines = {}
