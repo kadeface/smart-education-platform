@@ -240,3 +240,314 @@ class ScoreRankings(models.Model):
         verbose_name = '排名情况统计'
         verbose_name_plural = '排名情况统计'
         unique_together = (('exam', 'unified_student_id', 'subject', 'select_type', 'level_type'),)
+
+
+class ExamLevelStatistics(models.Model):
+    """考试分层统计数据（市/区/校三级统计）"""
+    LEVEL_CHOICES = [
+        ('city', '市级'),
+        ('district', '区县'),
+        ('school', '学校')
+    ]
+
+    stat_id = models.AutoField(primary_key=True)
+    exam_id = models.CharField('考试ID', max_length=50)
+    select_type = models.CharField(
+        '分科类型',
+        max_length=10,
+        choices=[('文科', '文科'), ('理科', '理科'), ('未分科', '未分科')]
+    )
+    level_type = models.CharField(
+        '统计层级',
+        max_length=10,
+        choices=LEVEL_CHOICES,
+        help_text='市级/区县/学校'
+    )
+    district_name = models.CharField('区县名称', max_length=50, null=True)
+    school_name = models.CharField('学校名称', max_length=100, null=True)
+
+    # 基础统计指标
+    basic_stats = models.JSONField(
+        '基础统计指标',
+        help_text="""
+        {
+            'student_count': 考生人数,
+            'max_score': 最高分,
+            'min_score': 最低分,
+            'mean_score': 平均分,
+            'std_dev': 标准差
+        }
+        """
+    )
+
+    # 排名分布统计
+    ranking_stats = models.JSONField(
+        '排名分布统计',
+        help_text="""
+        {
+            'TOP10': {'学校A': 5, '学校B': 3...},
+            'TOP50': {'学校A': 15, '学校B': 12...},
+            ...
+        }
+        """
+    )
+
+    # 分数线统计
+    score_lines = models.JSONField(
+        '分数线统计',
+        help_text="""
+        {
+            'C9': {'line': 680, 'count': 50, 'rate': 5.2},
+            '985': {'line': 650, 'count': 100, 'rate': 10.5},
+            ...
+        }
+        """
+    )
+
+    create_time = models.DateTimeField('创建时间', auto_now_add=True)
+    update_time = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        db_table = 'exam_level_statistics'
+        unique_together = [
+            'exam_id', 'select_type', 'level_type',
+            'district_name', 'school_name'
+        ]
+        verbose_name = '考试分层统计'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        if self.level_type == 'city':
+            return f"{self.exam_id}-市级统计-{self.select_type}"
+        elif self.level_type == 'district':
+            return f"{self.exam_id}-{self.district_name}-{self.select_type}"
+        else:
+            return f"{self.exam_id}-{self.school_name}-{self.select_type}"
+
+
+class ExamLevelAnalysisConfig(models.Model):
+    """考试分层分析配置
+
+    此配置用于设置考试分层分析的参数，包括：
+    1. 排名分析配置：设置需要统计的排名范围（如TOP10、TOP50等）
+    2. 分数线配置：设置各类分数线的划分比例
+
+    主要用途：
+    1. 为不同类型的考试提供不同的分析配置
+    2. 支持多套配置方案的切换和复用
+    3. 确保分析参数的一致性和可追溯性
+
+    使用场景：
+    1. 期中/期末考试可能需要不同的排名范围
+    2. 不同区域可能需要不同的分数线划分
+    3. 临时性的专项分析可能需要特殊配置
+    4. 文理分科考试需要不同的配置
+    """
+
+    # 分科类型选项
+    SELECT_TYPE_CHOICES = [
+        ('文科', '文科'),
+        ('理科', '理科'),
+        ('未分科', '未分科')
+    ]
+
+    # 预设的排名范围选项
+    RANK_RANGES = [
+        (10, 'TOP10'),
+        (20, 'TOP20'),
+        (50, 'TOP50'),
+        (100, 'TOP100'),
+        (200, 'TOP200'),
+        (500, 'TOP500'),
+    ]
+
+    # 预设的分数线类型
+    SCORE_LINE_TYPES = [
+        ('C9', 'C9高校'),
+        ('985', '985高校'),
+        ('211', '211高校'),
+        ('特控', '特控线'),
+        ('本科', '本科线'),
+        ('专科', '专科线'),
+    ]
+
+    # 三率分数线类型（未分科使用）
+    THREE_RATE_TYPES = [
+        ('优秀', '优秀线'),
+        ('合格', '合格线'),
+        ('低分', '低分线'),
+    ]
+
+    config_id = models.AutoField(primary_key=True)
+    exam_id = models.CharField('考试ID', max_length=50)
+    select_type = models.CharField(
+        '分科类型',
+        max_length=20,
+        choices=SELECT_TYPE_CHOICES,
+        default='未分科',
+        help_text='选择考试的分科类型'
+    )
+    name = models.CharField('配置名称', max_length=50)
+    is_active = models.BooleanField('是否启用', default=True)
+
+    rank_ranges = models.JSONField(
+        '排名配置',
+        default=dict,
+        help_text='''
+        按区域配置排名范围，格式如：
+        {
+            "市级": [10, 20, 50, 100, 200, 500],
+            "开平市": [10, 50, 300, 600],
+            "恩平市": [10, 50, 200],
+            "default": [10, 50, 100]  # 默认配置
+        }
+        '''
+    )
+
+    score_lines = models.JSONField(
+        '分数线配置',
+        default=dict,
+        help_text='''
+        分数线配置，格式如：
+        # 文理分科考试：
+        {
+            "C9": 680,
+            "985": 650,
+            "211": 620,
+            "特控": 600,
+            "本科": 550,
+            "专科": 450
+        }
+        # 未分科考试：
+        {
+            "优秀": 85,
+            "合格": 60,
+            "低分": 36
+        }
+        '''
+    )
+
+    description = models.TextField('说明', blank=True)
+    create_time = models.DateTimeField('创建时间', auto_now_add=True)
+    update_time = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        db_table = 'exam_level_analysis_config'
+        verbose_name = '考试分层分析配置'
+        verbose_name_plural = verbose_name
+        unique_together = ['exam_id', 'select_type', 'name']
+
+    def __str__(self):
+        return f"{self.name}({self.select_type})({'启用' if self.is_active else '禁用'})"
+
+    def get_score_lines_display(self):
+        """获取分数线配置的显示文本"""
+        display = []
+        for line_type, score in self.score_lines.items():
+            if self.select_type == '未分科':
+                display.append(f"{line_type}({score}分)")
+            else:
+                display.append(f"{line_type}({score}分)")
+        return ', '.join(display)
+    get_score_lines_display.short_description = '分数线配置'
+
+    def get_rank_ranges_display(self, district=None):
+        """获取排名范围的显示文本"""
+        area = district or '市级'
+        ranges = self.rank_ranges.get(area) or self.rank_ranges.get('default', [])
+        return f"TOP{', TOP'.join(map(str, ranges))}"
+    get_rank_ranges_display.short_description = '排名配置'
+
+    def get_district_list(self):
+        """获取配置的区域列表"""
+        districts = set(self.rank_ranges.keys())
+        districts.discard('default')
+        districts.discard('市级')
+        return sorted(districts)
+    get_district_list.short_description = '配置区域'
+
+    def get_line_types(self):
+        """获取分数线类型列表"""
+        if self.select_type == '未分科':
+            return self.THREE_RATE_TYPES
+        return self.SCORE_LINE_TYPES
+
+    def __str__(self):
+        return f"{self.name}({self.select_type})({'启用' if self.is_active else '禁用'})"
+
+    def get_score_line_display(self):
+        """获取分数线配置的显示文本"""
+        lines = []
+        for line in self.score_lines:
+            lines.append(f"{line['type']}({line['ratio'] * 100:.1f}%)")
+        return ', '.join(lines)
+
+    get_score_line_display.short_description = '分数线配置'
+
+    def get_rank_ranges_display(self):
+        """获取排名范围的显示文本"""
+        return f"TOP{', TOP'.join(map(str, self.rank_ranges))}"
+
+    get_rank_ranges_display.short_description = '排名配置'
+
+
+class ExamLevelAnalysisTask(models.Model):
+    """考试分层分析任务
+
+    用于管理和追踪考试分层分析的执行过程，包括：
+    1. 记录分析任务的执行状态
+    2. 关联具体的分析配置
+    3. 保存错误信息（如果有）
+
+    分析内容：
+    1. 市级整体情况分析
+    2. 区县层面横向对比
+    3. 学校层面横向对比
+    4. 排名分布统计
+    5. 分数线达线情况
+
+    任务状态流转：
+    pending(待执行) -> running(执行中) -> completed(已完成)/failed(失败)
+    """
+
+    STATUS_CHOICES = [
+        ('pending', '待执行'),
+        ('running', '执行中'),
+        ('completed', '已完成'),
+        ('failed', '失败')
+    ]
+
+    task_id = models.AutoField(primary_key=True)
+    exam_id = models.CharField(
+        '考试ID',
+        max_length=50,
+        help_text='要分析的考试ID，格式如：202411-DIST-H-2025'
+    )
+    config = models.ForeignKey(
+        ExamLevelAnalysisConfig,
+        on_delete=models.PROTECT,
+        verbose_name='分析配置',
+        help_text='使用的分析配置方案'
+    )
+    status = models.CharField(
+        '状态',
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        help_text='任务执行状态'
+    )
+    error_message = models.TextField(
+        '错误信息',
+        blank=True,
+        help_text='任务执行失败时的错误信息'
+    )
+    create_time = models.DateTimeField('创建时间', auto_now_add=True)
+    update_time = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        db_table = 'exam_level_analysis_task'
+        verbose_name = '考试分层分析任务'
+        verbose_name_plural = verbose_name
+
+    def __str__(self):
+        return f"考试{self.exam_id}的分析任务(状态:{self.get_status_display()})"

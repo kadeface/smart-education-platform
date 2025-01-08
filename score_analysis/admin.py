@@ -1,5 +1,7 @@
 #score_analysis/score_analysis.py:
 import json
+
+from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import path ,reverse
 from django.template.response import TemplateResponse
 from django.db import connection
@@ -7,13 +9,15 @@ from django import forms
 from django.shortcuts import render
 from django.db.models import Q
 from django.utils.safestring import mark_safe
-from .models.statistics import ExamScoreLines,ScoreRankings, StatisticsExamIndicators
+from .models.statistics import ExamScoreLines, ScoreRankings, StatisticsExamIndicators, ExamLevelAnalysisTask, \
+    ExamLevelAnalysisConfig
 from django.contrib.admin import SimpleListFilter
 from django.contrib import admin,messages
 from django.shortcuts import redirect
 from .models.base import BaseExamConfig,BaseSubjectConfig
 from .services.ranking_service import RankingService
 from .models.source import ScoreStudentBasic
+from .services.statistics.level_statistics_generator import ExamLevelStatisticsGenerator
 from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
 import logging
@@ -570,11 +574,14 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 # 1. 生成市级统计
                 service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='city', request=request)
                 service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='city', request=request)
+                service.generate_all_statistics(exam_id=exam_id, select_type='未确定', level_type='city',request=request)
 
                 # 2. 生成区县级统计
                 service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='district',
                                                 request=request)
                 service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='district',
+                                                request=request)
+                service.generate_all_statistics(exam_id=exam_id, select_type='未确定', level_type='district',
                                                 request=request)
 
                 messages.success(request, f'考试 {exam_id} 的市级和区县级统计数据已生成')
@@ -584,6 +591,8 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='district',
                                                 request=request)
                 service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='district',
+                                                request=request)
+                service.generate_all_statistics(exam_id=exam_id, select_type='未分科', level_type='district',
                                                 request=request)
 
                 messages.success(request, f'考试 {exam_id} 的区县级统计数据已生成')
@@ -770,37 +779,52 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
     def _process_summary_data(self, stats):
         """
         处理综述数据，生成完整的统计信息
+        Args:
+            stats: StatisticsExamIndicators 对象
+        Returns:
+            dict: 处理后的统计数据
         """
         if not stats:
             logger.warning("没有找到统计数据")
             return {}
 
         try:
-            # 1. 解析基础数据
-            school_count = len(json.loads(stats.school_distribution)) if stats.school_distribution else 0
-            thresholds = json.loads(stats.threshold_stats) if stats.threshold_stats else {}
+            # 1. 安全地解析JSON数据
+            try:
+                school_distribution = json.loads(stats.school_distribution) if stats.school_distribution else {}
+                school_count = len(school_distribution)
+            except json.JSONDecodeError:
+                logger.warning(f"解析school_distribution失败: {stats.school_distribution}")
+                school_count = 0
 
-            # 构建基础查询
+            try:
+                thresholds = json.loads(stats.threshold_stats) if stats.threshold_stats else {}
+            except json.JSONDecodeError:
+                logger.warning(f"解析threshold_stats失败: {stats.threshold_stats}")
+                thresholds = {}
+
+            # 2. 构建基础查询
             query = ScoreStudentBasic.objects.filter(
-                exam_id=stats.exam_id,
-                select_type=stats.select_type
+                exam_id=stats.exam_id
             )
 
-            # 根据层级添加筛选条件
-            if stats.level_type == '地市级':
-                # 地市级查询最高分的学校
-                query = query.filter(total_score=stats.max_score)
-            elif stats.level_type == '区县级':
-                # 区县级只看指定区县的学校
-                query = query.filter(district_name=stats.district_name)
-           # else:  # 学校级
-                # 学校级只看指定学校
-           #     query = query.filter(school_name=stats.school_name)
+            # 添加select_type过滤（如果存在）
+            if hasattr(stats, 'select_type') and stats.select_type:
+                query = query.filter(select_type=stats.select_type)
 
-            # 获取最高分记录
-            top_student = query.order_by(
-                '-total_score'
-            ).values(
+            # 根据层级添加筛选条件
+            if hasattr(stats, 'level_type'):
+                if stats.level_type == '地市级':
+                    if hasattr(stats, 'max_score'):
+                        query = query.filter(total_score=stats.max_score)
+                elif stats.level_type == '区县级':
+                    if hasattr(stats, 'district_name'):
+                        query = query.filter(district_name=stats.district_name)
+                elif hasattr(stats, 'school_name'):  # 学校级
+                    query = query.filter(school_name=stats.school_name)
+
+            # 3. 获取最高分记录
+            top_student = query.order_by('-total_score').values(
                 'student_id',
                 'student_name',
                 'school_name',
@@ -808,7 +832,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 'district_name'
             ).first()
 
-            # 3. 处理分数线数据
+            # 4. 处理分数线数据
             score_lines = {}
             name_mapping = {
                 'C9层': 'c9',
@@ -819,38 +843,39 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 '本科层': 'undergraduate'
             }
 
-            # 获取总人数，用于计算比率
-            total_students = stats.student_count or 1  # 避免除以0
+            # 安全获取总人数
+            total_students = getattr(stats, 'student_count', 0) or 1
 
+            # 处理每个分数线
             for display_name, key in name_mapping.items():
                 line_data = thresholds.get(display_name, {})
                 count = int(line_data.get('count', 0) or 0)
-                # 使用总人数计算比率
                 rate = (count / total_students) * 100 if total_students > 0 else 0
 
                 score_lines[key] = {
                     'name': display_name,
                     'score': float(line_data.get('line', 0) or 0),
                     'count': count,
-                    'rate': round(rate, 2)  # 四舍五入到2位小数
+                    'rate': round(rate, 2)
                 }
 
-                # 添加日志以检查计算过程
                 logger.info(f"{display_name} - 人数: {count}, 总人数: {total_students}, 比率: {rate}%")
 
-            # 4. 整理返回数据
+            # 5. 整理返回数据
             summary_data = {
                 'school_count': school_count,
                 'student_count': total_students,
-                'mean_score': round(float(stats.mean_score or 0), 2),
-                'max_score': float(stats.max_score or 0),
-                'top_school': top_student.school_name if top_student else '未知',
+                'mean_score': round(float(getattr(stats, 'mean_score', 0) or 0), 2),
+                'max_score': float(getattr(stats, 'max_score', 0) or 0),
+                'top_school': top_student['school_name'] if top_student else '未知',
                 'score_lines': score_lines
             }
 
-            logger.info(f"成功处理统计数据: 学校数={school_count}, 学生数={total_students}, "
-                        f"平均分={summary_data['mean_score']}, 最高分={stats.max_score}, "
-                        f"第一名学校={summary_data['top_school']}")
+            logger.info(
+                f"成功处理统计数据: 学校数={school_count}, 学生数={total_students}, "
+                f"平均分={summary_data['mean_score']}, 最高分={summary_data['max_score']}, "
+                f"第一名学校={summary_data['top_school']}"
+            )
 
             return summary_data
 
@@ -1471,6 +1496,7 @@ class LayerAnalysisAdmin(admin.ModelAdmin):
         """禁用删除功能"""
         return False
 
+
 @admin.register(TrackingRecord)
 class TrackingAdmin(admin.ModelAdmin):
 
@@ -1642,3 +1668,135 @@ class TrackingAdmin(admin.ModelAdmin):
                 exams[level] = dict(sorted(exams[level].items(), reverse=True))
 
             return exams
+
+
+@admin.register(ExamLevelAnalysisConfig)
+class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
+    """考试分层分析配置管理"""
+
+    change_list_template = 'admin/exam_level/config_list.html'
+
+    def get_urls(self):
+        """自定义URL模式"""
+        from django.urls import path
+
+        info = self.model._meta.app_label, self.model._meta.model_name
+
+        return [
+            path('',
+                 self.admin_site.admin_view(self.changelist_view),
+                 name='%s_%s_changelist' % info),
+            path('<str:exam_id>/<str:select_type>/',
+                 self.admin_site.admin_view(self.config_detail_view),
+                 name='%s_%s_config' % info),
+        ]
+
+    def changelist_view(self, request, extra_context=None):
+        """配置列表视图"""
+        context = dict(
+            title='考试分层分析配置',
+            opts=self.model._meta,
+            app_label=self.model._meta.app_label,
+            exams=BaseExamConfig.objects.all().order_by('-exam_id'),
+            select_types=['文科', '理科', '未分科'],
+            has_change_permission=self.has_change_permission(request),
+            is_popup=False,
+            cl=None,
+            media=self.media,
+            has_add_permission=self.has_add_permission(request),
+            has_delete_permission=self.has_delete_permission(request),
+        )
+
+        # 获取现有配置
+        configs = ExamLevelAnalysisConfig.objects.all()
+        config_map = {}
+        for config in configs:
+            if config.exam_id not in config_map:
+                config_map[config.exam_id] = {}
+            config_map[config.exam_id][config.select_type] = config
+
+        context['config_map'] = config_map
+
+        return TemplateResponse(request, self.change_list_template, context)
+
+    def config_detail_view(self, request, exam_id, select_type):
+        """配置详情视图"""
+        try:
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            config, created = ExamLevelAnalysisConfig.objects.get_or_create(
+                exam_id=exam_id,
+                select_type=select_type,
+                defaults={
+                    'name': f'{exam.exam_name}-{select_type}配置',
+                    'rank_ranges': {
+                        '市级': [10, 20, 50, 100, 200, 500],
+                        'default': [10, 50, 100]
+                    },
+                    'score_lines': self._get_default_score_lines(select_type)
+                }
+            )
+
+            if request.method == 'POST':
+                try:
+                    # 处理表单提交
+                    rank_ranges = {}
+                    for area in request.POST.getlist('area_name'):
+                        ranges = request.POST.getlist(f'rank_ranges_{area}')
+                        rank_ranges[area] = [int(r) for r in ranges if r]
+
+                    score_lines = {}
+                    for type_ in request.POST.getlist('score_type'):
+                        value = request.POST.get(f'score_value_{type_}')
+                        if value:
+                            score_lines[type_] = float(value)
+
+                    config.rank_ranges = rank_ranges
+                    config.score_lines = score_lines
+                    config.save()
+
+                    messages.success(request, '配置已更新')
+                    return HttpResponseRedirect('../')
+
+                except Exception as e:
+                    messages.error(request, f'更新失败：{str(e)}')
+
+            context = {
+                'title': f'{exam.exam_name} - {select_type}配置',
+                'opts': self.model._meta,
+                'app_label': self.model._meta.app_label,
+                'exam': exam,
+                'config': config,
+                'has_change_permission': self.has_change_permission(request),
+                'is_popup': False,
+                'media': self.media,
+                'has_add_permission': self.has_add_permission(request),
+                'has_delete_permission': self.has_delete_permission(request),
+            }
+
+            return TemplateResponse(
+                request,
+                'admin/exam_level/config_detail.html',
+                context
+            )
+
+        except Exception as e:
+            messages.error(request, str(e))
+            return HttpResponseRedirect('../')
+
+    def _get_default_score_lines(self, select_type):
+        """获取默认分数线配置"""
+        if select_type in ['文科', '理科']:
+            return {
+                'C9': 680,
+                '985': 650,
+                '211': 620,
+                '特控': 600,
+                '本科': 550,
+                '专科': 450
+            }
+        else:
+            return {
+                '优秀': 0.20,  # 前20%
+                '合格': 0.80,  # 前80%
+                '低分': 0.95  # 后5%
+            }

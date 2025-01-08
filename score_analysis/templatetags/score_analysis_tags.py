@@ -49,3 +49,9 @@ def percentage(value):
 def get_attr(obj, attr):
     """获取对象的属性值"""
     return getattr(obj, attr, None)
+
+# 在现有文件中添加新的过滤器
+@register.filter
+def dict_get(dictionary, key):
+    """获取字典值的模板过滤器"""
+    return dictionary.get(key, {})

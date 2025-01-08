@@ -1,0 +1,66 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="module">
+    <h2>考试分层分析配置</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>考试ID</th>
+                <th>考试名称</th>
+                <th>文科配置</th>
+                <th>理科配置</th>
+                <th>未分科配置</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for exam in exams %}
+            <tr>
+                <td>{{ exam.id }}</td>
+                <td>{{ exam.name }}</td>
+                <td>
+                    {% with config=config_map|get:exam.id|get:'文科' %}
+                    {% if config %}
+                        <a href="{% url 'admin:exam-level-analysis-config-detail' exam.id '文科' %}">
+                            查看配置
+                        </a>
+                    {% else %}
+                        <a href="{% url 'admin:exam-level-analysis-config-detail' exam.id '文科' %}">
+                            创建配置
+                        </a>
+                    {% endif %}
+                    {% endwith %}
+                </td>
+                <td>
+                    {% with config=config_map|get:exam.id|get:'理科' %}
+                    {% if config %}
+                        <a href="{% url 'admin:exam-level-analysis-config-detail' exam.id '理科' %}">
+                            查看配置
+                        </a>
+                    {% else %}
+                        <a href="{% url 'admin:exam-level-analysis-config-detail' exam.id '理科' %}">
+                            创建配置
+                        </a>
+                    {% endif %}
+                    {% endwith %}
+                </td>
+                <td>
+                    {% with config=config_map|get:exam.id|get:'未分科' %}
+                    {% if config %}
+                        <a href="{% url 'admin:exam-level-analysis-config-detail' exam.id '未分科' %}">
+                            查看配置
+                        </a>
+                    {% else %}
+                        <a href="{% url 'admin:exam-level-analysis-config-detail' exam.id '未分科' %}">
+                            创建配置
+                        </a>
+                    {% endif %}
+                    {% endwith %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

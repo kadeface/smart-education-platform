@@ -1,871 +1,1017 @@
-#基础统计服务模块
-import logging
-from django.contrib import messages
+# score_analysis/services/statistics/statistics_service.py
 
-from django.db import transaction
-from django.db.models import Avg, Max, Min, StdDev, Count, Q
-from ..models.base import BaseSubjectConfig
-from ..models.statistics import (
-    StatisticsExamIndicators,
-    ScoreRankings,
-    ExamScoreLines
-)
-from ..models.source import ScoreStudentBasic
 import json
-logger = logging.getLogger('django')  # 使用Django的默认logger
-#from score_processor.models import BaseExamConfig,BaseSubjectConfig
-class BaseStatisticsService:
-    """基础统计服务"""
+import logging
+from sys import path
+from django.contrib import messages
+from django.db.models import Subquery, OuterRef
+from django.shortcuts import render, redirect
+from django.urls import reverse
+from django.utils.safestring import mark_safe
 
-    def calculate_basic_statistics(self, exam_id, select_type, level_type='city'):
-        """计算统计数据"""
-        try:
-            logger.info(f"开始计算{select_type}统计数据: exam_id={exam_id}, level_type={level_type}")
+from score_analysis.models import (
+    ScoreRankings,
+    BaseExamConfig,
+    ScoreStudentBasic
+)
+from score_analysis.models.statistics import StatisticsExamIndicators,ExamScoreLines
+from score_analysis.services.base_statistics import BaseStatisticsService
 
-            # 基础查询
-            scores = ScoreStudentBasic.objects.filter(
-                exam_id=exam_id,
-                select_type=select_type
-            )
+logger = logging.getLogger(__name__)
 
-            # 打印查询条件和SQL
-            logger.info(f"查询条件: exam_id={exam_id}, select_type={select_type}")
-            logger.info(f"SQL查询: {scores.query}")
 
-            # 检查数据库中是否存在相关记录
-            sample_data = ScoreStudentBasic.objects.filter(exam_id=exam_id).values('select_type').distinct()
-            logger.info(f"该考试ID下的所有select_type: {list(sample_data)}")
+class StatisticsViewService:
+    """统计数据查看服务"""
 
-            # 解析考试ID获取考试级别
-            exam_parts = exam_id.split('-')
-            exam_level = exam_parts[1].upper()
-
-            # 定义统计函数，避免代码重复
-            def calculate_stats(scores_data):
-                return {
-                    'basic_stats': self._calculate_basic_stats(scores_data),
-                    'school_count': scores_data.values('school_name').distinct().count(),
-                    'quantile_stats': self._calculate_quantile_stats(scores_data),
-                    'subject_stats': self._calculate_subject_stats(scores_data, select_type),
-                    'threshold_stats': self._calculate_threshold_stats(scores_data),
-                    #'school_distribution': self._calculate_school_distribution(scores_data)
-                }
-
-            if exam_level == 'CITY':
-                # 市级考试：计算市级和区县级统计
-                logger.info(f"计算市级{select_type}整体统计")
-
-                # 检查市级数据
-                logger.info(f"市级成绩记录数: {scores.count()}")
-
-                # 1. 计算市级统计
-                city_stats = calculate_stats(scores)
-
-                # 2. 计算区县统计
-                districts = scores.values_list('district_name', flat=True).distinct()
-                logger.info(f"发现的区县列表: {list(districts)}")
-
-                district_stats = {}
-                for district_name in districts:
-                    logger.info(f"计算区县 {district_name} 的{select_type}统计")
-                    district_scores = scores.filter(district_name=district_name)
-                    logger.info(f"区县 {district_name} 的成绩记录数: {district_scores.count()}")
-                    district_stats[district_name] = calculate_stats(district_scores)
-
-                return {
-                    'city': city_stats,
-                    'districts': district_stats
-                }
-
-            else:  # DIST 考试
-                # 区县考试：只计算当前区县统计
-                logger.info(f"计算区县考试{select_type}统计")
-
-                # 从成绩表中获取区县名称
-                actual_district = ScoreStudentBasic.objects.filter(
-                    exam_id=exam_id
-                ).values_list('district_name', flat=True).distinct().first()
-
-                if not actual_district:
-                    raise ValueError(f"未能从成绩表中获取区县信息: {exam_id}")
-
-                logger.info(f"从成绩表中获取到区县: {actual_district}")
-
-                # 使用区县名称查询
-                scores = scores.filter(district_name=actual_district)
-                logger.info(f"区县成绩记录数: {scores.count()}")
-
-                # 检查是否有数据
-                if scores.count() == 0:
-                    # 检查原始数据
-                    all_records = ScoreStudentBasic.objects.filter(exam_id=exam_id)
-                    logger.info(f"该考试ID下的总记录数: {all_records.count()}")
-                    if all_records.exists():
-                        sample = all_records.first()
-                        logger.info(f"示例记录: exam_id={sample.exam_id}, "
-                                    f"district_name={sample.district_name}, "
-                                    f"select_type={sample.select_type}")
-                    else:
-                        logger.warning(f"未找到任何相关考试记录: {exam_id}")
-
-                stats = calculate_stats(scores)
-                return {actual_district: stats}
-
-        except Exception as e:
-            logger.error(
-                f"计算统计数据失败: exam_id={exam_id}, select_type={select_type}, level_type={level_type}, error={str(e)}")
-            logger.exception("详细错误信息:")
-            raise
-
-    def _calculate_basic_stats(self, scores):
-        """计算基本统计指标"""
-        try:
-            stats = scores.aggregate(
-                student_count=Count('student_id'),
-                max_score=Max('total_score'),
-                min_score=Min('total_score'),
-                mean=Avg('total_score'),
-                std_dev=StdDev('total_score')
-            )
-            return {
-                'student_count': stats['student_count'],
-                'max_score': float(stats['max_score']) if stats['max_score'] else 0,
-                'min_score': float(stats['min_score']) if stats['min_score'] else 0,
-                'mean': float(stats['mean']) if stats['mean'] else 0,
-                'std_dev': float(stats['std_dev']) if stats['std_dev'] else 0
-            }
-        except Exception as e:
-            logger.error(f"计算基础统计失败: error={str(e)}")
-            raise
-
-    def _calculate_rank_distribution(self, rankings, subject, district_name=None):
-        """计算排名分布
-        Args:
-            rankings: 成绩查询集 (ScoreStudentBasic.objects)
-            subject: 科目（'total_score'/'chinese'/'math' 等）
-            district_name: 区县名称，默认None表示地市级统计
-        Returns:
-            dict: {
-                'school_rankings': {
-                    '学校A': {'top_10': 5, 'top_20': 8, 'top_50': 15, ...},  # 实际人数
-                    '学校B': {'top_1250': 20}
-                }
-            }
+    def _get_level_type(self, exam_id):
+        """
+        根据考试ID获取统计层级信息
         """
         try:
-            # 定义要统计的名次范围
-            rank_ranges = [10, 20, 50, 100]
-            if subject == 'total_score':
-                rank_ranges.extend([200, 500, 1250])
+            if 'CITY' in exam_id:
+                # 对于市级考试，获取所有区县
+                districts = StatisticsExamIndicators.objects.filter(
+                    exam_id=exam_id,
+                    subject_id='total_score',
+                    student_count__gt=0
+                ).exclude(
+                    level_type='地市级'
+                ).values_list('level_type', flat=True).distinct()
 
-            # 构建基础查询
-            base_query = rankings.filter(
-                total_score__gt=0
-            )
+                return '地市级', list(districts)
+            else:
+                # 对于区县级考试
+                district = StatisticsExamIndicators.objects.filter(
+                    exam_id=exam_id,
+                    subject_id='total_score',
+                    student_count__gt=0
+                ).values_list('level_type', flat=True).first()
 
-            # 如果指定了区县，添加区县过滤
-            if district_name:
-                base_query = base_query.filter(district_name=district_name)
-
-            # 先排序并获取所有需要的数据
-            ordered_scores = list(base_query.order_by(
-                '-total_score',
-                '-math'
-            ).values('school_name'))
-
-            school_rankings = {}
-
-            # 对每个名次范围进行统计
-            for top_n in rank_ranges:
-                # 获取前 top_n 名的成绩
-                top_scores = ordered_scores[:top_n]
-
-                # 统计每个学校的人数
-                school_counts = {}
-                for score in top_scores:
-                    school_name = score['school_name']
-                    if school_name:
-                        school_counts[school_name] = school_counts.get(school_name, 0) + 1
-
-                # 更新学校排名统计
-                for school_name, count in school_counts.items():
-                    if school_name not in school_rankings:
-                        school_rankings[school_name] = {}
-                    school_rankings[school_name][f'top_{top_n}'] = count
-
-            return {'school_rankings': school_rankings}
+                return district, None
 
         except Exception as e:
-            logger.error(f"计算排名分布失败: error={str(e)}")
-            raise
-    def _calculate_threshold_stats(self, scores):
+            logger.error(f"获取考试层级失败: {str(e)}")
+            return None, None
 
-        """计算达线统计"""
+    def _process_summary_data(self, stats):
+        """处理综述数据"""
+        if not stats:
+            return {}
+
         try:
-            # 获取第一条记录
-            first_score = scores.first()
-            if not first_score:
-                return {}
+            # 解析基础数据
+            school_count = len(json.loads(stats.school_distribution)) if stats.school_distribution else 0
+            thresholds = json.loads(stats.threshold_stats) if stats.threshold_stats else {}
 
-            # 使用 select_type 字段
-            score_lines = ExamScoreLines.objects.filter(
-                exam_id=first_score.exam_id,
-                select_type=first_score.select_type
-            )
+            # 获取第一名学校信息
+            top_student = ScoreRankings.objects.filter(
+                exam_id=stats.exam_id,
+                subject_id='total_score',
+                select_type=stats.select_type,
+                raw_score=stats.max_score
+            ).exclude(
+                level_type='地市级'
+            ).order_by('-raw_score').first()
 
-            threshold_stats = {}
-            for line in score_lines:
-                above_count = scores.filter(total_score__gte=line.score).count()
-                total_count = scores.count()
+            # 处理分数线数据
+            score_lines = self._process_score_lines(stats, thresholds)
 
-                threshold_stats[line.line_type] = {
-                    'line': float(line.score),
-                    'count': above_count,
-                    'rate': round(above_count * 100 / total_count, 2) if total_count > 0 else 0
-                }
-
-            return threshold_stats
-        except Exception as e:
-            logger.error(f"计算达线统计失败: error={str(e)}")
-            raise
-
-
-
-    def _calculate_subject_quantile_stats(self, scores, subject):
-        """计算科目分位数统计"""
-        try:
-            subject_scores = list(scores.filter(**{
-                f'{subject}__isnull': False,
-                f'{subject}__gt': 0
-            }).values_list(subject, flat=True).order_by(subject))
-
-            if not subject_scores:
-                return {
-                    'q80': 0,
-                    'median': 0,
-                    'q20': 0,
-                    'q10': 0
-                }
-
-            total_count = len(subject_scores)
+            # 整理返回数据
             return {
-                'q80': subject_scores[int(total_count * 0.8)] if total_count > 0 else 0,
-                'median': subject_scores[int(total_count * 0.5)] if total_count > 0 else 0,
-                'q20': subject_scores[int(total_count * 0.2)] if total_count > 0 else 0,
-                'q10': subject_scores[int(total_count * 0.1)] if total_count > 0 else 0
+                'school_count': school_count,
+                'student_count': stats.student_count,
+                'mean_score': round(float(stats.mean_score or 0), 2),
+                'max_score': float(stats.max_score or 0),
+                'top_school': top_student.school_name if top_student else '未知',
+                'score_lines': score_lines
             }
+
         except Exception as e:
-            logger.error(f"计算科目分位数统计失败: subject={subject}, error={str(e)}")
-            raise
+            logger.error(f"处理综述数据失败: {str(e)}")
+            return {}
 
-    def _calculate_subject_school_stats(self, scores, subject):
-        """计算科目的学校分布统计"""
-        try:
-            school_stats = scores.filter(**{
-                f'{subject}__isnull': False,
-                f'{subject}__gt': 0
-            }).values('school_name').annotate(
-                count=Count('id'),
-                mean=Avg(subject),
-                max_score=Max(subject),
-                min_score=Min(subject)
-            )
-
-            return {
-                stat['school_name']: {
-                    'count': stat['count'],
-                    'mean': round(float(stat['mean']), 2),
-                    'max_score': float(stat['max_score']),
-                    'min_score': float(stat['min_score'])
-                }
-                for stat in school_stats
-            }
-        except Exception as e:
-            logger.error(f"计算科目学校分布统计失败: subject={subject}, error={str(e)}")
-            raise
-
-    def update_statistics(self, exam_id, select_type, level_type='city'):
-        """更新统计数据"""
-        try:
-            with transaction.atomic():
-                # 直接调用 update_subject_statistics 来处理所有科目（包括总分）
-                success = self.update_subject_statistics(exam_id, select_type, level_type)
-                if success:
-                    logger.info(f"统计数据更新成功: exam_id={exam_id}, select_type={select_type}")
-                return success
-        except Exception as e:
-            logger.error(f"更新统计数据失败: exam_id={exam_id}, select_type={select_type}, error={str(e)}")
-            return False
-
-
-    def _prepare_statistics_data(self, stats):
-        """准备统计数据"""
-        return {
-            # 基础统计
-            'student_count': stats['basic_stats']['student_count'],
-            'max_score': stats['basic_stats']['max_score'],
-            'min_score': stats['basic_stats']['min_score'],
-            'mean_score': stats['basic_stats']['mean_score'],
-            'std_dev': stats['basic_stats']['std_dev'],
-
-            # 分位数统计
-            'q80_score': stats['quantile_stats']['q80_score'],
-            'median_score': stats['quantile_stats']['median_score'],
-            'q20_score': stats['quantile_stats']['q20_score'],
-            'q10_score': stats['quantile_stats']['q10_score'],
-
-            # 排名分布
-            'top_10_distribution': stats['rank_distribution']['top_10'],
-            'top_20_distribution': stats['rank_distribution']['top_20'],
-            'top_50_distribution': stats['rank_distribution']['top_50'],
-            'top_100_distribution': stats['rank_distribution']['top_100'],
-            'top_200_distribution': stats['rank_distribution']['top_200'],
-            'top_500_distribution': stats['rank_distribution']['top_500'],
-            'top_1250_distribution': stats['rank_distribution']['top_1250'],
-
-            # 其他统计
-            'threshold_stats': stats['threshold_stats'],
-            'school_distribution': stats['school_distribution'],
-            'rank_distribution': stats['rank_distribution'],
-
-            # 等级分布（从threshold_stats计算）
-            'excellent_rate': stats['threshold_stats'].get('excellent', {}).get('rate', 0),
-            'pass_rate': stats['threshold_stats'].get('pass', {}).get('rate', 0),
-            'low_score_rate': stats['threshold_stats'].get('low', {}).get('rate', 0),
+    def _process_score_lines(self, stats, thresholds):
+        """处理分数线数据"""
+        score_lines = {}
+        name_mapping = {
+            'C9层': 'c9',
+            '985层': '985',
+            '211层': '211',
+            '双一流层': 'dual_first_class',
+            '优分层': 'excellent',
+            '本科层': 'undergraduate'
         }
 
-    def _calculate_quantile_stats(self, scores):
-        """计算分位数统计"""
-        try:
-            # 首先获取所有分数并排序
-            all_scores = list(scores.values_list('total_score', flat=True).order_by('total_score'))
+        total_students = stats.student_count or 1
 
-            if not all_scores:
-                return {
-                    'q80_score': 0,
-                    'median_score': 0,
-                    'q20_score': 0,
-                    'q10_score': 0
-                }
+        for display_name, key in name_mapping.items():
+            line_data = thresholds.get(display_name, {})
+            count = int(line_data.get('count', 0) or 0)
+            rate = (count / total_students) * 100 if total_students > 0 else 0
 
-            total_count = len(all_scores)
-
-            # 计算各个分位数的索引
-            q80_index = int(total_count * 0.8)
-            median_index = int(total_count * 0.5)
-            q20_index = int(total_count * 0.2)
-            q10_index = int(total_count * 0.1)
-
-            return {
-                'q80_score': all_scores[q80_index] if q80_index < total_count else all_scores[-1],
-                'median_score': all_scores[median_index] if median_index < total_count else all_scores[-1],
-                'q20_score': all_scores[q20_index] if q20_index < total_count else all_scores[0],
-                'q10_score': all_scores[q10_index] if q10_index < total_count else all_scores[0]
+            score_lines[key] = {
+                'name': display_name,
+                'score': float(line_data.get('line', 0) or 0),
+                'count': count,
+                'rate': round(rate, 2)
             }
-        except Exception as e:
-            logger.error(f"计算分位数统计失败: error={str(e)}")
-            raise
 
-    def _calculate_subject_stats(self, scores, select_type):
-        """计算各科目统计"""
-        try:
-            # 总分
-            subjects = ['total_score']
-            subjects.extend(['chinese', 'math', 'english'])
+        return score_lines
 
-            # 根据文理科添加不同科目
-            if select_type == '理科':
-                subjects.extend(['physics', 'chemistry', 'biology', 'politics', 'geography'])
-            elif select_type == '文科':
-                subjects.extend(['history', 'chemistry', 'biology', 'politics', 'geography'])
+    def has_add_permission(self, request):
+        return False
 
-            logger.info(f"计算{select_type}科目统计: {subjects}")
+    def get_queryset(self, request):
+        """获取所有有成绩的考试"""
+        # 1. 从成绩表获取所有考试ID
+        exams_with_scores = list(ScoreStudentBasic.objects.values_list('exam_id', flat=True).distinct())
 
-            # 先打印一下scores的数量
-            logger.info(f"总成绩记录数: {scores.count()}")
+        # 2. 获取现有的统计记录，并关联考试名称
+        # 只获取总分记录，避免重复显示
+        existing_stats = StatisticsExamIndicators.objects.filter(
+            exam_id__in=exams_with_scores,
+            select_type='理科',
+            level_type='city',
+            subject_id='total_score'  # 只显示总分记录
+        ).annotate(
+            exam_name=Subquery(
+                BaseExamConfig.objects.filter(
+                    exam_id=OuterRef('exam_id')
+                ).values('exam_name')[:1]
+            )
+        )
 
-            # 打印一条示例记录
-            sample_score = scores.first()
-            if sample_score:
-                logger.info(f"示例成绩记录: {sample_score.__dict__}")
-
-            subject_stats = {}
-            for subject in subjects:
-                field_name = subject
-                logger.info(f"开始处理科目 {subject}")
-
-                # 打印该科目的原始数据
-                #raw_scores = scores.values_list(field_name, flat=True)
-                #logger.info(f"科目 {subject} 原始成绩数量: {raw_scores.count()}")
-                #logger.info(f"科目 {subject} 成绩示例: {list(raw_scores[:5])}")
-
-                # 获取该科目的所有分数（排除空值和零分）
-                subject_scores = list(scores.values_list(field_name, flat=True)
-                                      .exclude(Q(**{field_name: None}) | Q(**{field_name: 0}))
-                                      .order_by(field_name))
-
-                if not subject_scores:
-                    logger.warning(f"科目 {subject} 没有有效成绩")
-                    subject_stats[subject] = {
-                        'mean': 0,
-                        'max_score': 0,
-                        'q80': 0,
-                        'median': 0,
-                        'q20': 0,
-                        'q10': 0
-                    }
-                    continue
-
-                total_count = len(subject_scores)
-                logger.info(f"科目 {subject} 有效成绩数量: {total_count}")
-
-                # 计算分位数索引
-                q80_index = int(total_count * 0.8)
-                median_index = int(total_count * 0.5)
-                q20_index = int(total_count * 0.2)
-                q10_index = int(total_count * 0.1)
-
-                # 计算统计值
-                stats = scores.aggregate(
-                    mean=Avg(field_name),
-                    max_score=Max(field_name)
+        # 3. 如果没有统计记录，为所有考试创建初始记录
+        if not existing_stats.exists():
+            stats_to_create = []
+            for exam_id in exams_with_scores:
+                stats_to_create.append(
+                    StatisticsExamIndicators(
+                        exam_id=exam_id,
+                        select_type='理科',
+                        level_type='city',
+                        subject_id='total_score'  # 确保新建记录是总分
+                    )
+                )
+            if stats_to_create:
+                StatisticsExamIndicators.objects.bulk_create(stats_to_create)
+                # 重新查询，包含考试名称
+                return StatisticsExamIndicators.objects.filter(
+                    exam_id__in=exams_with_scores,
+                    select_type='理科',
+                    level_type='city',
+                    subject_id='total_score'  # 只返回总分记录
+                ).annotate(
+                    exam_name=Subquery(
+                        BaseExamConfig.objects.filter(
+                            exam_id=OuterRef('exam_id')
+                        ).values('exam_name')[:1]
+                    )
                 )
 
-                stats.update({
-                    'q80': subject_scores[q80_index] if q80_index < total_count else subject_scores[-1],
-                    'median': subject_scores[median_index] if median_index < total_count else subject_scores[-1],
-                    'q20': subject_scores[q20_index] if q20_index < total_count else subject_scores[0],
-                    'q10': subject_scores[q10_index] if q10_index < total_count else subject_scores[0]
-                })
-                # 计算该科目的学校分布
-                school_stats = scores.values('school_name') \
-                    .annotate(
-                    count=Count('student_id'),
-                    mean=Avg(field_name),
-                    max_score=Max(field_name),
-                    min_score=Min(field_name),
-                    std_dev=StdDev(field_name)
-                ) \
-                    .values('school_name', 'count', 'mean', 'max_score', 'min_score', 'std_dev')
+        return existing_stats
 
-                # 构建学校分布数据
-                school_distribution = {
-                    str(stat['school_name']): {
-                        'count': stat['count'],
-                        'mean': round(float(stat['mean']), 2) if stat['mean'] else 0,
-                        'max_score': float(stat['max_score']) if stat['max_score'] else 0,
-                        'min_score': float(stat['min_score']) if stat['min_score'] else 0,
-                        'std_dev': round(float(stat['std_dev']), 2) if stat['std_dev'] else 0
-                    }
-                    for stat in school_stats
-                }
+    def exam_id(self, obj):
+        """获取考试名称"""
+        return getattr(obj, 'exam_name', obj.exam_id)
 
-                # 将所有统计数据合并到一起
-                stats.update({
-                    'school_distribution': school_distribution
-                })
+    exam_id.short_description = '考试名称'
 
-                subject_stats[subject] = stats
-                logger.info(f"完成科目 {subject} 统计计算")
 
-            return subject_stats
+    def exam_time(self, obj):
+        """从考试名称中提取时间"""
+        """从考试ID中提取时间"""
+        if obj.exam_id and len(obj.exam_id) >= 6:
+            year = obj.exam_id[:4]  # 取前4位作为年份
+            month = obj.exam_id[4:6]  # 取第5-6位作为月份
+            result = f"{year}年{month}月"
+            return result
+        return ''
 
-        except Exception as e:
-            logger.error(f"计算科目统计失败: select_type={select_type}, error={str(e)}")
-            raise
+    exam_time.short_description = '考试时间'
 
-    def _calculate_single_subject_stats(self, scores, subject):
-        """计算单个科目的基础统计"""
-        try:
-            stats = scores.filter(**{
-                f'{subject}__isnull': False,
-                f'{subject}__gt': 0
-            }).aggregate(
-                mean=Avg(subject),
-                max_score=Max(subject),
-                min_score=Min(subject),
-                std_dev=StdDev(subject)
-            )
-            stats['student_count'] = scores.filter(**{
-                f'{subject}__isnull': False,
-                f'{subject}__gt': 0
-            }).count()
-            return stats
-        except Exception as e:
-            logger.error(f"计算科目基础统计失败: subject={subject}, error={str(e)}")
-            raise
 
-    def calculate_subject_statistics(self, exam_id, select_type, subject, level_type='city'):
-        """计算单科统计数据"""
-        try:
-            # 获取成绩数据
-            scores = ScoreStudentBasic.objects.filter(
-                exam_id=exam_id,
-                select_type=select_type
-            )
-
-            # 计算基础统计
-            basic_stats = self._calculate_single_subject_stats(scores, subject)
-
-            # 计算分位数统计
-            valid_scores = scores.filter(**{
-                f'{subject}__isnull': False,
-                f'{subject}__gt': 0
-            }).values_list(subject, flat=True).order_by(subject)
-
-            all_scores = list(valid_scores)
-            if not all_scores:
-                quantile_stats = {
-                    'q80_score': 0,
-                    'median_score': 0,
-                    'q20_score': 0,
-                    'q10_score': 0
-                }
-            else:
-                total_count = len(all_scores)
-                q80_index = int(total_count * 0.8)
-                median_index = int(total_count * 0.5)
-                q20_index = int(total_count * 0.2)
-                q10_index = int(total_count * 0.1)
-
-                quantile_stats = {
-                    'q80_score': float(all_scores[q80_index] if q80_index < total_count else all_scores[-1]),
-                    'median_score': float(all_scores[median_index] if median_index < total_count else all_scores[-1]),
-                    'q20_score': float(all_scores[q20_index] if q20_index < total_count else all_scores[0]),
-                    'q10_score': float(all_scores[q10_index] if q10_index < total_count else all_scores[0])
-                }
-
-            # 返回完整的统计数据
-            return {
-                'basic_stats': {
-                    'student_count': basic_stats['student_count'],
-                    'max_score': float(basic_stats['max_score']) if basic_stats['max_score'] else 0,
-                    'min_score': float(basic_stats['min_score']) if basic_stats['min_score'] else 0,
-                    'mean': float(basic_stats['mean']) if basic_stats['mean'] else 0,
-                    'std_dev': float(basic_stats['std_dev']) if basic_stats['std_dev'] else 0
-                },
-                'quantile_stats': quantile_stats,
-                'school_distribution': self._calculate_school_distribution(scores)
-            }
-
-        except Exception as e:
-            logger.error(
-                f"计算单科统计数据失败: exam_id={exam_id}, select_type={select_type}, subject={subject}, error={str(e)}")
-            raise
-
-    def update_subject_statistics(self, exam_id, select_type, level_type='city'):
-        """更新单科统计数据"""
-        try:
-            # 获取一条记录来判断科目
-            sample_score = ScoreStudentBasic.objects.filter(
-                exam_id=exam_id,
-                select_type=select_type
-            ).first()
-
-            if not sample_score:
-                logger.warning(f"未找到成绩数据: exam_id={exam_id}, select_type={select_type}")
+    def has_statistics(self, obj):
+        def has_statistics(self, obj):
+            """是否已生成统计"""
+            try:
+                # 检查是否存在统计数据
+                return StatisticsExamIndicators.objects.filter(
+                    exam_id=obj.exam_id,
+                    subject_id='total_score',
+                    student_count__gt=0
+                ).exists()
+            except Exception as e:
+                logger.error(f"检查统计状态失败: {str(e)}")
                 return False
 
-            # 获取排名数据
-            rankings = ScoreRankings.objects.filter(
-                exam_id=exam_id,
-                select_type=select_type
-            )
-
-            # 0. 总分
-            subjects = ['total_score']
-
-            # 1. 必考科目（3科）
-            subjects.extend(['chinese', 'math', 'english'])
-
-            # 2. 根据文理科添加主科（1科）
-            if select_type == '理科':
-                subjects.append('physics')
-            else:  # 文科
-                subjects.append('history')
-
-            # 3. 选考科目（4选2）：从化学、生物、地理、政治中选择大于0的科目
-            optional_subjects = ['chemistry', 'biology', 'geography', 'politics']
-            for subject in optional_subjects:
-                score = getattr(sample_score, subject)
-                if score is not None and score > 0:
-                    subjects.append(subject)
-
-            # 统计每个科目的数据
-            for subject in subjects:
-                stats = self._calculate_subject_statistics(exam_id, select_type, subject)
-                self._save_subject_statistics(exam_id, select_type, subject, level_type, stats, rankings)
-
-            logger.info(f"单科统计数据更新成功: exam_id={exam_id}, select_type={select_type}")
-            return True
-        except Exception as e:
-            logger.error(f"更新单科统计数据失败: exam_id={exam_id}, select_type={select_type}, error={str(e)}")
-            return False
-
-
-    def _calculate_subject_statistics(self, exam_id, select_type, subject):
-        """计算单科统计数据"""
-        """计算单科统计数据"""
+    def get_action_button(self, obj):
+        """获取操作按钮"""
         try:
-            # 获取成绩数据
-            scores = ScoreStudentBasic.objects.filter(
-                exam_id=exam_id,
-                select_type=select_type
+            # 检查是否存在有效的统计数据
+            has_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=obj.exam_id,
+                subject_id='total_score',
+                student_count__gt=0
+            ).exists()
+
+            button_text = "重新统计" if has_stats else "生成统计"
+
+            # 生成统计按钮
+            generate_url = reverse(
+                'admin:score_analysis_statisticsexamindicators_generate_statistics',
+                args=[obj.exam_id]
             )
 
-            # 如果是总分，使用 total_score 字段
-            score_field = 'total_score' if subject == 'total_score' else subject
+            buttons = [
+                f'<a class="button" style="background-color: #79aec8; padding: 5px 10px; '
+                f'color: white; text-decoration: none; border-radius: 4px; margin-right: 5px;" '
+                f'href="{generate_url}">{button_text}</a>'
+            ]
 
-            # 计算基础统计
-            if subject == 'total_score':
-                basic_stats = scores.aggregate(
-                    student_count=Count('student_id'),
-                    max_score=Max('total_score'),
-                    min_score=Min('total_score'),
-                    mean=Avg('total_score'),
-                    std_dev=StdDev('total_score')
+            if has_stats:
+                # 查看结果按钮
+                view_url = reverse(
+                    'admin:score_analysis_statisticsexamindicators_view_statistics',
+                    args=[obj.exam_id]
                 )
-            else:
-                basic_stats = self._calculate_single_subject_stats(scores, subject)
+                buttons.append(
+                    f'<a class="button" style="background-color: #417690; padding: 5px 10px; '
+                    f'color: white; text-decoration: none; border-radius: 4px;" '
+                    f'href="{view_url}">查看结果</a>'
+                )
 
-            # 计算分位数统计
-            valid_scores = scores.filter(**{
-                f'{score_field}__isnull': False,
-                f'{score_field}__gt': 0
-            }).values_list(score_field, flat=True).order_by(score_field)
-
-            all_scores = list(valid_scores)
-            if not all_scores:
-                return {
-                    'basic_stats': {
-                        'student_count': 0,
-                        'max_score': 0,
-                        'min_score': 0,
-                        'mean': 0,
-                        'std_dev': 0
-                    },
-                    'quantile_stats': {
-                        'q80_score': 0,
-                        'median_score': 0,
-                        'q20_score': 0,
-                        'q10_score': 0
-                    },
-                    'school_distribution': {}
-                }
-
-            total_count = len(all_scores)
-            q80_index = int(total_count * 0.8)
-            median_index = int(total_count * 0.5)
-            q20_index = int(total_count * 0.2)
-            q10_index = int(total_count * 0.1)
-
-            # 返回完整的统计数据
-            return {
-                'basic_stats': {
-                    'student_count': basic_stats['student_count'],
-                    'max_score': float(basic_stats['max_score']) if basic_stats['max_score'] else 0,
-                    'min_score': float(basic_stats['min_score']) if basic_stats['min_score'] else 0,
-                    'mean': float(basic_stats['mean']) if basic_stats['mean'] else 0,
-                    'std_dev': float(basic_stats['std_dev']) if basic_stats['std_dev'] else 0
-                },
-                'quantile_stats': {
-                    'q80_score': float(all_scores[q80_index] if q80_index < total_count else all_scores[-1]),
-                    'median_score': float(all_scores[median_index] if median_index < total_count else all_scores[-1]),
-                    'q20_score': float(all_scores[q20_index] if q20_index < total_count else all_scores[0]),
-                    'q10_score': float(all_scores[q10_index] if q10_index < total_count else all_scores[0])
-                },
-                'school_distribution': self._calculate_school_distribution(scores.filter(**{
-                    f'{score_field}__isnull': False,
-                    f'{score_field}__gt': 0
-                }))
-            }
-
+            return mark_safe(''.join(buttons))
         except Exception as e:
-            logger.error(
-                f"计算单科统计数据失败: exam_id={exam_id}, select_type={select_type}, subject={subject}, error={str(e)}")
-            # 返回默认值
-            return {
-                'basic_stats': {
-                    'student_count': 0,
-                    'max_score': 0,
-                    'min_score': 0,
-                    'mean': 0,
-                    'std_dev': 0
-                },
-                'quantile_stats': {
-                    'q80_score': 0,
-                    'median_score': 0,
-                    'q20_score': 0,
-                    'q10_score': 0
-                },
-                'school_distribution': {}
-            }
+            logger.error(f"生成操作按钮失败: {str(e)}")
+            return "操作失败"
 
-    def generate_all_statistics(self, exam_id, select_type, level_type='city', request=None):
-        """生成所有统计数据的入口方法"""
+    get_action_button.short_description = '操作'
+
+    def generate_statistics(self, request, exam_id):
+        """生成统计数据"""
         try:
-            logger.info(f"开始生成{select_type}统计数据: exam_id={exam_id}, level_type={level_type}")
+            print(f"开始生成统计数据: exam_id={exam_id}")
+            service = BaseStatisticsService()
 
             # 解析考试ID获取考试级别
             exam_parts = exam_id.split('-')
             if len(exam_parts) < 2:
                 raise ValueError(f"无效的考试ID格式: {exam_id}")
 
-            exam_level = exam_parts[1].upper()  # CITY 或 DIST
-            logger.info(f"考试级别: {exam_level}")
+            exam_level = exam_parts[1].upper()  # DIST 或 CITY
 
-            # 计算统计数据
-            stats = self.calculate_basic_statistics(exam_id, select_type, level_type)
-
-            # 获取排名数据
-            rankings = ScoreRankings.objects.filter(
+            # 删除旧的统计数据
+            StatisticsExamIndicators.objects.filter(
                 exam_id=exam_id,
-                select_type=select_type
-            )
+                subject_id__isnull=True
+            ).delete()
 
             if exam_level == 'CITY':
-                # 市级考试：保存市级和区县级统计
-                logger.info(f"处理市级考试{select_type}统计")
+                # 市级考试需要生成市级和区县级统计
+                # 1. 生成市级统计
+                service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='city', request=request)
+                service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='city', request=request)
 
-                # 1. 保存市级统计
-                city_stats = stats['city']
-                self._save_subject_statistics(
-                    exam_id=exam_id,
-                    select_type=select_type,
-                    level_type='地市级',
-                    stats=city_stats,
-                    rankings=rankings
-                )
+                # 2. 生成区县级统计
+                service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='district',
+                                                request=request)
+                service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='district',
+                                                request=request)
 
-                # 2. 保存各区县统计
-                district_stats = stats['districts']
-                for district_name, district_stat in district_stats.items():
-                    logger.info(f"保存区县 {district_name} 的{select_type}统计数据")
-                    self._save_subject_statistics(
-                        exam_id=exam_id,
-                        select_type=select_type,
-                        level_type=district_name,
-                        stats=district_stat,
-                        rankings=rankings
-                    )
+                messages.success(request, f'考试 {exam_id} 的市级和区县级统计数据已生成')
 
-            else:  # DIST 考试
-                # 区县考试：只保存当前区县统计
-                # 获取区县名称（stats的键就是区县名称）
-                district_name = list(stats.keys())[0]
-                district_stats = stats[district_name]
+            elif exam_level == 'DIST':
+                # 区县考试只生成区县级统计
+                service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='district',
+                                                request=request)
+                service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='district',
+                                                request=request)
 
-                logger.info(f"处理区县考试{select_type}统计: {district_name}")
-                self._save_subject_statistics(
-                    exam_id=exam_id,
-                    select_type=select_type,
-                    level_type=district_name,
-                    stats=district_stats,
-                    rankings=rankings
-                )
+                messages.success(request, f'考试 {exam_id} 的区县级统计数据已生成')
 
-            success_msg = f'考试 {exam_id} 的{select_type}统计数据已生成'
-            logger.info(success_msg)
-            if request:
-                messages.success(request, success_msg)
-            return True
+            else:
+                raise ValueError(f"未知的考试级别: {exam_level}")
+            return redirect('admin:score_analysis_statisticsexamindicators_view_statistics',
+                          exam_id=exam_id)
+
 
         except Exception as e:
-            error_msg = f"生成{select_type}统计数据失败: exam_id={exam_id}, error={str(e)}"
-            logger.error(error_msg)
-            logger.exception("详细错误信息:")
-            if request:
-                messages.error(request, error_msg)
-            return False
+            print(f"生成统计失败: {str(e)}")
+            messages.error(request, f'考试 {exam_id} 统计数据生成失败: {str(e)}')
+            return redirect('admin:score_analysis_statisticsexamindicators_changelist')
 
-    def _save_subject_statistics(self, exam_id, select_type, level_type, stats, rankings):
-        """保存统计数据"""
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            # 生成统计的URL
+            path('generate-statistics/<str:exam_id>/',
+                 self.admin_site.admin_view(self.generate_statistics),
+                 name='score_analysis_statisticsexamindicators_generate_statistics'),
+
+            # 查看统计结果的URL
+            path('view-statistics/<str:exam_id>/',
+                 self.admin_site.admin_view(self.view_statistics),
+                 name='score_analysis_statisticsexamindicators_view_statistics'),
+        ]
+        return custom_urls + urls
+
+    def view_statistics(self, request, exam_id):
+        """查看统计结果页面"""
         try:
-            logger.info(f"开始保存{select_type}统计数据: exam_id={exam_id}, level_type={level_type}")
+            # 1. 获取考试层级信息
+            level_type, districts = self._get_level_type(exam_id)
+            logger.info(f"考试 {exam_id} 的统计层级为: {level_type}, 包含区县: {districts}")
 
-            # 获取科目统计数据
-            subject_stats = stats.get('subject_stats', {})
+            if not level_type:
+                raise ValueError(f"无法确定考试 {exam_id} 的统计层级")
 
-            # 获取所有科目配置
-            subject_configs = {
-                subject.subject_id.lower(): subject
-                for subject in BaseSubjectConfig.objects.all()
+            # 2. 获取理科和文科的统计数据
+            science_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=exam_id,
+                select_type='理科',
+                subject_id='total_score',
+                level_type=level_type,
+                student_count__gt=0
+            ).first()
+
+            arts_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=exam_id,
+                select_type='文科',
+                subject_id='total_score',
+                level_type=level_type,
+                student_count__gt=0
+            ).first()
+
+            # 3. 获取考试名称
+            exam_name = BaseExamConfig.objects.filter(exam_id=exam_id).values_list('exam_name', flat=True).first()
+
+            # 4. 处理各类统计数据
+            context = {
+                'title': f'{exam_name} - 统计结果',
+                'exam_id': exam_id,
+                'exam_name': exam_name,
+                'level_type': level_type,
+
+                # 统计数据
+                'science_summary': self._process_summary_data(science_stats),
+                'arts_summary': self._process_summary_data(arts_stats),
+                'science_score_lines': self._score_line_distribution(science_stats),
+                'arts_score_lines': self._score_line_distribution(arts_stats),
+                'science_rankings': dict(sorted(
+                    self._process_rank_distribution(science_stats).items(),
+                    key=lambda x: x[1]['top_10'],
+                    reverse=True
+                )) if science_stats else {},
+                'arts_rankings': dict(sorted(
+                    self._process_rank_distribution(arts_stats).items(),
+                    key=lambda x: x[1]['top_10'],
+                    reverse=True
+                )) if arts_stats else {},
+                'science_quartiles': self._process_quartile_analysis(science_stats, 'science'),
+                'arts_quartiles': self._process_quartile_analysis(arts_stats, 'arts'),
+                'science_school_means': self._process_school_subject_means(science_stats, 'science'),
+                'arts_school_means': self._process_school_subject_means(arts_stats, 'arts'),
+
+                **self.admin_site.each_context(request),
             }
 
-            # 遍历所有科目保存统计数据
-            for subject_name, subject_stat in subject_stats.items():
-                logger.info(f"保存科目 {subject_name} 的统计数据")
-
-                # 获取科目配置实例
-                subject_obj = subject_configs.get(subject_name)
-                if not subject_obj:
-                    logger.warning(f"未找到科目配置: {subject_name}")
-                    continue
-
-                # 获取该科目的排名分布，根据level_type决定是否传入区县名称
-                # 修改排名分布的计算逻辑
-                if level_type == '地市级':
-                    # 地市级：使用所有数据计算排名分布
-                    source_scores = ScoreStudentBasic.objects.filter(
+            # 5. 如果是地市级考试，获取区县数据
+            if level_type == '地市级' and districts:
+                district_data = {}
+                for district in districts:
+                    district_stats_science = StatisticsExamIndicators.objects.filter(
                         exam_id=exam_id,
-                        select_type=select_type
-                    )
-                else:
-                    # 区县级：只使用该区县的数据计算排名分布
-                    source_scores = ScoreStudentBasic.objects.filter(
+                        select_type='理科',
+                        subject_id='total_score',
+                        level_type=district,
+                        student_count__gt=0
+                    ).first()
+
+                    district_stats_arts = StatisticsExamIndicators.objects.filter(
                         exam_id=exam_id,
-                        select_type=select_type,
-                        district_name=level_type
-                    )
+                        select_type='文科',
+                        subject_id='total_score',
+                        level_type=district,
+                        student_count__gt=0
+                    ).first()
 
-                rank_distributions = self._calculate_rank_distribution(
-                    rankings=source_scores,
-                    subject=subject_name
-                    )
+                    district_data[district] = {
+                        'science': self._process_summary_data(district_stats_science),
+                        'arts': self._process_summary_data(district_stats_arts)
+                    }
 
-                defaults = {
-                    # 基础统计
-                    'student_count': stats['basic_stats']['student_count'],
-                    'max_score': subject_stat['max_score'],
-                    'mean_score': subject_stat['mean'],
-                    'std_dev': stats['basic_stats'].get('std_dev'),
+                context['district_data'] = district_data
 
-                    # 分位数统计
-                    'q80_score': subject_stat['q80'],
-                    'median_score': subject_stat['median'],
-                    'q20_score': subject_stat['q20'],
-                    'q10_score': subject_stat['q10'],
-
-                    # 学校分布
-                    'school_distribution': json.dumps(subject_stat['school_distribution'], ensure_ascii=False),
-
-                    # 排名分布
-                    'rank_distribution': json.dumps(rank_distributions, ensure_ascii=False),
-
-                    # 达线统计（如果有的话）
-                    'threshold_stats': json.dumps(stats.get('threshold_stats', {}), ensure_ascii=False),
-
-                    # 优秀率、及格率等（如果有的话）
-                    'excellent_rate': stats.get('excellent_rate'),
-                    'pass_rate': stats.get('pass_rate'),
-                    'low_score_rate': stats.get('low_score_rate')
-                }
-
-                # 保存或更新统计数据
-                StatisticsExamIndicators.objects.update_or_create(
-                    exam_id=exam_id,
-                    select_type=select_type,
-                    subject=subject_obj,
-                    level_type=level_type,
-                    defaults=defaults
-                )
-
-                logger.info(f"完成保存科目 {subject_name} 的统计数据")
-
-            logger.info(f"统计数据保存完成: exam_id={exam_id}, select_type={select_type}")
-            return True
+            return render(
+                request,
+                'admin/score_analysis/statisticsexamindicators/generate_stats.html',
+                context
+            )
 
         except Exception as e:
-            logger.error(f"保存统计数据失败: exam_id={exam_id}, select_type={select_type}, error={str(e)}")
-            raise
+            logger.error(f"获取统计数据失败: {str(e)}")
+            messages.error(request, f'获取统计数据失败: {str(e)}')
+            return redirect('admin:score_analysis_statisticsexamindicators_changelist')
+    #获取考试的类型（江门市统考或者开平市统考）
+    def _get_exam_statistics(self, exam_id):
+        """获取考试统计数据"""
 
+        # 判断考试类型并返回对应的level_type
+        if 'CITY' in exam_id:
+            return 'city'  # 地市级统考
+        else:
+            return '开平市'  # 默认为区县级别（开平市）
+    #获取考试的类型（江门市统考或者区县市统考）
+    def _get_level_type(self, exam_id):
+        """
+        根据考试ID获取统计层级信息
+
+        Args:
+            exam_id: str, 考试ID (例如: JM-CITY-2023-1)
+
+        Returns:
+            tuple: (level_type, districts)
+                - level_type: str, '地市级' 或 具体区县名
+                - districts: list, 如果是地市级考试则返回所有区县列表，否则返回None
+        """
+        logger.info(f"开始确定考试 {exam_id} 的统计层级")
+
+        try:
+            if 'CITY' in exam_id:
+                # 对于市级考试，获取所有区县
+                districts = StatisticsExamIndicators.objects.filter(
+                    exam_id=exam_id,
+                    subject_id='total_score',
+                    student_count__gt=0
+                ).exclude(
+                    level_type='地市级'
+                ).values_list('level_type', flat=True).distinct()
+
+                return '地市级', list(districts)
+            else:
+                # 对于区县级考试
+                district = StatisticsExamIndicators.objects.filter(
+                    exam_id=exam_id,
+                    subject_id='total_score',
+                    student_count__gt=0
+                ).values_list('level_type', flat=True).first()
+
+                if district:
+                    logger.info(f"区县级考试: {district}")
+                    return district, None
+                else:
+                    logger.error(f"未找到考试 {exam_id} 的统计记录")
+                    return None, None
+
+        except Exception as e:
+            logger.error(f"获取考试层级失败: {str(e)}")
+            return None, None
+        #综述数据
+
+    def _process_summary_data(self, stats):
+        """
+        处理综述数据，生成完整的统计信息
+        """
+        if not stats:
+            logger.warning("没有找到统计数据")
+            return {}
+
+        try:
+            # 1. 解析基础数据
+            school_count = len(json.loads(stats.school_distribution)) if stats.school_distribution else 0
+            thresholds = json.loads(stats.threshold_stats) if stats.threshold_stats else {}
+
+            # 2. 获取第一名学校信息
+            if stats.level_type == '地市级':
+                top_student = ScoreRankings.objects.filter(
+                    exam_id=stats.exam_id,
+                    subject_id='total_score',
+                    select_type=stats.select_type,
+                    raw_score=stats.max_score
+                ).exclude(
+                    level_type='地市级'
+                ).order_by('-raw_score').first()
+            else:
+                top_student = ScoreRankings.objects.filter(
+                    exam_id=stats.exam_id,
+                    subject_id='total_score',
+                    select_type=stats.select_type,
+                    level_type=stats.level_type
+                ).order_by('-raw_score').first()
+
+            # 3. 处理分数线数据
+            score_lines = {}
+            name_mapping = {
+                'C9层': 'c9',
+                '985层': '985',
+                '211层': '211',
+                '双一流层': 'dual_first_class',
+                '优分层': 'excellent',
+                '本科层': 'undergraduate'
+            }
+
+            # 获取总人数，用于计算比率
+            total_students = stats.student_count or 1  # 避免除以0
+
+            for display_name, key in name_mapping.items():
+                line_data = thresholds.get(display_name, {})
+                count = int(line_data.get('count', 0) or 0)
+                # 使用总人数计算比率
+                rate = (count / total_students) * 100 if total_students > 0 else 0
+
+                score_lines[key] = {
+                    'name': display_name,
+                    'score': float(line_data.get('line', 0) or 0),
+                    'count': count,
+                    'rate': round(rate, 2)  # 四舍五入到2位小数
+                }
+
+                # 添加日志以检查计算过程
+                logger.info(f"{display_name} - 人数: {count}, 总人数: {total_students}, 比率: {rate}%")
+
+            # 4. 整理返回数据
+            summary_data = {
+                'school_count': school_count,
+                'student_count': total_students,
+                'mean_score': round(float(stats.mean_score or 0), 2),
+                'max_score': float(stats.max_score or 0),
+                'top_school': top_student.school_name if top_student else '未知',
+                'score_lines': score_lines
+            }
+
+            logger.info(f"成功处理统计数据: 学校数={school_count}, 学生数={total_students}, "
+                        f"平均分={summary_data['mean_score']}, 最高分={stats.max_score}, "
+                        f"第一名学校={summary_data['top_school']}")
+
+            return summary_data
+
+        except Exception as e:
+            logger.error(f"处理综述数据失败: {str(e)}")
+            logger.exception(e)
+            return {}
+    #区县学校分数线分布情况
+    def _process_school_distribution(self, school_distribution_json):
+        """处理学校分布数据"""
+        if not school_distribution_json:
+            return {
+                'school_count': 0,
+                'student_count': 0,
+                'mean_score': 0,
+                'max_score': 0,
+                'top_school': "暂无数据"
+            }
+
+        # 解析JSON数据
+        schools_data = json.loads(school_distribution_json) if isinstance(school_distribution_json,
+                                                                          str) else school_distribution_json
+
+        # 计算基础统计数据
+        total_students = 0
+        weighted_sum = 0
+        max_score = 0
+        top_school = "暂无数据"
+
+        for school, data in schools_data.items():
+            school_count = data['count']
+            total_students += school_count
+            weighted_sum += data['mean'] * school_count
+
+            if data['max_score'] > max_score:
+                max_score = data['max_score']
+                top_school = school
+
+        return {
+            'school_count': len(schools_data),
+            'student_count': total_students,
+            'mean_score': round(weighted_sum / total_students, 2) if total_students > 0 else 0,
+            'max_score': max_score,
+            'top_school': top_school
+        }
+    #分数线达线情况
+    def _score_line_distribution(self, stats_obj):
+        """处理分数线分布数据"""
+        if not stats_obj or not stats_obj.threshold_stats:
+            return {}
+
+        try:
+            thresholds = json.loads(stats_obj.threshold_stats)
+            # 按照line值从高到低排序
+            sorted_thresholds = dict(sorted(
+                thresholds.items(),
+                key=lambda x: float(x[1].get('line', 0)),
+                reverse=True
+            ))
+            return sorted_thresholds
+        except Exception as e:
+            logger.error(f"解析threshold_stats失败: {str(e)}")
+            return {}
+    #各校的排名分布
+    def _process_rank_distribution(self, stats):
+        """处理排名分布数据
+        Args:
+            stats: StatisticsExamIndicators实例
+        Returns:
+            dict: {
+                '学校A': {'top_10': 5, 'top_20': 8, 'top_50': 10, ...},
+                '学校B': {'top_10': 0, 'top_20': 0, 'top_50': 2, ...},  # 没有的排名补0
+            }
+        """
+        try:
+            # 检查数据是否存在
+            if not stats or not stats.rank_distribution:
+                logger.warning("没有排名分布数据")
+                return {}
+
+            # 解析JSON数据
+            rank_data = json.loads(stats.rank_distribution)
+
+            # 获取school_rankings数据
+            school_rankings = rank_data.get('school_rankings', {})
+
+            # 定义所有需要的排名范围
+            rank_ranges = ['top_10', 'top_20', 'top_50', 'top_100',
+                           'top_200', 'top_500', 'top_1250']
+
+            # 处理每个学校的数据，确保所有排名范围都存在
+            processed_rankings = {}
+            for school, rankings in school_rankings.items():
+                processed_rankings[school] = {
+                    rank_range: rankings.get(rank_range, 0)
+                    for rank_range in rank_ranges
+                }
+
+            # 按top_10人数排序
+            sorted_data = dict(sorted(
+                processed_rankings.items(),
+                key=lambda x: x[1]['top_10'],
+                reverse=True
+            ))
+
+            return sorted_data
+
+        except Exception as e:
+            logger.error(f"处理排名分布数据失败: {str(e)}")
+            return {}
+    def _process_quartile_analysis(self, stats, subject_type='science'):
+        """处理四分位分析数据"""
+        if not stats:
+            return {}
+
+        # 定义所有需要分析的科目
+        base_subjects = {
+            'total_score': '总分',
+            'chinese': '语文',
+            'math': '数学',
+            'english': '英语',
+            'chemistry': '化学',
+            'biology': '生物',
+            'politics': '政治',
+            'geography': '地理'
+        }
+
+        # 根据文理科添加特定科目
+        if subject_type == 'science':
+            base_subjects['physics'] = '物理'
+        elif subject_type == 'arts':
+            base_subjects['history'] = '历史'
+
+        quartile_data = {}
+
+        # 获取每个科目的统计数据
+        for subject_code, subject_name in base_subjects.items():
+            subject_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=stats.exam_id,
+                select_type=stats.select_type,
+                subject_id=subject_code,
+                student_count__gt=0
+            ).first()
+
+            if subject_stats:
+                quartile_data[subject_name] = {
+                    'mean': subject_stats.mean_score,
+                    'max': subject_stats.max_score,
+                    'q80': subject_stats.q80_score,
+                    'median': subject_stats.median_score,
+                    'q20': subject_stats.q20_score,
+                    'q10': subject_stats.q10_score
+                }
+
+        return quartile_data
+    #各校的平均分列表
+    def _process_school_subject_means(self, stats, exam_type):
+        """处理各校各科平均分数据"""
+        try:
+            if not stats:
+                return {'subjects': [], 'schools': []}
+
+            exam_id = stats.exam_id
+            select_type = '理科' if exam_type == 'science' else '文科'
+            level_type = stats.level_type
+
+            # 获取所有科目的统计数据
+            all_stats = StatisticsExamIndicators.objects.filter(
+                exam_id=exam_id,
+                select_type=select_type,
+                level_type=level_type
+            )
+
+            # 打印调试信息
+           # logger.info(f"处理{select_type}各校各科平均分数据:")
+           # logger.info(f"找到 {all_stats.count()} 个科目的统计数据")
+
+            # 准备数据结构
+            schools_data = {}
+            subjects_order = []
+
+            # 处理每个科目的数据
+            for stat in all_stats:
+                subject_name = stat.subject.subject_name
+                subjects_order.append(subject_name)
+
+                # 打印当前处理的科目
+             #   logger.info(f"处理科目: {subject_name}")
+
+                # 解析school_distribution JSON数据
+                try:
+                    school_dist = json.loads(stat.school_distribution)
+                    logger.info(f"科目 {subject_name} 的学校分布数据: {school_dist}")
+                except (json.JSONDecodeError, AttributeError) as e:
+                    logger.error(f"解析科目 {subject_name} 的school_distribution失败: {e}")
+                    continue
+
+                # 整理每个学校的数据
+                for school_name, school_stats in school_dist.items():
+                    if school_name not in schools_data:
+                        schools_data[school_name] = {
+                            'school_name': school_name,
+                            'subjects': {}
+                        }
+
+                    # 添加该科目的统计数据
+                    schools_data[school_name]['subjects'][subject_name] = {
+                        'count': school_stats['count'],
+                        'mean': school_stats['mean'],
+                        'std_dev': school_stats.get('std_dev', 0)
+                    }
+
+            # 转换为列表并按总分平均分排序
+            schools_list = list(schools_data.values())
+            schools_list.sort(
+                key=lambda x: x['subjects'].get('总分', {}).get('mean', 0),
+                reverse=True
+            )
+
+            # 打印最终的数据结构
+           # logger.info(f"最终数据结构:")
+           # logger.info(f"科目顺序: {subjects_order}")
+            #logger.info(f"学校数据示例: {schools_list[0] if schools_list else 'No schools'}")
+
+            return {
+                'subjects': subjects_order,
+                'schools': schools_list
+            }
+
+        except Exception as e:
+            logger.error(f"处理学校科目平均分失败: exam_type={exam_type}, error={str(e)}")
+            logger.exception("详细错误信息:")
+            return {'subjects': [], 'schools': []}
+
+
+    def _prepare_subject_data(self, stats, score_lines, select_type):
+        """准备学科统计数据"""
+        if not stats:
+            return {}
+
+        # 1. 获取最高分学校
+        school_distribution = stats.school_distribution or {}
+        top_school = "暂无数据"
+        if school_distribution:
+            top_scores = sorted(
+                [(school, data.get('max_score', 0))
+                 for school, data in school_distribution.items()],
+                key=lambda x: x[1],
+                reverse=True
+            )
+            if top_scores:
+                top_school = top_scores[0][0]
+
+        # 2. 准备基础数据
+        data = {
+            # 基本信息 - 直接使用数据库字段
+            'school_count': len(school_distribution),
+            'student_count': stats.student_count,
+            'mean_score': float(stats.mean_score) if stats.mean_score else 0,
+            'max_score': float(stats.max_score) if stats.max_score else 0,
+            'min_score': float(stats.min_score) if stats.min_score else 0,
+            'std_dev': float(stats.std_dev) if stats.std_dev else 0,
+            'top_school': top_school,
+
+            # 分数线和上线数据
+            'excellent_rate': float(stats.excellent_rate) if stats.excellent_rate else 0,
+            'pass_rate': float(stats.pass_rate) if stats.pass_rate else 0,
+            'low_score_rate': float(stats.low_score_rate) if stats.low_score_rate else 0,
+        }
+
+        # 添加分数线数据
+        for line_type, score in score_lines.items():
+            data[f'{line_type}'] = score
+            if stats.threshold_stats and line_type in stats.threshold_stats:
+                data[f'{line_type}_count'] = stats.threshold_stats[line_type].get('count', 0)
+                data[f'{line_type}_rate'] = stats.threshold_stats[line_type].get('rate', 0)
+
+        # 3. 处理学校分布数据
+        school_stats = []
+        for school_name, school_data in school_distribution.items():
+            school_info = {
+                'name': school_name,
+                'student_count': school_data.get('student_count', 0),
+                'max_score': school_data.get('max_score', 0),
+                'min_score': school_data.get('min_score', 0),
+                'mean_score': school_data.get('mean_score', 0),
+                'mean_rank': school_data.get('mean_rank', 0),
+            }
+
+            # 添加各分数线上线数据
+            threshold_stats = school_data.get('threshold_stats', {})
+            for line_type in score_lines.keys():
+                line_stats = threshold_stats.get(line_type, {})
+                school_info[f'{line_type}_count'] = line_stats.get('count', 0)
+                school_info[f'{line_type}_rate'] = line_stats.get('rate', 0)
+
+            school_stats.append(school_info)
+
+        # 按平均分排序
+        school_stats.sort(key=lambda x: x['mean_score'], reverse=True)
+        data['school_stats'] = school_stats
+
+        # 4. 处理排名分布数据
+        rank_stats = {
+            'thresholds': {},
+            'total': {},
+            'schools': {}
+        }
+
+        # 处理各个排名段的分布
+        rank_fields = {
+            'top10': 'top_10_distribution',
+            'top20': 'top_20_distribution',
+            'top50': 'top_50_distribution',
+            'top100': 'top_100_distribution',
+            'top200': 'top_200_distribution',
+            'top500': 'top_500_distribution',
+            'top1250': 'top_1250_distribution'
+        }
+
+        for rank_key, field_name in rank_fields.items():
+            distribution = getattr(stats, field_name) or {}
+            if distribution:
+                rank_stats['thresholds'][rank_key] = distribution.get('min_score', 0)
+                rank_stats['total'][rank_key] = distribution.get('count', 0)
+
+        data['rank_stats'] = rank_stats
+
+        # 5. 处理四分位数据
+        data.update({
+            'q80_score': float(stats.q80_score) if stats.q80_score else 0,
+            'median_score': float(stats.median_score) if stats.median_score else 0,
+            'q20_score': float(stats.q20_score) if stats.q20_score else 0,
+            'q10_score': float(stats.q10_score) if stats.q10_score else 0,
+        })
+
+        return data
+    # 新增：查看统计结果的方法
+    def statistics_result(self, request, exam_id):
+        """查看统计结果"""
+        try:
+            # 1. 获取统计数据
+            print(f"正在查找考试ID: {exam_id} 的统计数据")  # 调试信息
+
+            stats_list = StatisticsExamIndicators.objects.filter(
+                exam_id=exam_id,
+                subject_id='total_score'
+            )
+
+            print(f"找到的统计数据数量: {stats_list.count()}")  # 调试信息
+
+            if not stats_list.exists():
+                messages.error(request, f'未找到考试 {exam_id} 的统计数据')
+                return redirect('admin:score_analysis_statisticsexamindicators_changelist')
+
+            # 分别获取理科和文科的统计数据
+            science_stats = stats_list.filter(select_type='理科').first()
+            arts_stats = stats_list.filter(select_type='文科').first()
+
+            print(f"理科统计数据: {science_stats}")  # 调试信息
+            print(f"文科统计数据: {arts_stats}")  # 调试信息
+
+            # 获取分数线数据
+            score_lines = self.get_score_lines(exam_id)
+            print(f"分数线数据: {score_lines}")  # 调试信息
+
+            # 2. 准备上下文数据
+            context = {
+                'exam_id': exam_id,
+                'title': f'考试 {exam_id} 统计结果',
+                'science_data': self._prepare_subject_data(
+                    science_stats,
+                    score_lines.get('理科', {}),
+                    '理科'
+                ) if science_stats else None,
+                'arts_data': self._prepare_subject_data(
+                    arts_stats,
+                    score_lines.get('文科', {}),
+                    '文科'
+                ) if arts_stats else None,
+                **self.admin_site.each_context(request),
+            }
+
+            # 3. 渲染结果页面
+            return render(
+                request,
+                'admin/score_analysis/statisticsexamindicators/generate_stats.html',
+                context
+            )
+
+        except Exception as e:
+            logger.error(f"查看统计结果失败: {str(e)}")
+            print(f"错误详情: {str(e)}")  # 调试信息
+            messages.error(request, f'查看统计结果失败: {str(e)}')
+            return redirect('admin:score_analysis_statisticsexamindicators_changelist')
+
+    def get_score_lines(self, exam_id):
+        """从数据库获取分数线数据"""
+        try:
+            print(f"正在获取考试ID: {exam_id} 的分数线数据")  # 调试信息
+
+            # 获取所有分数线数据
+            lines = ExamScoreLines.objects.filter(exam_id=exam_id)
+            print(f"找到的分数线数据数量: {lines.count()}")  # 调试信息
+
+            # 初始化默认分数线数据结构
+            score_lines = {
+                '理科': {
+                    'qb_line': 0,
+                    '985_line': 0,
+                    '211_line': 0,
+                    'tk_line': 0,
+                    'bk_line': 0,
+                    'zk_line': 0
+                },
+                '文科': {
+                    'qb_line': 0,
+                    '985_line': 0,
+                    '211_line': 0,
+                    'tk_line': 0,
+                    'bk_line': 0,
+                    'zk_line': 0
+                }
+            }
+
+            # 如果有数据，更新默认值
+            if lines.exists():
+                # 转换分数线类型名称为代码中使用的键名
+                line_type_map = {
+                    'C9层': 'qb_line',
+                    '985层': '985_line',
+                    '211层': '211_line',
+                    '双一流层': 'tk_line',
+                    '本科层': 'bk_line',
+                    '优分层': 'zk_line'
+                }
+
+                # 更新分数线数据
+                for line in lines:
+                    key = line_type_map.get(line.line_type)
+                    if key and line.select_type in score_lines:
+                        score_lines[line.select_type][key] = float(line.score)
+                        print(f"更新分数线: {line.select_type} - {line.line_type} - {line.score}")  # 调试信息
+
+            print(f"最终分数线数据: {score_lines}")  # 调试信息
+            return score_lines
+
+        except Exception as e:
+            logger.error(f"获取分数线数据失败: {str(e)}")
+            print(f"获取分数线数据出错: {str(e)}")  # 调试信息
+
+            # 返回默认值
+            return {
+                '理科': {
+                    'qb_line': 0,
+                    '985_line': 0,
+                    '211_line': 0,
+                    'tk_line': 0,
+                    'bk_line': 0,
+                    'zk_line': 0
+                },
+                '文科': {
+                    'qb_line': 0,
+                    '985_line': 0,
+                    '211_line': 0,
+                    'tk_line': 0,
+                    'bk_line': 0,
+                    'zk_line': 0
+                }
+            }
+
+    # ... 其他方法从 admin 中复制过来 ...

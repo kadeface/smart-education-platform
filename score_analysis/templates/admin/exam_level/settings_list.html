@@ -1,0 +1,41 @@
+{% extends "admin/base_site.html" %}
+{% load score_analysis_tags %}
+
+{% block content %}
+<div class="module">
+    <h2>考试分层分析配置</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>考试ID</th>
+                <th>考试名称</th>
+                <th>文科配置</th>
+                <th>理科配置</th>
+                <th>未分科配置</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for exam in exams %}
+            <tr>
+                <td>{{ exam.exam_id }}</td>
+                <td>{{ exam.exam_name }}</td>
+                {% for select_type in select_types %}
+                <td>
+                    {% with config=config_map|dict_get:exam.exam_id|dict_get:select_type %}
+                    <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_changelist' %}{{ exam.exam_id }}/{{ select_type }}/">
+                        {% if config %}
+                            查看配置
+                        {% else %}
+                            创建配置
+                        {% endif %}
+                    </a>
+                    {% endwith %}
+                </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

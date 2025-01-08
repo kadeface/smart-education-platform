@@ -1,0 +1,77 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div class="module">
+    <h2>{{ exam.exam_name }} - {{ config.select_type }}配置</h2>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <fieldset>
+            <legend>排名范围配置</legend>
+            <div id="rank-ranges">
+                {% for area, ranges in config.rank_ranges.items %}
+                <div class="rank-area">
+                    <h3>{{ area }}</h3>
+                    {% for range in ranges %}
+                    <input type="number" name="rank_ranges" value="{{ range }}">
+                    {% endfor %}
+                    <button type="button" class="add-range">添加</button>
+                </div>
+                {% endfor %}
+                <button type="button" class="add-area">添加区域</button>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>分数线配置</legend>
+            <div id="score-lines">
+                {% for type, score in config.score_lines.items %}
+                <div class="score-line">
+                    <input type="text" name="type" value="{{ type }}" readonly>
+                    {% if config.select_type == '未分科' %}
+                    <input type="number" name="ratio" value="{{ score }}"
+                           step="0.01" min="0" max="1">
+                    {% else %}
+                    <input type="number" name="score" value="{{ score }}">
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <div class="submit-row">
+            <input type="submit" value="保存配置">
+        </div>
+    </form>
+</div>
+
+<script>
+// 添加必要的JavaScript代码处理表单交互
+document.addEventListener('DOMContentLoaded', function() {
+    // 添加排名范围
+    document.querySelectorAll('.add-range').forEach(button => {
+        button.addEventListener('click', function() {
+            const area = this.closest('.rank-area');
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.name = 'rank_ranges';
+            area.insertBefore(input, this);
+        });
+    });
+
+    // 添加区域
+    document.querySelector('.add-area').addEventListener('click', function() {
+        const areaDiv = document.createElement('div');
+        areaDiv.className = 'rank-area';
+        areaDiv.innerHTML = `
+            <h3>新区域</h3>
+            <input type="text" name="area_name" placeholder="区域名称">
+            <input type="number" name="rank_ranges">
+            <button type="button" class="add-range">添加</button>
+        `;
+        document.getElementById('rank-ranges').insertBefore(areaDiv, this);
+    });
+});
+</script>
+{% endblock %}
