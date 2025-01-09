@@ -262,7 +262,7 @@ class ExamLevelStatistics(models.Model):
         max_length=10,
         choices=LEVEL_CHOICES
     )
-
+    district_name = models.CharField('区县名称', max_length=50, null=True, blank=True)
     # 基础统计指标
     student_count = models.IntegerField('考生人数')
     max_score = models.DecimalField('最高分', max_digits=5, decimal_places=2)

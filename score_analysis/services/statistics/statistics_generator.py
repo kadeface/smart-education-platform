@@ -49,6 +49,10 @@ class StatisticsGenerator:
             exam_id: 考试ID
         """
         try:
+            # 先删除此次考试的所有统计数据
+            ExamLevelStatistics.objects.filter(exam_id=exam_id).delete()
+            logger.info(f"已清理考试 {exam_id} 的历史统计数据")
+
             exam_config = BaseExamConfig.objects.get(exam_id=exam_id)
             is_division = self._is_division_exam(exam_config)
             exam_type = self._get_exam_type(exam_id)
@@ -58,6 +62,10 @@ class StatisticsGenerator:
             if exam_type == 'city':
                 # 只生成市级统计
                 self._generate_city_statistics(exam_id, is_division)
+                # 对于市级考试，还需要生成每个区县的统计
+                districts = self._get_districts(exam_id)
+                for district in districts:
+                    self._generate_district_statistics(exam_id, district, is_division)
             elif exam_type == 'district':
                 # 生成区县级统计
                 districts = self._get_districts(exam_id)
@@ -157,7 +165,7 @@ class StatisticsGenerator:
                         exam_id=exam_id,
                         select_type=select_type,
                         level_type='district',
-                        #district_name=district,
+                        district_name=district,
                         defaults={
                             'student_count': stats_data['student_count'],
                             'max_score': stats_data['max_score'],
@@ -222,74 +230,13 @@ class StatisticsGenerator:
                 # 获取所有需要的数据
                 scores_with_details = list(records.values(
                     'total_score',
-                    'district_name',  # 注意这里改为 district_name
+                    'district_name',
                     'math',
                     'chinese'
                 ))
 
-                # 使用 NumPy 计算排名分布
-                data = np.array([(
-                    float(r['total_score']),
-                    float(r['math']),
-                    float(r['chinese']),
-                    r['district_name']  # 注意这里改为 district_name
-                ) for r in scores_with_details], dtype=[
-                    ('total_score', 'f8'),
-                    ('math', 'f8'),
-                    ('chinese', 'f8'),
-                    ('district_name', 'U100')  # 区县名称字段
-                ])
-
-                # 按总分、数学、语文排序
-                sorted_indices = np.lexsort((data['chinese'], data['math'], data['total_score']))[::-1]
-                sorted_data = data[sorted_indices]
-
-                # 定义关键排名点
-                rank_points = {
-                    'top_10': 10,
-                    'top_50': 50,
-                    'top_100': 100,
-                    'top_200': 200,
-                    'top_500': 500,
-                    'top_1000': 1000
-                }
-
-                # 初始化区县排名统计
-                district_rank_counts = {}
-
-                # 计算排名
-                current_rank = 1
-                i = 0
-                while i < len(sorted_data):
-                    # 找到所有同分数据
-                    same_score_mask = (sorted_data['total_score'][i:] == sorted_data['total_score'][i]) & \
-                                      (sorted_data['math'][i:] == sorted_data['math'][i]) & \
-                                      (sorted_data['chinese'][i:] == sorted_data['chinese'][i])
-                    same_score_count = np.sum(same_score_mask)
-
-                    # 获取这组同分的区县
-                    districts = sorted_data['district_name'][i:i + same_score_count]
-
-                    # 更新每个区县在各个排名点的计数
-                    for district in districts:
-                        if current_rank <= max(rank_points.values()):
-                            if district not in district_rank_counts:
-                                district_rank_counts[district] = {key: 0 for key in rank_points}
-
-                            for rank_key, rank_threshold in rank_points.items():
-                                if current_rank <= rank_threshold:
-                                    district_rank_counts[district][rank_key] += 1
-
-                    # 更新索引和排名
-                    i += same_score_count
-                    current_rank += same_score_count
-
-                # 只保留有排名的区县
-                district_rank_counts = {
-                    district: ranks
-                    for district, ranks in district_rank_counts.items()
-                    if any(ranks.values())
-                }
+                # 使用已有方法计算排名分布
+                district_rank_counts = self._calculate_rank_distribution(scores_with_details, 'district_name')
 
                 # 使用 NumPy 计算基础统计数据
                 scores_array = np.array([float(r['total_score']) for r in scores_with_details])
@@ -311,19 +258,23 @@ class StatisticsGenerator:
                     q10_score = float(np.percentile(scores_array, 10))
 
                     # 生成区县分布
-                    district_stats = pd.DataFrame(scores_with_details).groupby('district_name').agg({
-                        'total_score': ['count', 'mean', 'max', 'min']
-                    }).reset_index()
+                    from collections import defaultdict
 
-                    district_distribution = {
-                        row['district_name']: {
-                            'student_count': int(row['total_score']['count']),
-                            'avg_score': float(row['total_score']['mean']),
-                            'max_score': float(row['total_score']['max']),
-                            'min_score': float(row['total_score']['min'])
+                    # 收集每个区县的成绩
+                    district_scores = defaultdict(list)
+                    for record in scores_with_details:
+                        district_scores[record['district_name']].append(float(record['total_score']))
+
+                    # 计算每个区县的统计数据
+                    district_distribution = {}
+                    for district_name, scores in district_scores.items():
+                        scores_array = np.array(scores)
+                        district_distribution[district_name] = {
+                            'student_count': len(scores),
+                            'avg_score': float(np.mean(scores_array)),
+                            'max_score': float(np.max(scores_array)),
+                            'min_score': float(np.min(scores_array))
                         }
-                        for _, row in district_stats.iterrows()
-                    }
 
                     # 保存市级统计数据
                     ExamLevelStatistics.objects.update_or_create(
@@ -340,11 +291,11 @@ class StatisticsGenerator:
                             'q80_score': q80_score,
                             'q20_score': q20_score,
                             'q10_score': q10_score,
-                            'excellent_rate': 20.0,  # 固定为前20%
-                            'pass_rate': 80.0,  # 固定为前80%
-                            'low_score_rate': 10.0,  # 固定为后10%
+                            'excellent_rate': 20.0,
+                            'pass_rate': 80.0,
+                            'low_score_rate': 10.0,
                             'rank_distribution': district_rank_counts,
-                            'school_distribution': district_distribution,  # 注意这里仍然使用 school_distribution 字段
+                            'school_distribution': district_distribution,
                             'threshold_stats': {
                                 'excellent': {'score': q80_score},
                                 'pass': {'score': q20_score},
@@ -575,26 +526,15 @@ class StatisticsGenerator:
             logger.error(f"计算学校分布失败: error={str(e)}")
             return {}
 
-    def _calculate_rank_distribution(self, records):
-        """使用 NumPy 计算排名分布"""
+    def _calculate_rank_distribution(self, scores_with_details, group_field='school_name'):
+        """计算排名分布
+        Args:
+            scores_with_details: 包含成绩数据的记录列表
+            group_field: 分组字段名称（默认为school_name）
+        Returns:
+            排名分布统计字典
+        """
         try:
-            # 将记录转换为 numpy 数组
-            data = np.array([(
-                float(r['total_score']),
-                float(r['math']),
-                float(r['chinese']),
-                r['school_name']
-            ) for r in records], dtype=[
-                ('total_score', 'f8'),
-                ('math', 'f8'),
-                ('chinese', 'f8'),
-                ('school_name', 'U100')  # 假设学校名称不超过100个字符
-            ])
-
-            # 按总分、数学、语文排序
-            sorted_indices = np.lexsort((data['chinese'], data['math'], data['total_score']))[::-1]
-            sorted_data = data[sorted_indices]
-
             # 定义关键排名点
             rank_points = {
                 'top_10': 10,
@@ -605,44 +545,71 @@ class StatisticsGenerator:
                 'top_1000': 1000
             }
 
-            # 初始化学校排名统计
-            school_rank_counts = {}
+            # 初始化分组排名统计
+            group_rank_counts = {}
+
+            # 按总分、数学、语文排序
+            sorted_records = sorted(
+                scores_with_details,
+                key=lambda x: (float(x['total_score']), float(x['math']), float(x['chinese'])),
+                reverse=True
+            )
 
             # 计算排名
             current_rank = 1
             i = 0
-            while i < len(sorted_data):
-                # 找到所有同分数据
-                same_score_mask = (sorted_data['total_score'][i:] == sorted_data['total_score'][i]) & \
-                                  (sorted_data['math'][i:] == sorted_data['math'][i]) & \
-                                  (sorted_data['chinese'][i:] == sorted_data['chinese'][i])
-                same_score_count = np.sum(same_score_mask)
+            while i < len(sorted_records):
+                current_record = sorted_records[i]
+                current_score = float(current_record['total_score'])
+                current_math = float(current_record['math'])
+                current_chinese = float(current_record['chinese'])
+                current_group = current_record[group_field]
 
-                # 获取这组同分的学校
-                schools = sorted_data['school_name'][i:i + same_score_count]
+                # 找到所有同分的记录
+                same_rank_count = 1
+                j = i + 1
+                while j < len(sorted_records):
+                    next_record = sorted_records[j]
+                    if (float(next_record['total_score']) == current_score and
+                            float(next_record['math']) == current_math and
+                            float(next_record['chinese']) == current_chinese):
+                        same_rank_count += 1
+                        j += 1
+                    else:
+                        break
 
-                # 更新每个学校在各个排名点的计数
-                for school in schools:
-                    if current_rank <= max(rank_points.values()):
-                        if school not in school_rank_counts:
-                            school_rank_counts[school] = {key: 0 for key in rank_points}
+                # 初始化当前组的排名统计
+                if current_group not in group_rank_counts:
+                    group_rank_counts[current_group] = {
+                        rank_key: 0 for rank_key in rank_points
+                    }
 
-                        for rank_key, rank_threshold in rank_points.items():
-                            if current_rank <= rank_threshold:
-                                school_rank_counts[school][rank_key] += 1
+                # 更新排名计数
+                for rank_key, rank_threshold in rank_points.items():
+                    if current_rank <= rank_threshold:
+                        group_rank_counts[current_group][rank_key] += 1
+
+                # 处理同分的其他记录
+                for k in range(i + 1, i + same_rank_count):
+                    group = sorted_records[k][group_field]
+                    if group not in group_rank_counts:
+                        group_rank_counts[group] = {
+                            rank_key: 0 for rank_key in rank_points
+                        }
+                    for rank_key, rank_threshold in rank_points.items():
+                        if current_rank <= rank_threshold:
+                            group_rank_counts[group][rank_key] += 1
 
                 # 更新索引和排名
-                i += same_score_count
-                current_rank += same_score_count
+                i += same_rank_count
+                current_rank += same_rank_count
 
-            # 只保留有排名的学校
-            school_rank_counts = {
-                school: ranks
-                for school, ranks in school_rank_counts.items()
+            # 只保留有排名的组
+            return {
+                group: ranks
+                for group, ranks in group_rank_counts.items()
                 if any(ranks.values())
             }
-
-            return school_rank_counts
 
         except Exception as e:
             logger.error(f"计算排名分布失败: {str(e)}")

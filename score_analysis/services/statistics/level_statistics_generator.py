@@ -4,7 +4,7 @@ import numpy as np
 from django.db.models import Q, Count, Avg, Max
 
 from score_analysis.models import BaseExamConfig, ScoreStudentBasic
-from score_analysis.models.statistics import ExamLevelStatistics, ExamLevelAnalysisTask, ExamLevelAnalysisConfig
+from score_analysis.models.statistics import ExamLevelAnalysisConfig
 import logging
 logger = logging.getLogger(__name__)
 
