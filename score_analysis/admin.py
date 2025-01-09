@@ -17,7 +17,8 @@ from django.shortcuts import redirect
 from .models.base import BaseExamConfig,BaseSubjectConfig
 from .services.ranking_service import RankingService
 from .models.source import ScoreStudentBasic
-from .services.statistics.level_statistics_generator import ExamLevelStatisticsGenerator
+from .services.statistics.level_statistics_generator import ExamLevelAnalysisGenerator
+from .services.statistics.statistics_generator import StatisticsGenerator
 from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
 import logging
@@ -554,14 +555,12 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
         """生成统计数据"""
         try:
             print(f"开始生成统计数据: exam_id={exam_id}")
-            service = BaseStatisticsService()
+            service = StatisticsGenerator()
 
             # 解析考试ID获取考试级别
             exam_parts = exam_id.split('-')
             if len(exam_parts) < 2:
                 raise ValueError(f"无效的考试ID格式: {exam_id}")
-
-            exam_level = exam_parts[1].upper()  # DIST 或 CITY
 
             # 删除旧的统计数据
             StatisticsExamIndicators.objects.filter(
@@ -569,39 +568,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
                 subject_id__isnull=True
             ).delete()
 
-            if exam_level == 'CITY':
-                # 市级考试需要生成市级和区县级统计
-                # 1. 生成市级统计
-                service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='city', request=request)
-                service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='city', request=request)
-                service.generate_all_statistics(exam_id=exam_id, select_type='未确定', level_type='city',request=request)
-
-                # 2. 生成区县级统计
-                service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='district',
-                                                request=request)
-                service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='district',
-                                                request=request)
-                service.generate_all_statistics(exam_id=exam_id, select_type='未确定', level_type='district',
-                                                request=request)
-
-                messages.success(request, f'考试 {exam_id} 的市级和区县级统计数据已生成')
-
-            elif exam_level == 'DIST':
-                # 区县考试只生成区县级统计
-                service.generate_all_statistics(exam_id=exam_id, select_type='理科', level_type='district',
-                                                request=request)
-                service.generate_all_statistics(exam_id=exam_id, select_type='文科', level_type='district',
-                                                request=request)
-                service.generate_all_statistics(exam_id=exam_id, select_type='未分科', level_type='district',
-                                                request=request)
-
-                messages.success(request, f'考试 {exam_id} 的区县级统计数据已生成')
-
-            else:
-                raise ValueError(f"未知的考试级别: {exam_level}")
-            return redirect('admin:score_analysis_statisticsexamindicators_view_statistics',
-                          exam_id=exam_id)
-
+            service.generate_exam_statistics(exam_id=exam_id)
 
         except Exception as e:
             print(f"生成统计失败: {str(e)}")
@@ -1683,12 +1650,22 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
         info = self.model._meta.app_label, self.model._meta.model_name
 
         return [
+            path('<str:exam_id>/basic_stats/',
+                 self.admin_site.admin_view(self.basic_stats_view),
+                 name='%s_%s_basic_stats' % info),
+          #  path('<str:exam_id>/generate_stats/',
+          #       self.admin_site.admin_view(self.generate_stats),
+          #       name='%s_%s_generate_stats' % info),
             path('',
                  self.admin_site.admin_view(self.changelist_view),
                  name='%s_%s_changelist' % info),
+            path('<str:exam_id>/reset/',
+                 self.admin_site.admin_view(self.reset_exam_configs),
+                 name='%s_%s_reset_exam' % info),
             path('<str:exam_id>/<str:select_type>/',
                  self.admin_site.admin_view(self.config_detail_view),
                  name='%s_%s_config' % info),
+
         ]
 
     def changelist_view(self, request, extra_context=None):
@@ -1800,3 +1777,71 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
                 '合格': 0.80,  # 前80%
                 '低分': 0.95  # 后5%
             }
+
+    def reset_exam_configs(self, request, exam_id):
+        """重置单个考试的所有配置"""
+        try:
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+
+            # 只重置配置表中的数据
+            for select_type in ['文科', '理科', '未分科']:
+                config, created = ExamLevelAnalysisConfig.objects.update_or_create(
+                    exam_id=exam_id,
+                    select_type=select_type,
+                    defaults={
+                        'name': f'{exam.exam_name}-{select_type}配置',
+                        'rank_ranges': {
+                            '市级': [10, 20, 50, 100, 200, 500],
+                            'default': [10, 50, 100]
+                        },
+                        'score_lines': self._get_default_score_lines(select_type)
+                    }
+                )
+
+            messages.success(request, f'考试 {exam.exam_name} 的配置已重置为默认值')
+
+        except BaseExamConfig.DoesNotExist:
+            messages.error(request, f'考试 {exam_id} 不存在')
+        except Exception as e:
+            messages.error(request, f'重置失败：{str(e)}')
+
+        # 修改重定向到列表页面
+        return HttpResponseRedirect(
+            reverse(
+                'admin:%s_%s_changelist' % (
+                    self.model._meta.app_label,
+                    self.model._meta.model_name
+                )
+            )
+        )
+    def basic_stats_view(self, request, exam_id):
+        """基础统计视图"""
+        try:
+
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            configs = ExamLevelAnalysisConfig.objects.filter(
+                exam_id=exam_id,
+                is_active=True
+            )
+
+            context = {
+                'title': f'{exam.exam_name} - 基础统计',
+                'opts': self.model._meta,
+                'app_label': self.model._meta.app_label,
+                'exam': exam,
+                'configs': configs,
+                'has_change_permission': self.has_change_permission(request),
+                'is_popup': False,
+                'media': self.media,
+            }
+
+            return TemplateResponse(
+                request,
+                'admin/exam_level/basic_stats.html',
+                context
+            )
+
+        except Exception as e:
+            messages.error(request, str(e))
+            return HttpResponseRedirect('../')
+

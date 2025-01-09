@@ -1,5 +1,7 @@
 from django.db import models
 from django.db.models import Avg, StdDev, Count, Min, Max, F
+
+from ..models.Tracking import TrackingRecord
 #from django.db.models.functions import Percentile
 from ..models.source import ScoreStudentBasic
 from ..models.statistics import StatisticsExamIndicators, ExamScoreLines,ScoreRankings
@@ -120,36 +122,90 @@ class BaseStatisticsService:
         return threshold_stats
 
     def calculate_rankings(self, exam_id, select_type, level_type):
-        """计算排名相关统计，从score_rankings表获取数据
+        """计算排名相关统计，直接使用tracking_records表中的排名信息
 
         Args:
             exam_id: 考试ID
             select_type: 文理科类型
-            level_type: 统计层级
+            level_type: 统计层级 (city/district/school)
 
         Returns:
             dict: 包含排名统计的字典
         """
-        # 从score_rankings获取排名数据
-        rankings = ScoreRankings.objects.filter(
+        # 根据统计层级选择对应的排名字段
+        rank_field = {
+            'city': 'city_rank',
+            'district': 'district_rank',
+            'school': 'school_rank'
+        }[level_type]
+
+        # 获取指定考试的所有记录，按选定的排名字段排序
+        records = TrackingRecord.objects.filter(
             exam_id=exam_id,
-            select_type=select_type,
-            level_type=level_type,
-            subject_id='total_score'  # 只统计总分
-        ).order_by('raw_score_rank')
+            select_type=select_type
+        ).order_by(rank_field)
 
         # 计算关键名次的分数
         ranking_stats = {}
-        total_students = rankings.count()
+        total_students = records.count()
 
-        # 计算特定名次的分数
-        key_ranks = [10, 50, 100, 200, 1250]
+        # 计算特定名次的分数线
+        key_ranks = [10, 50, 100, 200, 1250, 3000, 9600]
         for rank in key_ranks:
             if total_students >= rank:
-                score_at_rank = rankings[rank - 1].raw_score
-                ranking_stats[f'top_{rank}_score'] = score_at_rank
+                record = records.filter(**{rank_field + '__lte': rank}).order_by(
+                    '-' + rank_field
+                ).first()
+
+                if record:
+                    ranking_stats[f'top_{rank}_score'] = float(record.total_score)
+                    ranking_stats[f'top_{rank}_t_score'] = float(record.total_t_score)
+
+                    # 根据层级获取对应的T分
+                    t_score_field = {
+                        'city': 'city_t_score',
+                        'district': 'district_t_score',
+                        'school': 'school_t_score'
+                    }[level_type]
+
+                    level_t_score = getattr(record, t_score_field)
+                    if level_t_score:
+                        ranking_stats[f'top_{rank}_level_t_score'] = float(level_t_score)
+
+                    if record.percentile:
+                        ranking_stats[f'top_{rank}_percentile'] = float(record.percentile)
             else:
                 ranking_stats[f'top_{rank}_score'] = None
+                ranking_stats[f'top_{rank}_t_score'] = None
+                ranking_stats[f'top_{rank}_level_t_score'] = None
+                ranking_stats[f'top_{rank}_percentile'] = None
+
+        # 添加基础统计信息
+        if total_students > 0:
+            ranking_stats.update({
+                'total_students': total_students,
+                'max_score': float(records.aggregate(Max('total_score'))['total_score__max']),
+                'min_score': float(records.aggregate(Min('total_score'))['total_score__min']),
+                'mean_score': float(records.aggregate(Avg('total_score'))['total_score__avg']),
+                'max_t_score': float(records.aggregate(Max('total_t_score'))['total_t_score__max']),
+                'min_t_score': float(records.aggregate(Min('total_t_score'))['total_t_score__min']),
+                'mean_t_score': float(records.aggregate(Avg('total_t_score'))['total_t_score__avg'])
+            })
+
+            # 获取对应层级的T分统计
+            t_score_field = f'{level_type}_t_score'
+            t_score_stats = records.aggregate(
+                max_level_t=Max(t_score_field),
+                min_level_t=Min(t_score_field),
+                avg_level_t=Avg(t_score_field)
+            )
+
+            if t_score_stats['max_level_t']:
+                ranking_stats.update({
+                    f'max_{level_type}_t_score': float(t_score_stats['max_level_t']),
+                    f'min_{level_type}_t_score': float(t_score_stats['min_level_t']),
+                    f'mean_{level_type}_t_score': float(t_score_stats['avg_level_t'])
+                })
 
         return ranking_stats
 

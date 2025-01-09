@@ -243,14 +243,14 @@ class ScoreRankings(models.Model):
 
 
 class ExamLevelStatistics(models.Model):
-    """考试分层统计数据（市/区/校三级统计）"""
+    """考试分层统计数据"""
     LEVEL_CHOICES = [
         ('city', '市级'),
         ('district', '区县'),
         ('school', '学校')
     ]
 
-    stat_id = models.AutoField(primary_key=True)
+    indicator_id = models.AutoField(primary_key=True)
     exam_id = models.CharField('考试ID', max_length=50)
     select_type = models.CharField(
         '分科类型',
@@ -260,69 +260,96 @@ class ExamLevelStatistics(models.Model):
     level_type = models.CharField(
         '统计层级',
         max_length=10,
-        choices=LEVEL_CHOICES,
-        help_text='市级/区县/学校'
+        choices=LEVEL_CHOICES
     )
-    district_name = models.CharField('区县名称', max_length=50, null=True)
-    school_name = models.CharField('学校名称', max_length=100, null=True)
 
     # 基础统计指标
-    basic_stats = models.JSONField(
-        '基础统计指标',
-        help_text="""
-        {
-            'student_count': 考生人数,
-            'max_score': 最高分,
-            'min_score': 最低分,
-            'mean_score': 平均分,
-            'std_dev': 标准差
-        }
-        """
-    )
+    student_count = models.IntegerField('考生人数')
+    max_score = models.DecimalField('最高分', max_digits=5, decimal_places=2)
+    min_score = models.DecimalField('最低分', max_digits=5, decimal_places=2)
+    mean_score = models.DecimalField('平均分', max_digits=5, decimal_places=2)
+    median_score = models.DecimalField('中位数', max_digits=5, decimal_places=2)
+    std_dev = models.DecimalField('标准差', max_digits=5, decimal_places=2)
 
-    # 排名分布统计
-    ranking_stats = models.JSONField(
-        '排名分布统计',
-        help_text="""
-        {
-            'TOP10': {'学校A': 5, '学校B': 3...},
-            'TOP50': {'学校A': 15, '学校B': 12...},
-            ...
-        }
-        """
-    )
+    # 分位数统计
+    q80_score = models.DecimalField('80分位数', max_digits=5, decimal_places=2)
+    q20_score = models.DecimalField('20分位数', max_digits=5, decimal_places=2)
+    q10_score = models.DecimalField('10分位数', max_digits=5, decimal_places=2)
 
-    # 分数线统计
-    score_lines = models.JSONField(
-        '分数线统计',
-        help_text="""
-        {
-            'C9': {'line': 680, 'count': 50, 'rate': 5.2},
-            '985': {'line': 650, 'count': 100, 'rate': 10.5},
-            ...
-        }
-        """
-    )
+    # 达标率统计
+    excellent_rate = models.DecimalField('优秀率', max_digits=5, decimal_places=2)
+    pass_rate = models.DecimalField('及格率', max_digits=5, decimal_places=2)
+    low_score_rate = models.DecimalField('低分率', max_digits=5, decimal_places=2)
+
+    # JSON字段存储详细分布
+    rank_distribution = models.JSONField('排名分布', default=dict)
+    school_distribution = models.JSONField('学校分布', default=dict)
+    threshold_stats = models.JSONField('分数线统计', default=dict)
 
     create_time = models.DateTimeField('创建时间', auto_now_add=True)
-    update_time = models.DateTimeField('更新时间', auto_now=True)
 
     class Meta:
         db_table = 'exam_level_statistics'
-        unique_together = [
-            'exam_id', 'select_type', 'level_type',
-            'district_name', 'school_name'
-        ]
+        unique_together = ['exam_id', 'select_type', 'level_type']
         verbose_name = '考试分层统计'
         verbose_name_plural = verbose_name
 
     def __str__(self):
-        if self.level_type == 'city':
-            return f"{self.exam_id}-市级统计-{self.select_type}"
-        elif self.level_type == 'district':
-            return f"{self.exam_id}-{self.district_name}-{self.select_type}"
-        else:
-            return f"{self.exam_id}-{self.school_name}-{self.select_type}"
+        level_names = dict(self.LEVEL_CHOICES)
+        return f"{self.exam_id}-{level_names[self.level_type]}-{self.select_type}"
+
+    def save_ranking_stats(self, ranking_stats: dict):
+        """保存排名统计数据"""
+        self.student_count = ranking_stats['total_students']
+        self.max_score = ranking_stats['max_score']
+        self.min_score = ranking_stats['min_score']
+        self.mean_score = ranking_stats['mean_score']
+
+        # 保存分位数
+        self.q80_score = ranking_stats.get(f'top_{int(self.student_count * 0.2)}_score', 0)
+        self.q20_score = ranking_stats.get(f'top_{int(self.student_count * 0.8)}_score', 0)
+        self.q10_score = ranking_stats.get(f'top_{int(self.student_count * 0.9)}_score', 0)
+
+        # 计算中位数
+        median_rank = int(self.student_count * 0.5)
+        self.median_score = ranking_stats.get(f'top_{median_rank}_score', 0)
+
+        # 计算标准差 (使用80分位和20分位的差值除以2.5作为估计)
+        self.std_dev = (self.q80_score - self.q20_score) / 2.5
+
+        # 保存排名分布
+        self.rank_distribution = {
+            f'top_{rank}': {
+                'score': ranking_stats.get(f'top_{rank}_score'),
+                't_score': ranking_stats.get(f'top_{rank}_t_score'),
+                'percentile': ranking_stats.get(f'top_{rank}_percentile')
+            }
+            for rank in [10, 50, 100, 200, 1250, 3000, 9600]
+            if ranking_stats.get(f'top_{rank}_score')
+        }
+
+        # 保存阈值统计
+        self.threshold_stats = {
+            'excellent': {
+                'score': self.q80_score,
+                'rate': 20.0
+            },
+            'pass': {
+                'score': self.q20_score,
+                'rate': 80.0
+            },
+            'low': {
+                'score': self.q10_score,
+                'rate': 90.0
+            }
+        }
+
+        # 计算达标率
+        self.excellent_rate = 20.0  # 默认取前20%
+        self.pass_rate = 80.0  # 默认取前80%
+        self.low_score_rate = 10.0  # 默认取后10%
+
+        self.save()
 
 
 class ExamLevelAnalysisConfig(models.Model):

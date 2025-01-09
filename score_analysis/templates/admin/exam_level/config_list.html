@@ -18,6 +18,7 @@
                         <th scope="col">文科配置</th>
                         <th scope="col">理科配置</th>
                         <th scope="col">未分科配置</th>
+                        <th scope="col">操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -39,6 +40,17 @@
                             {% endwith %}
                         </td>
                         {% endfor %}
+                        <td>
+                            <a href="{% url opts|admin_urlname:'basic_stats' exam.exam_id %}"
+                               class="button stats-button">
+                                基础统计
+                            </a>
+                            <a href="{% url opts|admin_urlname:'reset_exam' exam.exam_id %}"
+                               class="button reset-button"
+                               onclick="return confirm('警告：这将重置该考试的所有配置到默认值。确定要继续吗？');">
+                                重置配置
+                            </a>
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -47,59 +59,15 @@
     </div>
 </div>
 
-<style>
-    .button.default {
-        display: inline-block;
-        padding: 6px 12px;
-        margin-bottom: 0;
-        font-size: 14px;
-        font-weight: 400;
-        line-height: 1.42857143;
-        text-align: center;
-        white-space: nowrap;
-        vertical-align: middle;
-        cursor: pointer;
-        background-image: none;
-        border: 1px solid transparent;
-        border-radius: 4px;
-        color: #fff;
-        background-color: #337ab7;
-        border-color: #2e6da4;
-        text-decoration: none;
-    }
 
-    .button.default:hover {
-        color: #fff;
-        background-color: #286090;
-        border-color: #204d74;
-    }
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+    <div class="{% if message.tags %}{{ message.tags }}{% endif %}">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
-    #result_list {
-        width: 100%;
-        border-spacing: 0;
-        border-collapse: collapse;
-    }
-
-    #result_list th {
-        background: #79aec8;
-        padding: 8px;
-        font-weight: 400;
-        font-size: 13px;
-        text-align: left;
-        color: #fff;
-    }
-
-    #result_list td {
-        padding: 8px;
-        border-bottom: 1px solid #eee;
-    }
-
-    .row1 {
-        background: #fff;
-    }
-
-    .row2 {
-        background: #f9f9f9;
-    }
-</style>
 {% endblock %}
