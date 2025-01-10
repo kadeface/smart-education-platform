@@ -40,6 +40,9 @@ urlpatterns = [
     path('indicators/basic/<str:module_type>/<str:exam_id>/',
          ExamOverviewView.as_view(),
          name='exam_overview'), #概述基础指标分析模块
+    path('exam/<str:exam_id>/statistics-preview/<str:module_type>/',
+             ExamOverviewView.as_view(),
+             name='statistics_preview'), #概述基础指标分析模块预览模块
 
     path('tracking/analysis/<str:module_type>/<str:exam_id>/',
          TrackingAnalysisView.as_view(),
@@ -60,6 +63,7 @@ urlpatterns = [
     path('tracking/warnings/<str:module_type>/<str:exam_id>/',
          WarningPredictionView.as_view(),
          name='warnings'),
+
 
  #   path('api/statistics/data/', StatisticsDataAPIView.as_view(), name='statistics-data'),
 

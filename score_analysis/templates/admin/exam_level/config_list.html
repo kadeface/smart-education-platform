@@ -33,10 +33,11 @@
                            class="button reset-button"
                            onclick="return confirm('确定要重置该考试的所有配置吗？')">重置配置</a>
                     </td>
-                    <td class="column-stats">
-                        <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_basic_stats' exam.exam_id %}"
-                           class="button stats-button">生成基础统计</a>
-                    </td>
+                        <td class="column-stats">
+                            <a href="{% url 'admin:score_analysis_statisticsexamindicators_generate_statistics' exam.exam_id %}"
+                               class="button stats-button"
+                               onclick="return confirm('确定要重新生成统计数据吗？')">生成统计</a>
+                        </td>
                 </tr>
                 {% endfor %}
             </tbody>

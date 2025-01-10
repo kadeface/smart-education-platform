@@ -569,7 +569,11 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             ).delete()
 
             service.generate_exam_statistics(exam_id=exam_id)
+        # 生成成功，添加成功消息
+            messages.success(request, f'考试 {exam_id} 统计数据生成成功')
 
+            # 重定向到预览页面
+            return redirect('score_analysis:statistics_preview', exam_id=exam_id,module_type='basic')
         except Exception as e:
             print(f"生成统计失败: {str(e)}")
             messages.error(request, f'考试 {exam_id} 统计数据生成失败: {str(e)}')
