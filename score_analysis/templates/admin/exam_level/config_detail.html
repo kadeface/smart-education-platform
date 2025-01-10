@@ -1,77 +1,173 @@
 {% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+{% load score_filters %}
+
+{% block extrastyle %}
+<link rel="stylesheet" type="text/css" href="{% static 'admin/css/forms.css' %}">
+<style>
+    .rank-ranges input {
+        width: 80px;
+        margin-right: 10px;
+    }
+    .score-config input {
+        width: 100px;
+    }
+    .form-row {
+        margin: 10px 0;
+    }
+    .help-text {
+        color: #666;
+        font-size: 12px;
+        margin-left: 10px;
+    }
+    .rank-ranges {
+        display: inline-block;
+        margin: 5px 0;
+    }
+    .add-rank, .remove-rank {
+        display: inline-block;
+        padding: 5px 10px;
+        margin: 0 5px;
+        background: #79aec8;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .remove-rank {
+        background: #ba2121;
+    }
+    .add-rank:hover {
+        background: #609ab6;
+    }
+    .remove-rank:hover {
+        background: #a41515;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="module">
-    <h2>{{ exam.exam_name }} - {{ config.select_type }}配置</h2>
-
+<div id="content-main">
     <form method="post">
         {% csrf_token %}
+        <fieldset class="module aligned">
+            <h2>{{ exam.exam_name }} - {{ config.select_type }}配置</h2>
 
-        <fieldset>
-            <legend>排名范围配置</legend>
-            <div id="rank-ranges">
-                {% for area, ranges in config.rank_ranges.items %}
-                <div class="rank-area">
-                    <h3>{{ area }}</h3>
-                    {% for range in ranges %}
-                    <input type="number" name="rank_ranges" value="{{ range }}">
-                    {% endfor %}
-                    <button type="button" class="add-range">添加</button>
+            <!-- 分数线配置部分 -->
+            <div class="form-row">
+                <h3>分数线配置</h3>
+                {% if is_divided %}
+                    <!-- 分科的情况：显示具体分数线配置 -->
+                    <div class="score-config">
+                        {% for type in score_types %}
+                        <div class="form-row">
+                            <label for="id_score_{{ type }}">{{ type }}分数线：</label>
+                            <input type="number"
+                                   id="id_score_{{ type }}"
+                                   name="score_value_{{ type }}"
+                                   value="{{ config.score_lines|get_item:type|default:'' }}"
+                                   step="0.5">
+                            <input type="hidden" name="score_type" value="{{ type }}">
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <!-- 未分科的情况：显示百分比配置 -->
+                    <div class="score-config">
+                        {% for type in score_types %}
+                        <div class="form-row">
+                            <label for="id_score_{{ type }}">{{ type }}比例（%）：</label>
+                            <input type="number"
+                                   id="id_score_{{ type }}"
+                                   name="score_value_{{ type }}"
+                                   value="{{ config.score_lines|get_item:type|multiply:100|default:'' }}"
+                                   min="0"
+                                   max="100"
+                                   step="0.1">
+                            <input type="hidden" name="score_type" value="{{ type }}">
+                            <span class="help-text">
+                                {% if type == '优秀' %}（如：20表示前20%为优秀）
+                                {% elif type == '合格' %}（如：80表示前80%为合格）
+                                {% elif type == '低分' %}（如：95表示后5%为低分）
+                                {% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- 排名范围配置部分 -->
+            <div class="form-row">
+                <h3>排名范围配置</h3>
+                {% for area in rank_areas %}
+                <div class="form-row">
+                    <input type="hidden" name="area_name" value="{{ area }}">
+                    <label>{{ area }}排名范围：</label>
+                    <div class="rank-ranges">
+                        {% with ranges=config.rank_ranges|get_item:area %}
+                        {% for rank in ranges %}
+                        <input type="number"
+                               name="rank_ranges_{{ area }}"
+                               value="{{ rank }}"
+                               min="1"
+                               class="rank-input">
+                        {% endfor %}
+                        {% endwith %}
+                        <button type="button" class="add-rank" data-area="{{ area }}" onclick="addRankInput(this)">添加</button>
+                        <button type="button" class="remove-rank" data-area="{{ area }}" onclick="removeRankInput(this)">删除</button>
+                    </div>
+                    <span class="help-text">（请按从小到大的顺序填写排名）</span>
                 </div>
                 {% endfor %}
-                <button type="button" class="add-area">添加区域</button>
+            </div>
+
+            <div class="submit-row">
+                <input type="submit" value="保存" class="default" name="_save">
+                <a href="../" class="button cancel-link">返回</a>
             </div>
         </fieldset>
-
-        <fieldset>
-            <legend>分数线配置</legend>
-            <div id="score-lines">
-                {% for type, score in config.score_lines.items %}
-                <div class="score-line">
-                    <input type="text" name="type" value="{{ type }}" readonly>
-                    {% if config.select_type == '未分科' %}
-                    <input type="number" name="ratio" value="{{ score }}"
-                           step="0.01" min="0" max="1">
-                    {% else %}
-                    <input type="number" name="score" value="{{ score }}">
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-        </fieldset>
-
-        <div class="submit-row">
-            <input type="submit" value="保存配置">
-        </div>
     </form>
 </div>
 
 <script>
-// 添加必要的JavaScript代码处理表单交互
-document.addEventListener('DOMContentLoaded', function() {
-    // 添加排名范围
-    document.querySelectorAll('.add-range').forEach(button => {
-        button.addEventListener('click', function() {
-            const area = this.closest('.rank-area');
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.name = 'rank_ranges';
-            area.insertBefore(input, this);
-        });
-    });
+function addRankInput(button) {
+    var container = button.closest('.rank-ranges');
+    var area = button.getAttribute('data-area');
 
-    // 添加区域
-    document.querySelector('.add-area').addEventListener('click', function() {
-        const areaDiv = document.createElement('div');
-        areaDiv.className = 'rank-area';
-        areaDiv.innerHTML = `
-            <h3>新区域</h3>
-            <input type="text" name="area_name" placeholder="区域名称">
-            <input type="number" name="rank_ranges">
-            <button type="button" class="add-range">添加</button>
-        `;
-        document.getElementById('rank-ranges').insertBefore(areaDiv, this);
-    });
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.name = 'rank_ranges_' + area;
+    input.min = '1';
+    input.className = 'rank-input';
+
+    button.parentNode.insertBefore(input, button);
+}
+
+function removeRankInput(button) {
+    var container = button.closest('.rank-ranges');
+    var inputs = container.querySelectorAll('input[type="number"]');
+    if (inputs.length > 1) {
+        inputs[inputs.length - 1].remove();
+    }
+}
+
+// 表单提交验证
+document.querySelector('form').addEventListener('submit', function(e) {
+    var containers = document.querySelectorAll('.rank-ranges');
+    for (var container of containers) {
+        var inputs = container.querySelectorAll('input[type="number"]');
+        var values = Array.from(inputs).map(input => parseInt(input.value));
+
+        for (var i = 1; i < values.length; i++) {
+            if (values[i] <= values[i-1]) {
+                var area = container.querySelector('input[name^="rank_ranges_"]').name.replace('rank_ranges_', '');
+                alert('请确保' + area + '的排名范围按从小到大的顺序填写！');
+                e.preventDefault();
+                return;
+            }
+        }
+    }
 });
 </script>
 {% endblock %}

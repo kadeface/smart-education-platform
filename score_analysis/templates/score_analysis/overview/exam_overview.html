@@ -1,0 +1,208 @@
+<!-- templates/score_analysis/overview/exam_overview.html -->
+
+{% extends 'score_analysis/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">考试概览</h2>
+
+    <!-- 全市总体情况 -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>理科总体情况</h5>
+                </div>
+                <div class="card-body">
+                    <p>总人数：{{ science.student_count }}人</p>
+                    <p>最高分：{{ science.max_score }}</p>
+                    <p>最低分：{{ science.min_score }}</p>
+                    <p>平均分：{{ science.mean_score }}</p>
+                    <p>中位数：{{ science.median_score }}</p>
+                    <p>标准差：{{ science.std_score }}</p>
+
+                    <!-- 分数线 -->
+                    <h6>分数线：</h6>
+                    <p>优秀线：{{ science.excellent_line }}</p>
+                    <p>及格线：{{ science.pass_line }}</p>
+                    <p>低分线：{{ science.low_line }}</p>
+
+                    <!-- 录取情况 -->
+                    <h6>录取情况：</h6>
+                    <ul>
+                        {% for level, data in science.admission_stats.items %}
+                        <li>
+                            {% if level == "C9" %}
+                                C9高校
+                            {% elif level == "985" %}
+                                985高校
+                            {% elif level == "211" %}
+                                211高校
+                            {% elif level == "专科" %}
+                                专科院校
+                            {% elif level == "本科" %}
+                                普通本科
+                            {% elif level == "特控" %}
+                                特殊类型
+                            {% else %}
+                                {{ level }}
+                            {% endif %}
+                            : {{ data.count }}人 ({{ data.rate }}%)
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <!-- TOP统计 -->
+                    <h6>各区TOP表现：</h6>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>区域</th>
+                                <th>TOP10</th>
+                                <th>TOP50</th>
+                                <th>TOP100</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for district, tops in science.top_stats.items %}
+                            <tr>
+                                <td>{{ district }}</td>
+                                <td>{{ tops.top_10 }}</td>
+                                <td>{{ tops.top_50 }}</td>
+                                <td>{{ tops.top_100 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文科部分与理科类似 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>文科总体情况</h5>
+                </div>
+                <div class="card-body">
+                    <!-- 基本统计 -->
+                    <p>总人数：{{ arts.student_count }}人</p>
+                    <p>最高分：{{ arts.max_score }}</p>
+                    <p>最低分：{{ arts.min_score }}</p>
+                    <p>平均分：{{ arts.mean_score }}</p>
+                    <p>中位数：{{ arts.median_score }}</p>
+                    <p>标准差：{{ arts.std_score }}</p>
+
+                    <!-- 分数线 -->
+                    <h6>分数线：</h6>
+                    <p>优秀线：{{ arts.excellent_line }}</p>
+                    <p>及格线：{{ arts.pass_line }}</p>
+                    <p>低分线：{{ arts.low_line }}</p>
+
+                    <!-- 录取情况 -->
+                    <h6>录取情况：</h6>
+                    <ul>
+                        {% for level, data in arts.admission_stats.items %}
+                        <li>
+                            {% if level == "C9" %}
+                                C9高校
+                            {% elif level == "985" %}
+                                985高校
+                            {% elif level == "211" %}
+                                211高校
+                            {% elif level == "专科" %}
+                                专科院校
+                            {% elif level == "本科" %}
+                                普通本科
+                            {% elif level == "特控" %}
+                                特殊类型
+                            {% else %}
+                                {{ level }}
+                            {% endif %}
+                            : {{ data.count }}人 ({{ data.rate }}%)
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    <!-- TOP统计 -->
+                    <h6>各区TOP表现：</h6>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>区域</th>
+                                <th>TOP10</th>
+                                <th>TOP50</th>
+                                <th>TOP100</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for district, tops in arts.top_stats.items %}
+                            <tr>
+                                <td>{{ district }}</td>
+                                <td>{{ tops.top_10 }}</td>
+                                <td>{{ tops.top_50 }}</td>
+                                <td>{{ tops.top_100 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 各区统计 -->
+    <h3 class="mb-3">各区统计</h3>
+    <div class="row">
+        {% for district in districts %}
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>{{ district.district_name }} - {{ district.select_type }}</h5>
+                </div>
+                <div class="card-body">
+                    <!-- 基本统计 -->
+                    <p>总人数：{{ district.student_count }}人</p>
+                    <p>最高分：{{ district.max_score }}</p>
+                    <p>平均分：{{ district.mean_score }}</p>
+                    <p>中位数：{{ district.median_score }}</p>
+                    <p>标准差：{{ district.std_score }}</p>
+
+                    <!-- 录取情况 -->
+                    <h6>录取情况：</h6>
+                    <ul>
+                        {% for level, data in district.admission_stats.items %}
+                        <li>{{ level }}: {{ data.count }}人 ({{ data.rate }}%)</li>
+                        {% endfor %}
+                    </ul>
+
+                    <!-- 学校统计 -->
+                    <h6>各校情况：</h6>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>学校</th>
+                                <th>人数</th>
+                                <th>平均分</th>
+                                <th>最高分</th>
+                                <th>最低分</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for school, data in district.school_stats.items %}
+                            <tr>
+                                <td>{{ school }}</td>
+                                <td>{{ data.student_count }}</td>
+                                <td>{{ data.avg_score|floatformat:2 }}</td>
+                                <td>{{ data.max_score|floatformat:2 }}</td>
+                                <td>{{ data.min_score|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,73 +1,134 @@
 {% extends "admin/base_site.html" %}
-{% load i18n admin_urls static admin_list score_analysis_tags %}
-
-{% block extrastyle %}
-  {{ block.super }}
-  <link rel="stylesheet" type="text/css" href="{% static "admin/css/changelists.css" %}">
-{% endblock %}
+{% load i18n admin_urls %}
 
 {% block content %}
 <div id="content-main">
-    <div class="module filtered" id="changelist">
-        <div class="results">
-            <table id="result_list">
-                <thead>
-                    <tr>
-                        <th scope="col">考试ID</th>
-                        <th scope="col">考试名称</th>
-                        <th scope="col">文科配置</th>
-                        <th scope="col">理科配置</th>
-                        <th scope="col">未分科配置</th>
-                        <th scope="col">操作</th>
-                    </tr>
-                </thead>
-                <tbody>
+    <div class="module" id="changelist">
+        <table id="result_list">
+            <thead>
+                <tr>
+                    <th class="column-exam_name">考试名称</th>
+                    <th class="column-semester">学期</th>
+                    <th class="column-actions">配置操作</th>
+                    <th class="column-stats">统计操作</th>
+                </tr>
+            </thead>
+            <tbody>
                 {% for exam in exams %}
-                    <tr class="{% cycle 'row1' 'row2' %}">
-                        <td>{{ exam.exam_id }}</td>
-                        <td>{{ exam.exam_name }}</td>
-                        {% for select_type in select_types %}
-                        <td>
-                            {% with config=config_map|dict_get:exam.exam_id|dict_get:select_type %}
-                            <a href="{% url opts|admin_urlname:'config' exam.exam_id select_type %}"
-                               class="button default">
-                                {% if config %}
-                                    查看配置
-                                {% else %}
-                                    创建配置
-                                {% endif %}
-                            </a>
-                            {% endwith %}
-                        </td>
-                        {% endfor %}
-                        <td>
-                            <a href="{% url opts|admin_urlname:'basic_stats' exam.exam_id %}"
-                               class="button stats-button">
-                                基础统计
-                            </a>
-                            <a href="{% url opts|admin_urlname:'reset_exam' exam.exam_id %}"
-                               class="button reset-button"
-                               onclick="return confirm('警告：这将重置该考试的所有配置到默认值。确定要继续吗？');">
-                                重置配置
-                            </a>
-                        </td>
-                    </tr>
+                <tr class="{% cycle 'row1' 'row2' %}">
+                    <td class="column-exam_name">{{ exam.exam_name }}</td>
+                    <td class="column-semester">{{ exam.semester }}</td>
+                    <td class="column-actions">
+                        {% if exam.semester in divided_semesters %}
+                            {% for type in science_arts_types %}
+                                <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_config_detail' exam.exam_id type %}"
+                                   class="button">{{ type }}配置</a>
+                            {% endfor %}
+                        {% else %}
+                            <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_config_detail' exam.exam_id general_type %}"
+                               class="button">未分科配置</a>
+                        {% endif %}
+
+                        <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_reset_exam' exam.exam_id %}"
+                           class="button reset-button"
+                           onclick="return confirm('确定要重置该考试的所有配置吗？')">重置配置</a>
+                    </td>
+                    <td class="column-stats">
+                        <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_basic_stats' exam.exam_id %}"
+                           class="button stats-button">生成基础统计</a>
+                    </td>
+                </tr>
                 {% endfor %}
-                </tbody>
-            </table>
-        </div>
+            </tbody>
+        </table>
     </div>
 </div>
 
+<style>
+    #result_list {
+        width: 100%;
+        border-spacing: 0;
+        border-collapse: separate;
+    }
+    th {
+        padding: 12px 15px;
+        background: #f8f8f8;
+        font-weight: bold;
+        text-align: center;  /* 表头文字居中 */
+        vertical-align: middle;  /* 垂直居中 */
+        font-size: 14px;  /* 可选：调整字体大小 */
+    }
+    .column-exam_name {
+        width: 20%;
+        min-width: 100px;
+         text-align: center;
+    }
 
-{% if messages %}
-<div class="messages">
-    {% for message in messages %}
-    <div class="{% if message.tags %}{{ message.tags }}{% endif %}">
-        {{ message }}
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
+    .column-semester {
+        width: 10%;
+        min-width: 100px;
+         text-align: center;
+    }
 
+    .column-actions {
+        width: 50%;
+        min-width: 200px;
+         text-align: center;
+    }
+
+    .column-stats {
+        width: 20%;
+        min-width: 150px;
+    }
+
+    .button {
+        display: inline-block;
+        padding: 6px 12px;
+        margin: 4px 8px;
+        background: #79aec8;
+        color: #fff;
+        border-radius: 4px;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .button:hover {
+        background: #609ab6;
+        color: #fff;
+    }
+
+    .reset-button {
+        background: #ba2121;
+    }
+
+    .reset-button:hover {
+        background: #a41515;
+    }
+
+    .stats-button {
+        background: #417690;
+    }
+
+    .stats-button:hover {
+        background: #305070;
+    }
+
+    td {
+        padding: 12px 15px;
+    }
+
+    th {
+        padding: 12px 15px;
+        background: #f8f8f8;
+        font-weight: bold;
+    }
+
+    tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+
+    tr:hover {
+        background-color: #f5f5f5;
+    }
+</style>
 {% endblock %}

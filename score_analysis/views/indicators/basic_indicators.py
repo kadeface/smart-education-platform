@@ -1,17 +1,27 @@
 # score_analysis/views/indicators/basic_indicators.py
 
 from django.shortcuts import render
-from score_analysis.services.indicators import IndicatorService
+
+from score_analysis.views.exam_over_view import ExamOverviewView
+
 
 
 def view_basic_indicators(request, module_type, exam_id):
     """查看基础指标统计"""
     try:
-        # 初始化请求
-        IndicatorService.init_request(request, module_type)
+        # 创建 ExamOverviewView 实例
+        view = ExamOverviewView()
 
-        # 获取统计数据
-        return IndicatorService.get_statistics(request, exam_id)
+        # 设置视图的必要属性
+        view.request = request
+        view.args = ()
+        view.kwargs = {'exam_id': exam_id}
+
+        # 获取上下文数据
+        context = view.get_context_data(exam_id=exam_id)
+
+        # 渲染模板
+        return render(request, view.template_name, context)
 
     except Exception as e:
         print(f"Error in view_basic_indicators: {str(e)}")

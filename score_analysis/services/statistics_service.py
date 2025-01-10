@@ -405,7 +405,7 @@ class StatisticsViewService:
 
             return render(
                 request,
-                'admin/score_analysis/statisticsexamindicators/generate_stats.html',
+                'admin/score_analysis/statisticsexamindicators/exam_overview_with_subjects.html',
                 context
             )
 
@@ -929,7 +929,7 @@ class StatisticsViewService:
             # 3. 渲染结果页面
             return render(
                 request,
-                'admin/score_analysis/statisticsexamindicators/generate_stats.html',
+                'admin/score_analysis/statisticsexamindicators/exam_overview_with_subjects.html',
                 context
             )
 

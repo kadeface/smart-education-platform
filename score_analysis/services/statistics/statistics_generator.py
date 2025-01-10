@@ -6,7 +6,8 @@ from django.db.models import Max, Min, Avg, Count
 
 from score_analysis.models import BaseExamConfig, ScoreStudentBasic, BaseSubjectConfig
 from score_analysis.models.Tracking import TrackingRecord
-from score_analysis.models.statistics import StatisticsExamIndicators, ExamScoreLines, ExamLevelStatistics
+from score_analysis.models.statistics import StatisticsExamIndicators, ExamScoreLines, ExamLevelStatistics, \
+    ExamLevelAnalysisConfig
 from collections import defaultdict
 import logging
 logger = logging.getLogger(__name__)
@@ -116,7 +117,9 @@ class StatisticsGenerator:
                     'total_score',
                     'school_name',
                     'math',
-                    'chinese'
+                    'chinese',
+                    'exam_id',
+                    'select_type'
                 ).order_by('-total_score'))
 
                 # 使用 NumPy 计算排名分布
@@ -135,7 +138,46 @@ class StatisticsGenerator:
                         'median_score': float(np.median(scores_array)),
                         'std_dev': float(np.std(scores_array)) if total_students > 1 else 0
                     }
+                    # 计算分位数
+                    q80_score = float(np.percentile(scores_array, 80))
+                    q20_score = float(np.percentile(scores_array, 20))
+                    q10_score = float(np.percentile(scores_array, 10))
+                    # 根据是否分科决定使用哪种阈值统计
+                    if is_division:
+                        # 使用配置的分数线
+                        threshold_stats = self._calculate_threshold_stats(records)
+                        if not threshold_stats:
+                            logger.warning(
+                                f"未找到分数线配置，使用分位数: exam_id={exam_id}, district={district}, select_type={select_type}")
+                            threshold_stats = {
+                                'excellent': {'score': q80_score},
+                                'pass': {'score': q20_score},
+                                'low': {'score': q10_score}
+                            }
+                    else:
+                        # 未分科使用分位数
+                        # 计算达线人数和比例
+                        excellent_count = len([s for s in scores_array if s >= q80_score])
+                        pass_count = len([s for s in scores_array if s >= q20_score])
+                        low_count = len([s for s in scores_array if s <= q10_score])
 
+                        threshold_stats = {
+                            'excellent': {
+                                'score': q80_score,
+                                'count': excellent_count,
+                                'rate': round(excellent_count * 100 / total_students, 2)
+                            },
+                            'pass': {
+                                'score': q20_score,
+                                'count': pass_count,
+                                'rate': round(pass_count * 100 / total_students, 2)
+                            },
+                            'low': {
+                                'score': q10_score,
+                                'count': low_count,
+                                'rate': round(low_count * 100 / total_students, 2)
+                            }
+                        }
                     # 计算分位数
                     q80_score = float(np.percentile(scores_array, 80))
                     q20_score = float(np.percentile(scores_array, 20))
@@ -181,12 +223,9 @@ class StatisticsGenerator:
                             'low_score_rate': 10.0,
                             'rank_distribution': school_rank_counts,
                             'school_distribution': school_distribution,
-                            'threshold_stats': {
-                                'excellent': {'score': q80_score},
-                                'pass': {'score': q20_score},
-                                'low': {'score': q10_score}
+                            'threshold_stats': threshold_stats
                             }
-                        }
+
                     )
 
                     logger.info(
@@ -232,7 +271,9 @@ class StatisticsGenerator:
                     'total_score',
                     'district_name',
                     'math',
-                    'chinese'
+                    'chinese',
+                    'exam_id',
+                    'select_type'
                 ))
 
                 # 使用已有方法计算排名分布
@@ -256,7 +297,24 @@ class StatisticsGenerator:
                     q80_score = float(np.percentile(scores_array, 80))
                     q20_score = float(np.percentile(scores_array, 20))
                     q10_score = float(np.percentile(scores_array, 10))
-
+                    # 根据是否分科决定使用哪种阈值统计
+                    if is_division:
+                        # 使用配置的分数线
+                        threshold_stats = self._calculate_threshold_stats(records)
+                        if not threshold_stats:
+                            logger.warning(f"未找到分数线配置，使用分位数: exam_id={exam_id}, select_type={select_type}")
+                            threshold_stats = {
+                                'excellent': {'score': q80_score},
+                                'pass': {'score': q20_score},
+                                'low': {'score': q10_score}
+                            }
+                    else:
+                        # 未分科使用分位数
+                        threshold_stats = {
+                            'excellent': {'score': q80_score},
+                            'pass': {'score': q20_score},
+                            'low': {'score': q10_score}
+                        }
                     # 生成区县分布
                     from collections import defaultdict
 
@@ -535,15 +593,52 @@ class StatisticsGenerator:
             排名分布统计字典
         """
         try:
-            # 定义关键排名点
-            rank_points = {
-                'top_10': 10,
-                'top_50': 50,
-                'top_100': 100,
-                'top_200': 200,
-                'top_500': 500,
-                'top_1000': 1000
-            }
+            if not scores_with_details:
+                logger.warning("没有成绩数据")
+                return {}
+
+            exam_id = scores_with_details[0]['exam_id']
+            select_type = scores_with_details[0]['select_type']
+
+            # 获取对应科目类型的排名配置
+            config = ExamLevelAnalysisConfig.objects.filter(
+                exam_id=exam_id,
+                select_type=select_type,  # 根据科目类型筛选
+                is_active=True
+            ).first()
+
+            if not config:
+                logger.warning(f"未找到排名配置: exam_id={exam_id}, select_type={select_type}, 使用默认配置")
+                rank_points = {
+                    'top_10': 10,
+                    'top_50': 50,
+                    'top_100': 100,
+                    'top_200': 200,
+                    'top_500': 400,
+                    'top_1000': 1200,
+                    'top_3000': 3000,
+                    'top_9600': 9600
+                }
+            else:
+                # 解析配置的排名点
+                rank_ranges = config.rank_ranges
+                if isinstance(rank_ranges, dict) and "市级" in rank_ranges:
+                    rank_points = rank_ranges["市级"]
+                else:
+                    rank_points = rank_ranges if isinstance(rank_ranges, list) else [10, 50, 100, 200, 500, 1000]
+
+                if not rank_points:
+                    logger.warning("配置的排名点无效，使用默认配置")
+                    rank_points = {
+                        'top_10': 10,
+                        'top_50': 50,
+                        'top_100': 100,
+                        'top_200': 200,
+                        'top_500': 500,
+                        'top_1000': 1000
+                    }
+
+            logger.info(f"使用的排名点配置: {rank_points}")
 
             # 初始化分组排名统计
             group_rank_counts = {}
@@ -554,7 +649,8 @@ class StatisticsGenerator:
                 key=lambda x: (float(x['total_score']), float(x['math']), float(x['chinese'])),
                 reverse=True
             )
-
+            # 修改排名点的格式
+            rank_points_dict = {f'top_{n}': n for n in rank_points}
             # 计算排名
             current_rank = 1
             i = 0
@@ -581,12 +677,12 @@ class StatisticsGenerator:
                 # 初始化当前组的排名统计
                 if current_group not in group_rank_counts:
                     group_rank_counts[current_group] = {
-                        rank_key: 0 for rank_key in rank_points
+                        rank_key: 0 for rank_key in rank_points_dict
                     }
 
                 # 更新排名计数
-                for rank_key, rank_threshold in rank_points.items():
-                    if current_rank <= rank_threshold:
+                for rank_key, rank_threshold in rank_points_dict.items():
+                    if int(current_rank) <= int(rank_threshold):
                         group_rank_counts[current_group][rank_key] += 1
 
                 # 处理同分的其他记录
@@ -594,9 +690,9 @@ class StatisticsGenerator:
                     group = sorted_records[k][group_field]
                     if group not in group_rank_counts:
                         group_rank_counts[group] = {
-                            rank_key: 0 for rank_key in rank_points
+                            rank_key: 0 for rank_key in rank_points_dict
                         }
-                    for rank_key, rank_threshold in rank_points.items():
+                    for rank_key, rank_threshold in rank_points_dict.items():
                         if current_rank <= rank_threshold:
                             group_rank_counts[group][rank_key] += 1
 
@@ -615,48 +711,87 @@ class StatisticsGenerator:
             logger.error(f"计算排名分布失败: {str(e)}")
             logger.exception(e)
             raise
+
     def _calculate_threshold_stats(self, scores):
-        """计算分数线达线情况
-        Args:
-            scores: QuerySet of ScoreStudentBasic
-        Returns:
-            dict: {line_type: {line, count, rate}}
-        """
+        """计算分数线达线情况"""
         try:
-            # 获取分数线
+            if not scores.exists():
+                logger.warning("没有成绩数据")
+                return {}
+
             exam_id = scores.first().exam_id
             select_type = scores.first().select_type
 
-            score_lines = ExamScoreLines.objects.filter(
+            # 从配置表获取分数线配置
+            config = ExamLevelAnalysisConfig.objects.filter(
                 exam_id=exam_id,
-                select_type=select_type
-            )
+                select_type=select_type,
+                is_active=True
+            ).first()
 
-            if not score_lines.exists():
+            if not config:
+                logger.warning(f"未找到分数线配置: exam_id={exam_id}, select_type={select_type}")
                 return {}
 
-            # 计算达线统计
-            stats = {}
-            total_count = scores.filter(total_score__gt=0).count()
+            # 解析分数线配置
+            score_lines = config.score_lines
+            if select_type in ['文科', '理科']:
+                # 分科考试使用固定分数线
+                stats = {}
+                total_count = scores.filter(total_score__gt=0).count()
 
-            for line in score_lines:
-                above_count = scores.filter(
-                    total_score__gt=0,
-                    total_score__gte=line.score
-                ).count()
+                for line_type, line_score in score_lines.items():
+                    above_count = scores.filter(
+                        total_score__gt=0,
+                        total_score__gte=line_score
+                    ).count()
 
-                stats[line.line_type] = {
-                    'line': float(line.score),
-                    'count': above_count,
-                    'rate': round(above_count * 100 / total_count, 2) if total_count > 0 else 0
-                }
+                    stats[line_type] = {
+                        'score': float(line_score),
+                        'count': above_count,
+                        'rate': round(above_count * 100 / total_count, 2) if total_count > 0 else 0
+                    }
+            else:
+                # 未分科使用分位数
+                scores_array = np.array([float(s.total_score) for s in scores.filter(total_score__gt=0)])
+                total_count = len(scores_array)
 
+                if total_count > 0:
+                    # 计算分位数
+                    q80_score = float(np.percentile(scores_array, 80))
+                    q20_score = float(np.percentile(scores_array, 20))
+                    q10_score = float(np.percentile(scores_array, 10))
+
+                    # 计算达线人数
+                    excellent_count = len(scores_array[scores_array >= q80_score])
+                    pass_count = len(scores_array[scores_array >= q20_score])
+                    low_count = len(scores_array[scores_array <= q10_score])
+
+                    stats = {
+                        'excellent': {
+                            'score': q80_score,
+                            'count': excellent_count,
+                            'rate': round(excellent_count * 100 / total_count, 2)
+                        },
+                        'pass': {
+                            'score': q20_score,
+                            'count': pass_count,
+                            'rate': round(pass_count * 100 / total_count, 2)
+                        },
+                        'low': {
+                            'score': q10_score,
+                            'count': low_count,
+                            'rate': round(low_count * 100 / total_count, 2)
+                        }
+                    }
+
+            logger.info(f"计算的分数线统计: {stats}")
             return stats
 
         except Exception as e:
             logger.error(f"计算分数线统计失败: error={str(e)}")
+            logger.exception(e)
             return {}
-
     def _calculate_group_distribution(self, scores_with_details, group_field='school_name'):
         """计算分组分布统计（学校或区县）
         Args:

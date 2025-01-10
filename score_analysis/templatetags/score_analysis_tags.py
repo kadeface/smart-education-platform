@@ -55,3 +55,4 @@ def get_attr(obj, attr):
 def dict_get(dictionary, key):
     """获取字典值的模板过滤器"""
     return dictionary.get(key, {})
+

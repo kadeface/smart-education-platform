@@ -350,7 +350,33 @@ class ExamLevelStatistics(models.Model):
         self.low_score_rate = 10.0  # 默认取后10%
 
         self.save()
+    def to_dict(self):
+        """将统计数据转换为字典格式"""
+        return {
+            'student_count': self.student_count,
+            'max_score': self.max_score,
+            'min_score': self.min_score,
+            'mean_score': self.mean_score,
+            'median_score': self.median_score,
+            'std_dev': self.std_dev,
+            'q80_score': self.q80_score,
+            'q20_score': self.q20_score,
+            'q10_score': self.q10_score,
+            'threshold_stats': self.threshold_stats,
+            'rank_distribution': self.rank_distribution,
+            'school_distribution': self.school_distribution,
+            'chinese_mean': self.chinese_mean,
+            'math_mean': self.math_mean,
+            'english_mean': self.english_mean,
+            # 根据科目类型添加不同的字段
+            'physics_mean': self.physics_mean if hasattr(self, 'physics_mean') else None,
+            'chemistry_mean': self.chemistry_mean if hasattr(self, 'chemistry_mean') else None,
+            'biology_mean': self.biology_mean if hasattr(self, 'biology_mean') else None,
+            'politics_mean': self.politics_mean if hasattr(self, 'politics_mean') else None,
+            'history_mean': self.history_mean if hasattr(self, 'history_mean') else None,
+            'geography_mean': self.geography_mean if hasattr(self, 'geography_mean') else None,
 
+        }
 
 class ExamLevelAnalysisConfig(models.Model):
     """考试分层分析配置

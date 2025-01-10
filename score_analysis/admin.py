@@ -679,7 +679,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
 
             return render(
                 request,
-                'admin/score_analysis/statisticsexamindicators/generate_stats.html',
+                'admin/score_analysis/statisticsexamindicators/exam_overview_with_subjects.html',
                 context
             )
 
@@ -1229,7 +1229,7 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
             # 3. 渲染结果页面
             return render(
                 request,
-                'admin/score_analysis/statisticsexamindicators/generate_stats.html',
+                'admin/score_analysis/statisticsexamindicators/exam_overview_with_subjects.html',
                 context
             )
 
@@ -1639,10 +1639,19 @@ class TrackingAdmin(admin.ModelAdmin):
 
 @admin.register(ExamLevelAnalysisConfig)
 class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
-    """考试分层分析配置管理"""
-
+    """设置考试线和排名统计"""
+    SCIENCE_ARTS_TYPES = ['文科', '理科']
+    GENERAL_TYPE = '不确定'
+    DIVIDED_SEMESTERS = ['高一下', '高二上','高二下', '高三上', '高三下']  # 需要分科的学期
     change_list_template = 'admin/exam_level/config_list.html'
-
+    change_form_template = 'admin/exam_level/config_detail.html'
+    class Media:
+        js = (
+            'admin/js/jquery.min.js',  # 确保 jQuery 加载
+            'admin/js/jquery.init.js',
+            'admin/js/core.js',
+            'admin/js/config.js',  # 我们的自定义 JS
+        )
     def get_urls(self):
         """自定义URL模式"""
         from django.urls import path
@@ -1653,9 +1662,9 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
             path('<str:exam_id>/basic_stats/',
                  self.admin_site.admin_view(self.basic_stats_view),
                  name='%s_%s_basic_stats' % info),
-          #  path('<str:exam_id>/generate_stats/',
-          #       self.admin_site.admin_view(self.generate_stats),
-          #       name='%s_%s_generate_stats' % info),
+            path('<str:exam_id>/',
+                 self.admin_site.admin_view(self.exam_config_list),
+                 name='%s_%s_exam_configs' % info),
             path('',
                  self.admin_site.admin_view(self.changelist_view),
                  name='%s_%s_changelist' % info),
@@ -1664,9 +1673,50 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
                  name='%s_%s_reset_exam' % info),
             path('<str:exam_id>/<str:select_type>/',
                  self.admin_site.admin_view(self.config_detail_view),
-                 name='%s_%s_config' % info),
+                 name='%s_%s_config_detail' % info),
+            path('<str:exam_id>/',
+                 self.admin_site.admin_view(self.config_detail_view),
+                 name='%s_%s_save_config' % info),
 
         ]
+
+    def exam_config_list(self, request, exam_id):
+        """显示单个考试的所有配置"""
+        try:
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+
+            context = {
+                'title': f'{exam.exam_name}配置',
+                'opts': self.model._meta,
+                'app_label': self.model._meta.app_label,
+                'exam': exam,
+                'has_change_permission': self.has_change_permission(request),
+                'is_popup': False,
+                'media': self.media,
+            }
+
+            if exam.semester in self.DIVIDED_SEMESTERS:
+                context['select_types'] = self.SCIENCE_ARTS_TYPES
+            else:
+                context['select_types'] = [self.GENERAL_TYPE]
+
+            return TemplateResponse(
+                request,
+                'admin/exam_level/exam_config_list.html',
+                context
+            )
+
+        except BaseExamConfig.DoesNotExist:
+            messages.error(request, f'考试 {exam_id} 不存在')
+            return HttpResponseRedirect('../')
+    def _validate_select_type(self, exam, select_type):
+        """验证分科类型是否合法"""
+        if exam.semester in self.DIVIDED_SEMESTERS:
+            # 需要分科的学期，只能选择文科或理科
+            return select_type in self.SCIENCE_ARTS_TYPES
+        else:
+            # 不分科的学期，只能选择未分科
+            return select_type == self.GENERAL_TYPE
 
     def changelist_view(self, request, extra_context=None):
         """配置列表视图"""
@@ -1675,7 +1725,10 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
             opts=self.model._meta,
             app_label=self.model._meta.app_label,
             exams=BaseExamConfig.objects.all().order_by('-exam_id'),
-            select_types=['文科', '理科', '未分科'],
+            # 添加这些上下文变量
+            divided_semesters=self.DIVIDED_SEMESTERS,  # ['高一下', '高二', '高三']
+            science_arts_types=self.SCIENCE_ARTS_TYPES,  # ['文科', '理科']
+            general_type=self.GENERAL_TYPE,  # '未分科'
             has_change_permission=self.has_change_permission(request),
             is_popup=False,
             cl=None,
@@ -1700,6 +1753,26 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
         """配置详情视图"""
         try:
             exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            # 如果没有指定 select_type，根据学期自动选择
+            if not select_type:
+                if exam.semester in self.DIVIDED_SEMESTERS:
+                    # 对于需要分科的学期，默认显示文科配置
+                    select_type = self.SCIENCE_ARTS_TYPES[0]  # '文科'
+                else:
+                    # 对于不分科的学期，显示未分科配置
+                    select_type = self.GENERAL_TYPE  # '未分科'
+
+                # 重定向到完整的 URL
+                return HttpResponseRedirect(
+                    reverse(
+                        'admin:%s_%s_config_detail' % (
+                            self.model._meta.app_label,
+                            self.model._meta.model_name
+                        ),
+                        args=[exam_id, select_type]
+                    )
+                )
+
             config, created = ExamLevelAnalysisConfig.objects.get_or_create(
                 exam_id=exam_id,
                 select_type=select_type,
@@ -1721,19 +1794,31 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
                         ranges = request.POST.getlist(f'rank_ranges_{area}')
                         rank_ranges[area] = [int(r) for r in ranges if r]
 
-                    score_lines = {}
-                    for type_ in request.POST.getlist('score_type'):
-                        value = request.POST.get(f'score_value_{type_}')
-                        if value:
-                            score_lines[type_] = float(value)
+                    # 根据分科类型处理不同的配置
+                    if exam.semester in self.DIVIDED_SEMESTERS:
+                        score_lines = {}
+                        for type_ in request.POST.getlist('score_type'):
+                            value = request.POST.get(f'score_value_{type_}')
+                            if value:
+                                score_lines[type_] = float(value)
+                        config.score_lines = score_lines
+                    else:
+                        # 未分科的情况下处理百分比配置
+                        score_lines = {}
+                        for type_ in ['优秀', '合格', '低分']:
+                            value = request.POST.get(f'score_value_{type_}')
+                            if value:
+                                score_lines[type_] = float(value) / 100  # 转换为小数
+                        config.score_lines = score_lines
 
                     config.rank_ranges = rank_ranges
-                    config.score_lines = score_lines
                     config.save()
 
                     messages.success(request, '配置已更新')
                     return HttpResponseRedirect('../')
 
+                except ValueError as e:
+                    messages.error(request, f'数值格式错误：{str(e)}')
                 except Exception as e:
                     messages.error(request, f'更新失败：{str(e)}')
 
@@ -1743,11 +1828,18 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
                 'app_label': self.model._meta.app_label,
                 'exam': exam,
                 'config': config,
+                'is_divided': exam.semester in self.DIVIDED_SEMESTERS,  # 是否分科
                 'has_change_permission': self.has_change_permission(request),
                 'is_popup': False,
                 'media': self.media,
                 'has_add_permission': self.has_add_permission(request),
                 'has_delete_permission': self.has_delete_permission(request),
+                # 添加额外的上下文数据
+                'score_types': {
+                    True: ['C9', '985', '211', '特控', '本科', '专科'],  # 分科的分数线类型
+                    False: ['优秀', '合格', '低分']  # 未分科的分数线类型
+                }[exam.semester in self.DIVIDED_SEMESTERS],
+                'rank_areas': ['市级', 'default'],  # 排名区域
             }
 
             return TemplateResponse(
@@ -1756,6 +1848,9 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
                 context
             )
 
+        except BaseExamConfig.DoesNotExist:
+            messages.error(request, f'考试 {exam_id} 不存在')
+            return HttpResponseRedirect('../')
         except Exception as e:
             messages.error(request, str(e))
             return HttpResponseRedirect('../')
@@ -1765,11 +1860,11 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
         if select_type in ['文科', '理科']:
             return {
                 'C9': 680,
-                '985': 650,
-                '211': 620,
-                '特控': 600,
-                '本科': 550,
-                '专科': 450
+                '985': 600,
+                '211': 580,
+                '特控': 530,
+                '本科': 420,
+                '专科': 270
             }
         else:
             return {
@@ -1780,32 +1875,57 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
 
     def reset_exam_configs(self, request, exam_id):
         """重置单个考试的所有配置"""
+        from django.db import transaction
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         try:
-            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            with transaction.atomic():  # 添加事务处理
+                exam = BaseExamConfig.objects.select_for_update().get(exam_id=exam_id)  # 添加行锁
 
-            # 只重置配置表中的数据
-            for select_type in ['文科', '理科', '未分科']:
-                config, created = ExamLevelAnalysisConfig.objects.update_or_create(
-                    exam_id=exam_id,
-                    select_type=select_type,
-                    defaults={
-                        'name': f'{exam.exam_name}-{select_type}配置',
-                        'rank_ranges': {
-                            '市级': [10, 20, 50, 100, 200, 500],
-                            'default': [10, 50, 100]
-                        },
-                        'score_lines': self._get_default_score_lines(select_type)
-                    }
-                )
+                # 根据学期确定需要重置的分科类型
+                if exam.semester in self.DIVIDED_SEMESTERS:
+                    select_types = self.SCIENCE_ARTS_TYPES  # 文科、理科
+                else:
+                    select_types = [self.GENERAL_TYPE]  # 未分科
 
-            messages.success(request, f'考试 {exam.exam_name} 的配置已重置为默认值')
+                # 只重置配置表中的数据
+                for select_type in select_types:
+                    try:
+                        config, created = ExamLevelAnalysisConfig.objects.update_or_create(
+                            exam_id=exam_id,
+                            select_type=select_type,
+                            defaults={
+                                'name': f'{exam.exam_name}-{select_type}配置',
+                                'rank_ranges': {
+                                    '市级': [10, 50, 100, 200, 500, 1200, 3000, 9600],
+                                    'default': [10, 50, 100, 400, 1250]
+                                },
+                                'score_lines': self._get_default_score_lines(select_type)
+                            }
+                        )
+                        logger.info(f'已重置配置: {exam.exam_name}-{select_type}')
+                    except Exception as e:
+                        logger.error(f'重置{select_type}配置失败: {str(e)}')
+                        raise
+
+                # 删除不需要的配置
+                ExamLevelAnalysisConfig.objects.filter(
+                    exam_id=exam_id
+                ).exclude(
+                    select_type__in=select_types
+                ).delete()
+
+                messages.success(request, f'考试 {exam.exam_name} 的配置已重置为默认值')
 
         except BaseExamConfig.DoesNotExist:
+            logger.error(f'考试不存在: {exam_id}')
             messages.error(request, f'考试 {exam_id} 不存在')
         except Exception as e:
+            logger.error(f'重置考试配置失败: {str(e)}')
             messages.error(request, f'重置失败：{str(e)}')
 
-        # 修改重定向到列表页面
         return HttpResponseRedirect(
             reverse(
                 'admin:%s_%s_changelist' % (

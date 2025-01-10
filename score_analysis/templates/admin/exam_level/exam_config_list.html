@@ -1,0 +1,41 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ exam.exam_name }} 配置</h1>
+
+    <div class="module">
+        {% for type in select_types %}
+        <div class="config-item">
+            <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_config_detail' exam.exam_id type %}"
+               class="button">
+                {{ type }}配置
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="submit-row">
+        <a href="{% url 'admin:score_analysis_examlevelanalysisconfig_changelist' %}"
+           class="button cancel-link">返回列表</a>
+    </div>
+</div>
+
+<style>
+    .config-item {
+        margin: 10px 0;
+    }
+    .button {
+        display: inline-block;
+        padding: 8px 15px;
+        background: #79aec8;
+        color: #fff;
+        border-radius: 4px;
+        text-decoration: none;
+    }
+    .button:hover {
+        background: #609ab6;
+    }
+</style>
+{% endblock %}

@@ -1,7 +1,5 @@
-{% extends "score_analysis/base_site.html" %}
-{% load i18n static %}
-
-
+{% extends "score_analysis/base.html" %}
+{% load  static %}
 {# 在头部添加样式引用 #}
 {% block extrastyle %}
     {{ block.super }}
@@ -9,49 +7,57 @@
 {% endblock %}
 {% block content %}
 <!-- 综述信息部分 -->
-<div class="stats-summary">
+
     <!-- 理科综述 -->
     <div class="summary-section">
         <h3>理科综述</h3>
-        <div class="summary-text">
-            本次考试，总计有<span id="science_school_count">-</span>所学校，参考总人数<span id="science_student_count">-</span>人。
-            均分为<span id="science_mean_score">-</span>分，最高分为<span id="science_max_score">-</span>分，
-            归属于<span id="science_top_school">-</span>。
-            清北线模拟上线（<span id="science_qb_line">-</span>分）人数<span id="science_qb_count">-</span>人
-            （<span id="science_qb_rate">-</span>%）
-            985线模拟上线（<span id="science_985_line">-</span>分）人数<span id="science_985_count">-</span>人
-            （<span id="science_985_rate">-</span>%）
-            211线模拟上线（<span id="science_211_line">-</span>分）人数<span id="science_211_count">-</span>人
-            （<span id="science_211_rate">-</span>%）
-            特控线模拟上线（<span id="science_tk_line">-</span>分）人数<span id="science_tk_count">-</span>人
-            （<span id="science_tk_rate">-</span>%）
-            本科线模拟上线（<span id="science_bk_line">-</span>分）人数<span id="science_bk_count">-</span>人
-            （<span id="science_bk_rate">-</span>%）
-            专科线模拟上线（<span id="science_zk_line">-</span>分）人数<span id="science_zk_count">-</span>人
-            （<span id="science_zk_rate">-</span>%）
-        </div>
+        {% if science %}
+            <div class="summary-text">
+                本次考试，总计有<span>{{ science.school_count }}</span>所学校，
+                参考总人数<span>{{ science.student_count }}</span>人。
+                均分为<span>{{ science.mean_score|floatformat:2 }}</span>分，
+                最高分为<span>{{ science.max_score|floatformat:2 }}</span>分，
+                归属于<span>{{ science.top_school }}</span>。
+
+                {% if science.threshold_stats %}
+                    {% for name, stats in science.threshold_stats.items %}
+                        <div class="threshold-item">
+                            {{ name }}线模拟上线（<span>{{ stats.score|floatformat:2 }}</span>分）
+                            人数<span>{{ stats.count }}</span>人
+                            （<span>{{ stats.rate|floatformat:2 }}</span>%）
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="alert alert-warning">暂无理科数据</div>
+        {% endif %}
     </div>
 
     <!-- 文科综述 -->
     <div class="summary-section">
         <h3>文科综述</h3>
-        <div class="summary-text">
-            本次考试，总计有<span id="arts_school_count">-</span>所学校，参考总人数<span id="arts_student_count">-</span>人。
-            均分为<span id="arts_mean_score">-</span>分，最高分为<span id="arts_max_score">-</span>分，
-            归属于<span id="arts_top_school">-</span>。
-            清北线模拟上线（<span id="arts_qb_line">-</span>分）人数<span id="arts_qb_count">-</span>人
-            （<span id="arts_qb_rate">-</span>%）
-            985线模拟上线（<span id="arts_985_line">-</span>分）人数<span id="arts_985_count">-</span>人
-            （<span id="arts_985_rate">-</span>%）
-            211线模拟上线（<span id="arts_211_line">-</span>分）人数<span id="arts_211_count">-</span>人
-            （<span id="arts_211_rate">-</span>%）
-            特控线模拟上线（<span id="arts_tk_line">-</span>分）人数<span id="arts_tk_count">-</span>人
-            （<span id="arts_tk_rate">-</span>%）
-            本科线模拟上线（<span id="arts_bk_line">-</span>分）人数<span id="arts_bk_count">-</span>人
-            （<span id="arts_bk_rate">-</span>%）
-            专科线模拟上线（<span id="arts_zk_line">-</span>分）人数<span id="arts_zk_count">-</span>人
-            （<span id="arts_zk_rate">-</span>%）
-        </div>
+        {% if arts %}
+            <div class="summary-text">
+                本次考试，总计有<span>{{ arts.school_count }}</span>所学校，
+                参考总人数<span>{{ arts.student_count }}</span>人。
+                均分为<span>{{ arts.mean_score|floatformat:2 }}</span>分，
+                最高分为<span>{{ arts.max_score|floatformat:2 }}</span>分，
+                归属于<span>{{ arts.top_school }}</span>。
+
+                {% if arts.threshold_stats %}
+                    {% for name, stats in arts.threshold_stats.items %}
+                        <div class="threshold-item">
+                            {{ name }}线模拟上线（<span>{{ stats.score|floatformat:2 }}</span>分）
+                            人数<span>{{ stats.count }}</span>人
+                            （<span>{{ stats.rate|floatformat:2 }}</span>%）
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="alert alert-warning">暂无文科数据</div>
+        {% endif %}
     </div>
 </div>
     <!-- Tab切换部分 -->

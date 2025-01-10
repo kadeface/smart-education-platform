@@ -10,8 +10,9 @@ from .views.client import (client_exam_list,
                      client_exam_detail,
                       view_statistics_result
                     )
-from score_analysis.views.indicators import basic_indicators
+from score_analysis.views.exam_over_view import  ExamOverviewView
 from score_analysis.views.tracking_view import TrackingAnalysisView
+from .views.generatestatsview import GenerateStatsView
 from .views.layer_view import LayerView
 from .views.tracking_view import (ScoreRankingView,
                                   ScoreTrendView,
@@ -37,8 +38,8 @@ urlpatterns = [
          name='layer_view'), #区域分析模块
 
     path('indicators/basic/<str:module_type>/<str:exam_id>/',
-         basic_indicators.view_basic_indicators,
-         name='view_basic_indicators'), #质量监测模块
+         ExamOverviewView.as_view(),
+         name='exam_overview'), #概述基础指标分析模块
 
     path('tracking/analysis/<str:module_type>/<str:exam_id>/',
          TrackingAnalysisView.as_view(),
@@ -61,5 +62,9 @@ urlpatterns = [
          name='warnings'),
 
  #   path('api/statistics/data/', StatisticsDataAPIView.as_view(), name='statistics-data'),
+
+   # path('statistics/generate/', GenerateStatsView.as_view(), name='generate_stats'),
+    #path('api/statistics/<str:exam_id>/', views.get_exam_statistics, name='get_exam_statistics'),
+
 ]
 
