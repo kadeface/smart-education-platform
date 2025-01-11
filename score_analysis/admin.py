@@ -4,7 +4,7 @@ import json
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import path ,reverse
 from django.template.response import TemplateResponse
-from django.db import connection
+from django.db import connection, transaction
 from django import forms
 from django.shortcuts import render
 from django.db.models import Q
@@ -17,19 +17,15 @@ from django.shortcuts import redirect
 from .models.base import BaseExamConfig,BaseSubjectConfig
 from .services.ranking_service import RankingService
 from .models.source import ScoreStudentBasic
-from .services.statistics.level_statistics_generator import ExamLevelAnalysisGenerator
 from .services.statistics.statistics_generator import StatisticsGenerator
-from .services.statistics_service import BaseStatisticsService
 from django.db.models import Subquery, OuterRef
 import logging
-from django.db import models
 from .models.region import LayerAnalysis
 from .services.region.layer_analysis import LayerAnalysisService
 from .services.region.layer_view import LayerViewService
 from .models.Tracking import TrackingRecord
 from .services.tracking.tracking_generator import TrackingGenerator
-from .services.tracking.statistics_calculator import StatisticsCalculator
-from .services.tracking.ranking_calculator import RankingCalculator
+
 # 获取 logger 实例
 logger = logging.getLogger('django')  # 使用 Django 的默认 logger
 
@@ -554,6 +550,14 @@ class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
     def generate_statistics(self, request, exam_id):
         """生成统计数据"""
         try:
+            config_exists = ExamLevelAnalysisConfig.objects.filter(exam_id=exam_id).exists()
+            if not config_exists:
+                # 获取考试信息以确定配置类型
+                exam = BaseExamConfig.objects.get(exam_id=exam_id)
+
+                messages.error(request, f'考试 {exam_id} 未配置分数线，请先配置分数线')
+                # 重定向到分数线配置页面
+                return redirect('admin:score_analysis_examlevelanalysisconfig_changelist')
             print(f"开始生成统计数据: exam_id={exam_id}")
             service = StatisticsGenerator()
 
@@ -1644,6 +1648,8 @@ class TrackingAdmin(admin.ModelAdmin):
 @admin.register(ExamLevelAnalysisConfig)
 class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
     """设置考试线和排名统计"""
+
+
     SCIENCE_ARTS_TYPES = ['文科', '理科']
     GENERAL_TYPE = '不确定'
     DIVIDED_SEMESTERS = ['高一下', '高二上','高二下', '高三上', '高三下']  # 需要分科的学期
@@ -1879,10 +1885,6 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
 
     def reset_exam_configs(self, request, exam_id):
         """重置单个考试的所有配置"""
-        from django.db import transaction
-        import logging
-
-        logger = logging.getLogger(__name__)
 
         try:
             with transaction.atomic():  # 添加事务处理
