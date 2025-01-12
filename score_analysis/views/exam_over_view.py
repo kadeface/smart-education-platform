@@ -1,4 +1,6 @@
 # score_analysis/views/exam_overview.py
+import traceback
+
 import numpy as np
 from django.shortcuts import render
 from django.views.generic import TemplateView
@@ -124,7 +126,7 @@ class ExamOverviewView(TemplateView):
                 # 6. 处理纯区县考试数据
                 districts = exam_stats.filter(level_type='district').order_by('district_name', 'select_type')
                 if districts.exists():
-                    district_context = self._process_district_stats(basic_stats, districts)
+                    district_context = self._process_district_exam_stats(basic_stats, districts)
 
                     # 添加考试信息到科目数据中
                     for subject in ['science', 'arts']:
@@ -334,44 +336,172 @@ class ExamOverviewView(TemplateView):
             # 4. 获取统计数据
             stats_obj = level_stats.filter(select_type=subject_type).first()
 
+            # 在返回数据之前，添加学校统计数据
             if stats_obj:
-                return self._prepare_stats(stats_obj, basic_subject_stats, top_school)
+                result = self._prepare_stats(stats_obj, basic_subject_stats, top_school)
+
+                # 获取学校统计数据
+                schools_data = []
+                school_names = filtered_stats.values_list('school_name', flat=True).distinct()
+
+                for school_name in school_names:
+                    # 获取该学校的分数
+                    school_scores = filtered_stats.filter(
+                        school_name=school_name
+                    ).values_list(subject, flat=True)
+
+                    scores_array = np.array([float(score) for score in school_scores if score > 0])
+
+                    if len(scores_array) > 0:
+                        # 计算分位数
+                        percentiles = np.percentile(scores_array, [5, 15, 55])
+
+                        school_data = {
+                            'school_name': school_name,
+                            'student_count': len(scores_array),
+                            'max_score': float(np.max(scores_array)),
+                            'mean_score': float(np.mean(scores_array)),
+                            'median_score': float(np.median(scores_array)),
+                            'std_score': float(np.std(scores_array)),
+                            'p5_score': float(percentiles[0]),
+                            'p15_score': float(percentiles[1]),
+                            'p55_score': float(percentiles[2]),
+                            'skewness': float(stats.skew(scores_array)),
+                            'kurtosis': float(stats.kurtosis(scores_array))
+                        }
+                        schools_data.append(school_data)
+
+                # 添加学校统计数据到结果中
+                result['school_stats'] = schools_data
+                logger.info(f"{subject_type}学校统计数据数量: {len(schools_data)}")
+
+                return result
             return None
 
         except Exception as e:
             logger.error(f"获取{subject_type}-{subject}统计数据时出错: {str(e)}")
+            logger.error(f"错误详情: {traceback.format_exc()}")
             return None
 
 
+    def _process_district_exam_stats(self, basic_stats, districts):
+        """
+           处理区县考试的统计数据。
 
-    def _process_district_stats(self, basic_stats, districts):
-        """处理区县统计数据"""
-        context = {}
-        district_stats_by_type = {stat.select_type: stat for stat in districts}
+           Args:
+               basic_stats: QuerySet, 基础统计数据
+               districts: QuerySet, 区县统计数据
 
-        # 处理理科数据
-        if '理科' in district_stats_by_type:
-            science_data = self._get_subject_stats(
-                basic_stats,
-                [district_stats_by_type['理科']],
-                subject_type='理科',
-                district_name=district_stats_by_type['理科'].district_name
-            )
-            if science_data:
-                context['science'] = science_data
+           Returns:
+               dict: 包含区县概况和学校详细数据的统计信息
+           """
+        try:
+            context = {}
+            district_stats_by_type = {stat.select_type: stat for stat in districts}
 
-        # 处理文科数据
-        if '文科' in district_stats_by_type:
-            arts_data = self._get_subject_stats(
-                basic_stats,
-                [district_stats_by_type['文科']],
-                subject_type='文科',
-                district_name=district_stats_by_type['文科'].district_name
-            )
-            if arts_data:
-                context['arts'] = arts_data
+            # 处理理科数据
+            if '理科' in district_stats_by_type:
+                # 1. 获取理科概况数据
+                science_data = self._get_subject_stats(
+                    basic_stats=basic_stats,
+                    level_stats=districts,
+                    subject_type='理科',
+                    district_name=None
+                )
 
-        return context
+                if science_data:
+                    # 2. 获取理科学校数据
+                    science_schools = self._get_schools_stats(
+                        basic_stats=basic_stats,
+                        subject_type='理科'
+                    )
+                    science_data['schools'] = science_schools
+                    context['science'] = science_data
+
+            # 处理文科数据
+            if '文科' in district_stats_by_type:
+                # 1. 获取文科概况数据
+                arts_data = self._get_subject_stats(
+                    basic_stats=basic_stats,
+                    level_stats=districts,
+                    subject_type='文科',
+                    district_name=None
+                )
+
+                if arts_data:
+                    # 2. 获取文科学校数据
+                    arts_schools = self._get_schools_stats(
+                        basic_stats=basic_stats,
+                        subject_type='文科'
+                    )
+                    arts_data['schools'] = arts_schools
+                    context['arts'] = arts_data
+
+            return context
+
+        except Exception as e:
+            logger.error(f"处理区县考试统计数据时出错: {str(e)}")
+            return None
+
+
+    def _get_schools_stats(self, basic_stats, subject_type):
+        """
+           获取各学校的统计数据。
+
+           Args:
+               basic_stats: QuerySet, 基础统计数据
+               subject_type: str, 科目类型（理科/文科）
+
+           Returns:
+               list: 学校统计数据列表
+           """
+        try:
+            # 按学校分组统计基础指标
+            schools_stats = basic_stats.filter(
+                select_type=subject_type
+            ).values('school_name').annotate(
+                student_count=Count('student_id'),
+                max_score=Max('total_score'),
+                mean_score=Avg('total_score'),
+                std_score=StdDev('total_score')
+            ).order_by('-mean_score')  # 按平均分降序排序
+
+            # 处理每个学校的数据
+            schools_data = []
+            for school in schools_stats:
+                # 获取该学校的所有分数
+                scores = basic_stats.filter(
+                    select_type=subject_type,
+                    school_name=school['school_name']
+                ).values_list('total_score', flat=True)
+
+                # 转换为numpy数组并过滤0分
+                scores_array = np.array([float(score) for score in scores if score > 0])
+
+                if len(scores_array) > 0:
+                    # 计算分位数
+                    percentiles = np.percentile(scores_array, [5, 15, 50, 55])
+
+                    school_data = {
+                        'school_name': school['school_name'],
+                        'student_count': school['student_count'],
+                        'max_score': float(school['max_score']),
+                        'mean_score': float(school['mean_score']),
+                        'median_score': float(percentiles[2]),  # 50分位数
+                        'std_score': float(school['std_score']),
+                        'p5_score': float(percentiles[0]),  # 5分位数
+                        'p15_score': float(percentiles[1]),  # 15分位数
+                        'p55_score': float(percentiles[3]),  # 55分位数
+                        'skewness': float(stats.skew(scores_array)),
+                        'kurtosis': float(stats.kurtosis(scores_array))
+                    }
+                    schools_data.append(school_data)
+
+            return schools_data
+
+        except Exception as e:
+            logger.error(f"获取学校统计数据时出错: {str(e)}")
+            return []
 
     def get_context_data_no_subjects(self, exam_id):
         """获取不分科考试的数据"""
