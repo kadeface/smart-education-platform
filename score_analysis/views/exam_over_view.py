@@ -6,7 +6,7 @@ from django.db.models import Max, Min, Avg, Count, StdDev, Variance, F
 from scipy import stats
 import json
 
-from score_analysis.models import ScoreStudentBasic
+from score_analysis.models import ScoreStudentBasic, BaseExamConfig
 from score_analysis.models.statistics import ExamLevelStatistics
 
 import logging
@@ -59,27 +59,48 @@ class ExamOverviewView(TemplateView):
         context = {}
 
         try:
-            # 1. 获取基础数据
-            basic_stats = self._get_basic_stats(exam_id)
-            exam_stats = self._get_exam_stats(exam_id)
 
-            # 2. 检查是否存在市级数据
+            # 1. 获取所有基础数据
+            basic_stats = self._get_basic_stats(exam_id)
+            if not basic_stats.exists():
+                raise ValueError(f"未找到ID为{exam_id}的考试基础数据")
+
+            exam_stats = self._get_exam_stats(exam_id)
+            exam_info = self._get_exam_info(exam_id)
+
+            # 2. 设置基本考试信息
+            context.update({
+                'exam_info': exam_info,
+                'exam_name': exam_info.get('exam_name', ''),
+                'exam_date': exam_info.get('exam_date', ''),
+            })
+            logger.info(f"考试基本信息: {context['exam_info']}")
+
+            # 3. 检查是否存在市级数据并设置考试类型
             has_city_data = exam_stats.filter(level_type='city').exists()
-            logger.info(f"是否有市级数据: {has_city_data}")
+            context['exam_type'] = 'city' if has_city_data else 'district'
+            logger.info(f"考试类型: {context['exam_type']}")
 
             if has_city_data:
-                # 3. 处理市级数据
+                # 4. 处理市级考试数据
                 city_context = self._process_city_stats(basic_stats, exam_stats)
+
+                # 添加考试信息到科目数据中
+                for subject in ['science', 'arts']:
+                    if subject in city_context:
+                        city_context[subject].update({
+                            'exam_info': exam_info,
+                            'is_district_exam': False
+                        })
+
                 context.update(city_context)
 
-                # 4. 处理区县数据并添加到市级数据中
+                # 5. 处理区县数据
                 districts = exam_stats.filter(level_type='district').order_by('district_name', 'select_type')
                 if districts.exists():
-                    # 按文理科分组处理区县数据
+                    district_scores = self._get_district_scores(exam_id)
                     science_districts = []
                     arts_districts = []
-                    # 获取所有区县的分数数据
-                    district_scores = self._get_district_scores(exam_id)
 
                     for district in districts:
                         scores = district_scores.get(district.district_name, {}).get(district.select_type, [])
@@ -90,19 +111,40 @@ class ExamOverviewView(TemplateView):
                             else:
                                 arts_districts.append(district_stats)
 
-                    # 将区县数据添加到相应的科目统计中
-                    if 'science' in context and science_districts:
+                    # 将区县数据添加到相应科目中
+                    if science_districts and 'science' in context:
                         context['science']['district_stats'] = science_districts
-                        logger.info(f"理科区县数据: {science_districts}")  # 添加日志
-                    if 'arts' in context and arts_districts:
+                        logger.info(f"理科区县数据数量: {len(science_districts)}")
+
+                    if arts_districts and 'arts' in context:
                         context['arts']['district_stats'] = arts_districts
-                        logger.info(f"文科区县数据: {arts_districts}")  # 添加日志
+                        logger.info(f"文科区县数据数量: {len(arts_districts)}")
+
             else:
-                # 5. 如果没有市级数据，使用区县数据
+                # 6. 处理纯区县考试数据
                 districts = exam_stats.filter(level_type='district').order_by('district_name', 'select_type')
                 if districts.exists():
-                    context.update(self._process_district_stats(basic_stats, districts))
+                    district_context = self._process_district_stats(basic_stats, districts)
 
+                    # 添加考试信息到科目数据中
+                    for subject in ['science', 'arts']:
+                        if subject in district_context:
+                            district_context[subject].update({
+                                'exam_info': exam_info,
+                                'is_district_exam': True
+                            })
+
+                    context.update(district_context)
+                    logger.info("已处理区县考试数据")
+            # 在返回之前添加日志
+            logger.info(f"science_data: {context.get('science')}")
+            logger.info(f"arts_data: {context.get('arts')}")
+
+            # 确保数据被正确序列化
+            if 'science' in context:
+                context['science_data'] = json.dumps(context['science'])
+            if 'arts' in context:
+                context['arts_data'] = json.dumps(context['arts'])
             return context
 
         except Exception as e:
@@ -127,6 +169,49 @@ class ExamOverviewView(TemplateView):
         return stats
 
 
+    def _calculate_score_range(self, scores):
+        """
+        计算有效分数的极差（忽略0分）。
+
+        Args:
+            scores: 分数列表
+
+        Returns:
+            float: 分数极差
+        """
+        try:
+            # 过滤掉0分
+            valid_scores = [score for score in scores if score > 0]
+            if not valid_scores:
+                return 0
+            return max(valid_scores) - min(valid_scores)
+        except Exception as e:
+            logger.error(f"计算分数极差时出错: {str(e)}")
+            return 0
+    def _get_exam_info(self, exam_id):
+        """
+           从base_exam_config获取考试基本信息。
+
+           Args:
+               exam_id: 考试ID
+
+           Returns:
+               dict: 包含考试基本信息的字典
+           """
+        try:
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            return {
+                'exam_name': exam.exam_name,
+                'exam_date': exam.exam_date.strftime('%Y-%m-%d') if exam.exam_date else '',
+                'exam_id': exam_id,
+                # 可以添加其他需要的考试信息
+            }
+        except BaseExamConfig.DoesNotExist:
+            logger.error(f"未找到ID为{exam_id}的考试")
+            return {}
+        except Exception as e:
+            logger.error(f"获取考试信息时出错: {str(e)}")
+            return {}
     def _process_city_stats(self, basic_stats, exam_stats):
         """处理市级统计数据"""
         context = {}
@@ -171,10 +256,21 @@ class ExamOverviewView(TemplateView):
         try:
             # 构建基础查询条件
             filter_params = {'select_type': subject_type}
-            if district_name:
+            # 只在非区县考试时添加district_name过滤
+            # 直接判断是否存在市级数据
+            is_city_exam = level_stats.filter(level_type='city').exists()
+
+            # 如果是市级考试且提供了区县名称，则添加区县过滤
+            if is_city_exam and district_name:
                 filter_params['district_name'] = district_name
 
+            # 记录查询条件
+            logger.info(f"查询条件: {filter_params}")
+
             filtered_stats = basic_stats.filter(**filter_params)
+
+            # 记录过滤后的数据量
+            logger.info(f"过滤后的数据量: {filtered_stats.count()}")
 
             # 1. 获取基础统计数据
             basic_subject_stats = filtered_stats.aggregate(
@@ -190,7 +286,7 @@ class ExamOverviewView(TemplateView):
             scores = np.array([float(score) for score in filtered_stats.values_list(subject, flat=True)])
             if len(scores) > 0:
                 # 2.1 计算分位数
-                percentiles = [10, 20, 25, 50, 75, 80]
+                percentiles = [0.001, 1, 16, 55, 75, 80]
                 score_percentiles = np.percentile(scores, percentiles)
 
 
