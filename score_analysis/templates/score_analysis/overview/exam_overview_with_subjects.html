@@ -4,217 +4,216 @@
 {% block content %}
 <!-- 内联CSS样式 -->
 <style>
-/* 整体布局 */
-.exam-header {
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background-color: #f8f9fa;
-    border-radius: 8px;
+/* 主要颜色变量 */
+:root {
+    --primary-color: #00bfa5;
+    --text-primary: #1d3557;
+    --text-secondary: #2c3e50;
+    --number-color: #0052cc;
+    --number-bg: #deebff;
+    --score-color: #bf2600;
+    --score-bg: #ffebe6;
+    --school-color: #006644;
+    --school-bg: #e3fcef;
 }
 
-.exam-header h2 {
-    margin: 0 0 1rem 0;
-    color: #2c3e50;
-    font-size: 1.8rem;
-}
-
-.exam-info {
-    display: flex;
-    gap: 2rem;
-    color: #666;
-}
-
-.exam-info span {
-    font-size: 1rem;
-}
-
-/* 标签页样式 */
-.type-tabs {
-    margin-bottom: 1.5rem;
-    border-bottom: 2px solid #e9ecef;
-    display: flex;
-    gap: 1rem;
-}
-
-.tab-item {
-    padding: 0.75rem 1.5rem;
-    color: #666;
-    text-decoration: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    transition: all 0.3s ease;
-}
-
-.tab-item:hover {
-    color: #2c3e50;
-    text-decoration: none;
-}
-
-.tab-item.active {
-    color: #3498db;
-    border-bottom-color: #3498db;
-    font-weight: 500;
-}
-
-/* 内容区域 */
-.tab-content {
+/* 市级统计样式 */
+.city-stats {
+    margin: 20px 0;
+    padding: 20px;
     background: #fff;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.tab-pane {
-    display: none;
-    padding: 1.5rem;
+.overview-section {
+    line-height: 2;
+    color: var(--text-secondary);
+    font-size: 1.1em;
 }
 
-.tab-pane.active {
-    display: block;
+.overview-section p {
+    margin: 15px 0;
 }
 
-/* 统计摘要部分 */
-.summary-section {
-    margin-bottom: 2rem;
+/* 数据高亮样式 */
+.number-highlight,
+.stat-value.number {
+    color: var(--number-color);
+    font-weight: 600;
+    background-color: var(--number-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-.summary-section h3 {
-    color: #2c3e50;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #e9ecef;
+.score-highlight,
+.stat-value.score {
+    color: var(--score-color);
+    font-weight: 600;
+    background-color: var(--score-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
 }
 
-.summary-text {
-    line-height: 1.6;
+.school-highlight,
+.stat-value.school {
+    color: var(--school-color);
+    font-weight: 600;
+    background-color: var(--school-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 
-.summary-text p {
-    margin-bottom: 1rem;
-    color: #4a4a4a;
-}
-
-.summary-text span {
-    color: #2c3e50;
-    font-weight: 500;
-    margin: 0 0.3rem;
-}
-
-/* 区县统计部分 */
+/* 区县统计样式 */
 .district-stats {
     margin-top: 2rem;
-    border-top: 1px solid #e9ecef;
-    padding-top: 1.5rem;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
 }
 
 .district-stats h4 {
-    color: #2c3e50;
-    margin-bottom: 1rem;
+    color: var(--text-primary);
+    font-size: 1.4em;
+    font-weight: 600;
+    margin-bottom: 15px;
+    padding-left: 15px;
+    border-left: 4px solid var(--primary-color);
 }
 
-.district-nav {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 2rem 0;
+/* 标签导航样式 */
+.district-tabs {
+    display: flex;
+    flex-direction: column;
+}
+
+.tab-header {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.5rem;
+    padding: 15px 15px 0;
+    margin-bottom: 20px;
 }
 
-.district-nav li a {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    background: #f8f9fa;
+.district-tab-btn {
+    padding: 8px 20px;
+    border: 1px solid #e0e0e0;
+    background: #fff;
+    cursor: pointer;
     border-radius: 4px;
     color: #666;
-    text-decoration: none;
+    font-size: 1em;
     transition: all 0.3s ease;
 }
 
-.district-nav li a:hover {
-    background: #e9ecef;
-    color: #2c3e50;
-}
-
-/* 区县详细信息 */
-.district-section {
-    margin-bottom: 2rem;
-    padding: 1.5rem;
+.district-tab-btn:hover {
     background: #f8f9fa;
+}
+
+.district-tab-btn.active {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+.student-count {
+    font-size: 0.85rem;
+    padding: 0.2rem 0.5rem;
+    background: rgba(0,0,0,0.1);
+    border-radius: 12px;
+    margin-left: 8px;
+}
+
+/* 统计网格布局 */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* 统计卡片样式 */
+.stat-box {
+    padding: 1.5rem;
+    background: white;
     border-radius: 8px;
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-left: 4px solid var(--primary-color);
 }
 
-.district-section h4 {
-    color: #2c3e50;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #e9ecef;
+.stat-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-.district-summary {
-    line-height: 1.6;
-}
-
-.district-summary p {
-    margin-bottom: 0.8rem;
-    color: #4a4a4a;
-}
-
-.district-summary span {
-    color: #2c3e50;
-    font-weight: 500;
-    margin: 0 0.3rem;
-}
-
-/* 返回顶部链接 */
-.back-to-top {
-    margin-top: 1rem;
-    text-align: right;
-}
-
-.back-to-top a {
-    color: #3498db;
-    text-decoration: none;
+.stat-title {
+    color: var(--text-secondary);
     font-size: 0.9rem;
+    margin-bottom: 0.5rem;
 }
 
-.back-to-top a:hover {
-    text-decoration: underline;
+/* 区县内容面板 */
+.district-tab-pane {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-/* 警告信息 */
-.alert {
-    padding: 1rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
+.district-tab-pane.active {
+    display: block;
+    opacity: 1;
 }
 
-.alert-warning {
-    background-color: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeeba;
+/* 分数区间、分位数据、分布特征部分 */
+.score-range-section,
+.percentile-section,
+.distribution-section {
+    margin-top: 2rem;
+}
+
+.score-range-section h5,
+.percentile-section h5,
+.distribution-section h5 {
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+    padding-left: 15px;
+    border-left: 4px solid var(--primary-color);
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
-    .exam-info {
+    .city-stats,
+    .district-stats {
+        padding: 15px;
+    }
+
+    .overview-section {
+        font-size: 1em;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .district-tab-btn {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .tab-header {
         flex-direction: column;
-        gap: 0.5rem;
-    }
-
-    .type-tabs {
-        gap: 0.5rem;
-    }
-
-    .tab-item {
-        padding: 0.5rem 1rem;
-    }
-
-    .district-stats ul {
-        flex-direction: column;
-    }
-
-    .district-section {
-        padding: 1rem;
     }
 }
 </style>
@@ -265,6 +264,7 @@
 
 <!-- JavaScript代码 -->
 <script>
+
 // Tab切换函数
 function switchTab(tabName, event) {
     if (event) {
@@ -291,118 +291,156 @@ function switchTab(tabName, event) {
 // 数据渲染函数
 function renderStats(type, data) {
     console.log(`开始渲染${type}数据`);
-
     const container = document.getElementById(type + '-tab');
-    const summarySection = container.querySelector('.summary-section');
 
-    // 检查区县数据
-    if (data.district_stats) {
-        console.log('区县数据:', {
-            类型: type,
-            数量: data.district_stats.length,
-            详情: data.district_stats
-        });
-    }
-
-    // 创建总体统计内容
     let content = `
-        <h3>${type === 'science' ? '理科' : '文科'}总体统计</h3>
-        <div class="summary-text">
-            <p class="basic-info">
-                本次考试，总计有<span>${data.school_count}</span>所学校，
-                参考总人数<span>${data.student_count}</span>人。
-            </p>
+        <!-- 市级统计 -->
+        <div class="city-stats">
+            <div class="overview-section">
+                <p class="overview-text">
+                    本次考试，总计有<span class="number-highlight">${data.school_count}所</span>学校，
+                    参考总人数<span class="number-highlight">${data.student_count}人</span>。
+                </p>
 
-            <p class="score-distribution">
-                平均分为<span>${data.mean_score.toFixed(2)}</span>分，
-                中位数为<span>${data.median_score.toFixed(2)}</span>分，
-                标准差为<span>${data.std_score.toFixed(2)}</span>。
-            </p>
+                <p class="stats-text">
+                    平均分为<span class="score-highlight">${data.mean_score.toFixed(2)}分</span>，
+                    中位数为<span class="score-highlight">${data.median_score.toFixed(2)}分</span>，
+                    标准差为<span class="number-highlight">${data.std_score.toFixed(2)}</span>。
+                </p>
 
-            <p class="score-range">
-                最高分为<span>${data.max_score.toFixed(2)}</span>分，
-                最低分为<span>${data.min_score.toFixed(2)}</span>分，
-                分数极差为<span>${data.range.toFixed(2)}</span>分。
-            </p>
+                <p class="score-text">
+                    最高分为<span class="score-highlight">${data.max_score.toFixed(2)}分</span>，
+                    所属学校为<span class="school-highlight">${data.top_school || '暂无数据'}</span>，
+                    分数极差为<span class="score-highlight">${data.range.toFixed(2)}分</span>。
+                </p>
 
-            <p class="percentiles">
-                成绩排名情况：
-                前20%的分数线为<span>${data.q80_score.toFixed(2)}</span>分，
-                前25%的分数线为<span>${data.q3_score.toFixed(2)}</span>分，
-                前50%的分数线为<span>${data.median_score.toFixed(2)}</span>分。
-            </p>
+                <p class="rank-text">
+                    成绩排名情况：
+                    前20%的分数线为<span class="score-highlight">${data.q80_score.toFixed(2)}分</span>，
+                    前25%的分数线为<span class="score-highlight">${data.q3_score.toFixed(2)}分</span>，
+                    前50%的分数线为<span class="score-highlight">${data.median_score.toFixed(2)}分</span>。
+                </p>
 
-            <p class="distribution">
-                分布特征：
-                偏度为<span>${data.skewness.toFixed(4)}</span>，
-                峰度为<span>${data.kurtosis.toFixed(4)}</span>。
-            </p>
-        </div>`;
+                <p class="distribution-text">
+                    分布特征：
+                    偏度为<span class="number-highlight">${data.skewness.toFixed(4)}</span>，
+                    峰度为<span class="number-highlight">${data.kurtosis.toFixed(4)}</span>。
+                </p>
+            </div>
+        </div>
 
-    // 添加区县统计
-    if (data.district_stats && data.district_stats.length > 0) {
-        content += `
+        <!-- 区县统计 -->
+        ${data.district_stats && data.district_stats.length > 0 ? `
             <div class="district-stats">
                 <h4>各区县统计</h4>
-
-                <!-- 区县导航列表 -->
-                <ul class="district-nav">
-                    ${data.district_stats.map(district => `
-                        <li>
-                            <a href="#${type}-district-${district.district_name}">
+                <div class="district-tabs">
+                    <div class="tab-header">
+                        ${data.district_stats.map((district, index) => `
+                            <button class="district-tab-btn ${index === 0 ? 'active' : ''}"
+                                    data-district="${district.district_name}"
+                                    onclick="switchDistrictTab('${type}', '${district.district_name}')">
                                 ${district.district_name}
-                            </a>
-                        </li>
-                    `).join('')}
-                </ul>
+                                <span class="student-count">${district.student_count}人</span>
+                            </button>
+                        `).join('')}
+                    </div>
 
-                <!-- 区县详细内容 -->
-                <div class="district-details">
-                    ${data.district_stats.map(district => `
-                        <div class="district-section" id="${type}-district-${district.district_name}">
-                            <h4>${district.district_name}</h4>
-                            <div class="district-summary">
-                                <p class="basic-info">
-                                    参考总人数<span>${district.student_count}</span>人
-                                </p>
+                    <div class="district-tab-content">
+                        ${data.district_stats.map((district, index) => `
+                            <div class="district-tab-pane ${index === 0 ? 'active' : ''}"
+                                 id="district-${type}-${district.district_name}">
+                                <!-- 基础统计 -->
+                                <div class="stats-grid">
+                                    <div class="stat-box">
+                                        <div class="stat-title">平均分</div>
+                                        <div class="stat-value score">${district.mean_score.toFixed(2)}</div>
+                                    </div>
+                                    <div class="stat-box">
+                                        <div class="stat-title">中位数</div>
+                                        <div class="stat-value score">${district.median_score.toFixed(2)}</div>
+                                    </div>
+                                    <div class="stat-box">
+                                        <div class="stat-title">标准差</div>
+                                        <div class="stat-value number">${district.std_score.toFixed(2)}</div>
+                                    </div>
+                                </div>
 
-                                <p class="score-distribution">
-                                    平均分为<span>${district.mean_score.toFixed(2)}</span>分，
-                                    中位数为<span>${district.median_score.toFixed(2)}</span>分，
-                                    标准差为<span>${district.std_score.toFixed(2)}</span>
-                                </p>
+                                <!-- 分数区间 -->
+                                <div class="stats-grid">
+                                    <div class="stat-box">
+                                        <div class="stat-title">最高分</div>
+                                        <div class="stat-value score">${district.max_score.toFixed(2)}</div>
+                                        <div class="school-highlight">${district.max_score_school || ''}</div>
+                                    </div>
+                                    <div class="stat-box">
+                                        <div class="stat-title">最低分</div>
+                                        <div class="stat-value score">${district.min_score.toFixed(2)}</div>
+                                    </div>
+                                    <div class="stat-box">
+                                        <div class="stat-title">分数极差</div>
+                                        <div class="stat-value score">${district.range.toFixed(2)}</div>
+                                    </div>
+                                </div>
 
-                                <p class="score-range">
-                                    最高分为<span>${district.max_score.toFixed(2)}</span>分
-                                    ${district.max_score_school ? `（${district.max_score_school}）` : ''}，
-                                    最低分为<span>${district.min_score.toFixed(2)}</span>分，
-                                    分数极差为<span>${district.range.toFixed(2)}</span>分
-                                </p>
+                                <!-- 分位数据 -->
+                                <div class="stats-grid">
+                                    <div class="stat-box">
+                                        <div class="stat-title">前5%</div>
+                                        <div class="stat-value score">${district.p5_score.toFixed(2)}</div>
+                                    </div>
+                                    <div class="stat-box">
+                                        <div class="stat-title">前15%</div>
+                                        <div class="stat-value score">${district.p15_score.toFixed(2)}</div>
+                                    </div>
+                                    <div class="stat-box">
+                                        <div class="stat-title">前55%</div>
+                                        <div class="stat-value score">${district.p55_score.toFixed(2)}</div>
+                                    </div>
+                                </div>
 
-                                <p class="percentiles">
-                                    成绩排名情况：
-                                    前5%的分数线为<span>${district.p5_score.toFixed(2)}</span>分，
-                                    前15%的分数线为<span>${district.p15_score.toFixed(2)}</span>分，
-                                    前55%的分数线为<span>${district.p55_score.toFixed(2)}</span>分
-                                </p>
-
-                                <p class="distribution">
-                                    分布特征：
-                                    偏度为<span>${district.skewness.toFixed(4)}</span>，
-                                    峰度为<span>${district.kurtosis.toFixed(4)}</span>
-                                </p>
+                                <!-- 分布特征 -->
+                                <div class="stats-grid">
+                                    <div class="stat-box">
+                                        <div class="stat-title">偏度</div>
+                                        <div class="stat-value number">${district.skewness.toFixed(4)}</div>
+                                    </div>
+                                    <div class="stat-box">
+                                        <div class="stat-title">峰度</div>
+                                        <div class="stat-value number">${district.kurtosis.toFixed(4)}</div>
+                                    </div>
+                                </div>
                             </div>
-                            <p class="back-to-top">
-                                <a href="#${type}-tab">返回${type === 'science' ? '理科' : '文科'}总览</a>
-                            </p>
-                        </div>
-                    `).join('')}
+                        `).join('')}
+                    </div>
                 </div>
-            </div>`;
-    }
+            </div>
+        ` : ''}
+    `;
 
-    // 更新内容
-    summarySection.innerHTML = content;
+    container.innerHTML = content;
+}
+
+// 区县标签切换函数
+function switchDistrictTab(type, districtName) {
+    const tabContent = document.getElementById(`${type}-tab`);
+    if (!tabContent) return;
+
+    // 只在当前科目标签内切换区县
+    const districtTabs = tabContent.querySelectorAll('.district-tab-btn');
+    const districtPanes = tabContent.querySelectorAll('.district-tab-pane');
+
+    // 移除当前科目下所有区县标签的active类
+    districtTabs.forEach(tab => tab.classList.remove('active'));
+    districtPanes.forEach(pane => pane.classList.remove('active'));
+
+    // 激活选中的区县标签和内容
+    const selectedTab = tabContent.querySelector(`[data-district="${districtName}"]`);
+    const selectedPane = tabContent.querySelector(`#district-${type}-${districtName}`);
+
+    if (selectedTab && selectedPane) {
+        selectedTab.classList.add('active');
+        selectedPane.classList.add('active');
+    }
 }
 
 // 页面加载完成后初始化
@@ -411,6 +449,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
         const scienceEl = document.getElementById('science-data');
         const artsEl = document.getElementById('arts-data');
+        const firstTab = document.querySelector('.tab-item');
 
         if (scienceEl) {
             const scienceData = JSON.parse(scienceEl.textContent);
@@ -422,6 +461,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const artsData = JSON.parse(artsEl.textContent);
             console.log('文科数据:', artsData);
             renderStats('arts', artsData);
+        }
+
+        if (firstTab) {
+            firstTab.click();
         }
     } catch (error) {
         console.error('数据处理错误:', error);
