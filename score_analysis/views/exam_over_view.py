@@ -1,8 +1,9 @@
 # score_analysis/views/exam_overview.py
+import numpy as np
 from django.shortcuts import render
 from django.views.generic import TemplateView
-from django.db.models import Max, Min, Avg, Count
-
+from django.db.models import Max, Min, Avg, Count, StdDev, Variance, F
+from scipy import stats
 import json
 
 from score_analysis.models import ScoreStudentBasic
@@ -44,127 +45,235 @@ class ExamOverviewView(TemplateView):
                 'error_message': f'获取统计数据时发生错误: {str(e)}'
             })
 
-    def get_context_data_with_subjects(self, exam_id):
-        """获取分科考试的数据"""
 
+    def get_context_data_with_subjects(self, exam_id):
+        """
+           获取分科考试的数据。
+
+           Args:
+               exam_id: 考试ID
+
+           Returns:
+               dict: 包含文理科统计数据的上下文
+           """
         context = {}
 
-        # 1. 获取基础成绩统计数据
-        basic_stats = ScoreStudentBasic.objects.filter(
+        try:
+            # 1. 获取基础数据
+            basic_stats = self._get_basic_stats(exam_id)
+            exam_stats = self._get_exam_stats(exam_id)
+
+            # 2. 检查是否存在市级数据
+            has_city_data = exam_stats.filter(level_type='city').exists()
+            logger.info(f"是否有市级数据: {has_city_data}")
+
+            if has_city_data:
+                # 3. 处理市级数据
+                city_context = self._process_city_stats(basic_stats, exam_stats)
+                context.update(city_context)
+
+                # 4. 处理区县数据并添加到市级数据中
+                districts = exam_stats.filter(level_type='district').order_by('district_name', 'select_type')
+                if districts.exists():
+                    # 按文理科分组处理区县数据
+                    science_districts = []
+                    arts_districts = []
+                    # 获取所有区县的分数数据
+                    district_scores = self._get_district_scores(exam_id)
+
+                    for district in districts:
+                        scores = district_scores.get(district.district_name, {}).get(district.select_type, [])
+                        district_stats = self._prepare_district_stats(district, scores)
+                        if district_stats:
+                            if district.select_type == '理科':
+                                science_districts.append(district_stats)
+                            else:
+                                arts_districts.append(district_stats)
+
+                    # 将区县数据添加到相应的科目统计中
+                    if 'science' in context and science_districts:
+                        context['science']['district_stats'] = science_districts
+                        logger.info(f"理科区县数据: {science_districts}")  # 添加日志
+                    if 'arts' in context and arts_districts:
+                        context['arts']['district_stats'] = arts_districts
+                        logger.info(f"文科区县数据: {arts_districts}")  # 添加日志
+            else:
+                # 5. 如果没有市级数据，使用区县数据
+                districts = exam_stats.filter(level_type='district').order_by('district_name', 'select_type')
+                if districts.exists():
+                    context.update(self._process_district_stats(basic_stats, districts))
+
+            return context
+
+        except Exception as e:
+            logger.error(f"获取分科考试数据时出错: {str(e)}")
+            return {}
+
+
+    def _get_basic_stats(self, exam_id):
+        """获取基础成绩统计数据"""
+        stats = ScoreStudentBasic.objects.filter(
             exam_id=exam_id,
             total_score__isnull=False
         )
-        logger.info(f"基础成绩数据数量: {basic_stats.count()}")
-
-        # 2. 获取考试级别数据
-        exam_stats = ExamLevelStatistics.objects.filter(exam_id=exam_id)
-        logger.info(f"考试统计数据数量: {exam_stats.count()}")
-
-        # 检查是否存在市级数据来判断考试级别
-        has_city_data = exam_stats.filter(level_type='city').exists()
-        logger.info(f"是否有市级数据: {has_city_data}")
+        logger.info(f"基础成绩数据数量: {stats.count()}")
+        return stats
 
 
-        if has_city_data:
-            # 3. 处理市级数据
-            city_stats = exam_stats.filter(level_type='city')
+    def _get_exam_stats(self, exam_id):
+        """获取考试级别统计数据"""
+        stats = ExamLevelStatistics.objects.filter(exam_id=exam_id)
+        logger.info(f"考试统计数据数量: {stats.count()}")
+        return stats
 
-            # 理科数据
-            science_basic_stats = basic_stats.filter(select_type='理科').aggregate(
-                school_count=Count('school_name', distinct=True),
-                student_count=Count('student_id'),
-                max_score=Max('total_score')
-            )
-            science_top_school = basic_stats.filter(
-                select_type='理科',
-                total_score=science_basic_stats['max_score']
-            ).values_list('school_name', flat=True).first() or "暂无数据"
 
-            science_stats = city_stats.filter(select_type='理科').first()
-            logger.info(f"理科统计数据: {science_stats}")
-            context['science'] = self._prepare_stats(
-                science_stats,
-                science_basic_stats,
-                science_top_school
-            )
+    def _process_city_stats(self, basic_stats, exam_stats):
+        """处理市级统计数据"""
+        context = {}
+        city_stats = exam_stats.filter(level_type='city')
+
+        # 处理理科数据
+        science_data = self._get_subject_stats(
+            basic_stats,
+            city_stats,
+            subject_type='理科'
+        )
+        if science_data:
+            context['science'] = science_data
             logger.info(f"处理后的理科数据: {context['science']}")
-            # 文科数据
-            arts_basic_stats = basic_stats.filter(select_type='文科').aggregate(
+
+        # 处理文科数据
+        arts_data = self._get_subject_stats(
+            basic_stats,
+            city_stats,
+            subject_type='文科'
+        )
+        if arts_data:
+            context['arts'] = arts_data
+
+        return context
+
+
+    def _get_subject_stats(self, basic_stats, level_stats, subject_type, subject='total_score', district_name=None):
+        """
+           获取指定科目的统计数据。
+
+           Args:
+               basic_stats: 基础成绩查询集
+               level_stats: 考试级别统计查询集
+               subject_type: 科目类型（理科/文科）
+               subject: 科目字段名称（默认为total_score，可以是chinese_score, math_score等）
+               district_name: 区县名称（可选）
+
+           Returns:
+               dict: 包含统计数据的字典
+           """
+        try:
+            # 构建基础查询条件
+            filter_params = {'select_type': subject_type}
+            if district_name:
+                filter_params['district_name'] = district_name
+
+            filtered_stats = basic_stats.filter(**filter_params)
+
+            # 1. 获取基础统计数据
+            basic_subject_stats = filtered_stats.aggregate(
                 school_count=Count('school_name', distinct=True),
                 student_count=Count('student_id'),
-                max_score=Max('total_score')
+                max_score=Max(subject),
+                min_score=Min(subject),
+                avg_score=Avg(subject),
+                std_dev=StdDev(subject)
             )
-            arts_top_school = basic_stats.filter(
-                select_type='文科',
-                total_score=arts_basic_stats['max_score']
+
+            # 2. 使用numpy和scipy进行统计分析
+            scores = np.array([float(score) for score in filtered_stats.values_list(subject, flat=True)])
+            if len(scores) > 0:
+                # 2.1 计算分位数
+                percentiles = [10, 20, 25, 50, 75, 80]
+                score_percentiles = np.percentile(scores, percentiles)
+
+
+
+                # 2.3 更新统计数据
+                basic_subject_stats.update({
+                    # 分位数统计
+                    'q10_score': float(score_percentiles[0]),
+                    'q20_score': float(score_percentiles[1]),
+                    'q1_score': float(score_percentiles[2]),
+                    'median_score': float(score_percentiles[3]),
+                    'q3_score': float(score_percentiles[4]),
+                    'q80_score': float(score_percentiles[5]),
+
+                    # 集中趋势
+
+                    'trimmed_mean': float(stats.trim_mean(scores, 0.1)),  # 去除极值的平均分
+
+                    # 离散程度
+                    'iqr': float(score_percentiles[4] - score_percentiles[2]),
+                    'range': float(basic_subject_stats['max_score'] - basic_subject_stats['min_score']),
+                    'cv': float(np.std(scores) / np.mean(scores)),
+
+                    # 分布特征
+                    'skewness': float(stats.skew(scores)),  # 使用 stats.skew
+                    'kurtosis': float(stats.kurtosis(scores)),  # 使用 stats.kurtosis
+
+                    # 正态性检验
+                    'normality_stat': float(stats.normaltest(scores)[0]),  # 使用 stats.normaltest
+                    'normality_pvalue': float(stats.normaltest(scores)[1])
+                })
+
+                # 2.4 计算Z分数（标准分）
+                z_scores = stats.zscore(scores)  # 使用 stats.zscore
+                basic_subject_stats.update({
+                    'z_score_above_2': float(np.sum(z_scores > 2) / len(scores)),
+                    'z_score_below_2': float(np.sum(z_scores < -2) / len(scores))
+                })
+
+            # 3. 获取最高分学校
+            top_school = filtered_stats.filter(
+                **{subject: basic_subject_stats['max_score']}
             ).values_list('school_name', flat=True).first() or "暂无数据"
 
-            arts_stats = city_stats.filter(select_type='文科').first()
-            context['arts'] = self._prepare_stats(
-                arts_stats,
-                arts_basic_stats,
-                arts_top_school
+            # 4. 获取统计数据
+            stats_obj = level_stats.filter(select_type=subject_type).first()
+
+            if stats_obj:
+                return self._prepare_stats(stats_obj, basic_subject_stats, top_school)
+            return None
+
+        except Exception as e:
+            logger.error(f"获取{subject_type}-{subject}统计数据时出错: {str(e)}")
+            return None
+
+
+
+    def _process_district_stats(self, basic_stats, districts):
+        """处理区县统计数据"""
+        context = {}
+        district_stats_by_type = {stat.select_type: stat for stat in districts}
+
+        # 处理理科数据
+        if '理科' in district_stats_by_type:
+            science_data = self._get_subject_stats(
+                basic_stats,
+                [district_stats_by_type['理科']],
+                subject_type='理科',
+                district_name=district_stats_by_type['理科'].district_name
             )
+            if science_data:
+                context['science'] = science_data
 
-        # 4. 处理区县数据
-        districts = exam_stats.filter(
-            level_type='district'
-        ).order_by('district_name', 'select_type')
-
-        if districts.exists():
-            context['districts'] = [
-                self._prepare_district_stats(stat) for stat in districts
-            ]
-
-            # 如果是区县级考试，使用第一个区县的数据作为主要数据
-            if not has_city_data:
-                district_stats_by_type = {}
-                for stat in districts:
-                    district_stats_by_type[stat.select_type] = stat
-
-                # 理科数据
-                if '理科' in district_stats_by_type:
-                    science_basic_stats = basic_stats.filter(
-                        select_type='理科',
-                        district_name=district_stats_by_type['理科'].district_name
-                    ).aggregate(
-                        school_count=Count('school_name', distinct=True),
-                        student_count=Count('student_id'),
-                        max_score=Max('total_score')
-                    )
-                    science_top_school = basic_stats.filter(
-                        select_type='理科',
-                        total_score=science_basic_stats['max_score'],
-                        district_name=district_stats_by_type['理科'].district_name
-                    ).values_list('school_name', flat=True).first() or "暂无数据"
-
-                    context['science'] = self._prepare_stats(
-                        district_stats_by_type['理科'],
-                        science_basic_stats,
-                        science_top_school
-                    )
-
-                # 文科数据
-                if '文科' in district_stats_by_type:
-                    arts_basic_stats = basic_stats.filter(
-                        select_type='文科',
-                        district_name=district_stats_by_type['文科'].district_name
-                    ).aggregate(
-                        school_count=Count('school_name', distinct=True),
-                        student_count=Count('student_id'),
-                        max_score=Max('total_score')
-                    )
-                    arts_top_school = basic_stats.filter(
-                        select_type='文科',
-                        total_score=arts_basic_stats['max_score'],
-                        district_name=district_stats_by_type['文科'].district_name
-                    ).values_list('school_name', flat=True).first() or "暂无数据"
-
-                    context['arts'] = self._prepare_stats(
-                        district_stats_by_type['文科'],
-                        arts_basic_stats,
-                        arts_top_school
-                    )
+        # 处理文科数据
+        if '文科' in district_stats_by_type:
+            arts_data = self._get_subject_stats(
+                basic_stats,
+                [district_stats_by_type['文科']],
+                subject_type='文科',
+                district_name=district_stats_by_type['文科'].district_name
+            )
+            if arts_data:
+                context['arts'] = arts_data
 
         return context
 
@@ -194,62 +303,171 @@ class ExamOverviewView(TemplateView):
 
 
     def _prepare_stats(self, stats, basic_stats, top_school):
-        """准备统计数据"""
+        """
+           准备统计数据。
+
+           Args:
+               stats: 统计对象
+               basic_stats: 基础统计数据
+               top_school: 最高分学校
+
+           Returns:
+               dict: 处理后的统计数据
+           """
         if not stats:
             return None
-
-
 
         threshold_stats = self.parse_json(stats.threshold_stats) if stats.threshold_stats else {}
         school_distribution = self.parse_json(stats.school_distribution) if stats.school_distribution else {}
         rank_distribution = self.parse_json(stats.rank_distribution) if stats.rank_distribution else {}
 
         return {
-            'school_count': basic_stats['school_count'],
+            # 基础计数
+            'school_count': basic_stats.get('school_count', 0),
             'student_count': stats.student_count,
-            'max_score': round(float(stats.max_score), 2),
-            'min_score': round(float(stats.min_score), 2),
-            'mean_score': round(float(stats.mean_score), 2),
-            'std_dev': round(float(stats.std_dev), 2),
+
+            # 集中趋势
+            'max_score': round(float(basic_stats.get('max_score', 0)), 2),
+            'min_score': round(float(basic_stats.get('min_score', 0)), 2),
+            'mean_score': round(float(basic_stats.get('avg_score', 0)), 2),
+            'median_score': round(float(basic_stats.get('median_score', 0)), 2),
+            'trimmed_mean': round(float(basic_stats.get('trimmed_mean', 0)), 2),
+
+            # 离散程度
+            'std_score': round(float(basic_stats.get('std_dev', 0)), 2),
+            'iqr': round(float(basic_stats.get('iqr', 0)), 2),
+            'range': round(float(basic_stats.get('range', 0)), 2),
+            'cv': round(float(basic_stats.get('cv', 0)), 4),
+
+            # 分位数
+            'q10_score': round(float(basic_stats.get('q10_score', 0)), 2),
+            'q20_score': round(float(basic_stats.get('q20_score', 0)), 2),
+            'q1_score': round(float(basic_stats.get('q1_score', 0)), 2),
+            'q3_score': round(float(basic_stats.get('q3_score', 0)), 2),
+            'q80_score': round(float(basic_stats.get('q80_score', 0)), 2),
+
+            # 分布特征
+            'skewness': round(float(basic_stats.get('skewness', 0)), 4),
+            'kurtosis': round(float(basic_stats.get('kurtosis', 0)), 4),
+            'normality_stat': round(float(basic_stats.get('normality_stat', 0)), 4),
+            'normality_pvalue': round(float(basic_stats.get('normality_pvalue', 0)), 4),
+
+            # Z分数统计
+            'z_score_above_2': round(float(basic_stats.get('z_score_above_2', 0)), 4),
+            'z_score_below_2': round(float(basic_stats.get('z_score_below_2', 0)), 4),
+
+            # 其他信息
             'top_school': top_school,
-
-            # 各类分数线统计
             'threshold_stats': threshold_stats,
-
-            # 学校分布数据
             'school_stats': school_distribution,
-
-            # 分数分布数据
             'rank_distribution': rank_distribution
         }
 
 
-    def _prepare_district_stats(self, stats):
-        """准备区县统计数据"""
-        if not stats:
+    def _prepare_district_stats(self, district, scores=None):
+        """
+           准备区县统计数据，使用实时计算。
+
+           Args:
+               district: 区县统计对象
+               scores: 列表，包含元组 (score, school_name)
+
+           Returns:
+               dict: 处理后的区县统计数据
+           """
+        logger.info(f"准备区县 {district.district_name} 的统计数据")
+        logger.info(f"收到的分数数据数量: {len(scores) if scores else 0}")
+
+        if not district or not scores:
+            logger.warning(f"缺少必要数据: district={bool(district)}, scores={bool(scores)}")
             return None
 
+        try:
+            # 分离分数和学校名
+            scores_data = np.array([(float(score), school) for score, school in scores if float(score) > 0])
+            if len(scores_data) == 0:
+                logger.warning(f"区县 {district.district_name} 没有有效分数数据")
+                return None
 
+            valid_scores = scores_data[:, 0].astype(float)  # 分数列表
+            schools = scores_data[:, 1]  # 学校名列表
 
-        school_data = self.parse_json(stats.school_distribution) if stats.school_distribution else {}
-        threshold_data = self.parse_json(stats.threshold_stats) if stats.threshold_stats else {}
+            # 计算基本统计量
+            mean_score = np.mean(valid_scores)
+            median_score = np.median(valid_scores)
+            std_score = np.std(valid_scores)
 
-        return {
-            'district_name': stats.district_name,
-            'select_type': stats.select_type,
-            'student_count': stats.student_count,
-            'max_score': round(float(stats.max_score), 2),
-            'min_score': round(float(stats.min_score), 2),
-            'mean_score': round(float(stats.mean_score), 2),
-            'std_dev': round(float(stats.std_dev), 2),
+            # 最高分及其学校
+            max_score_idx = np.argmax(valid_scores)
+            max_score = valid_scores[max_score_idx]
+            max_score_school = schools[max_score_idx]
 
-            # 学校统计数据
-            'school_stats': school_data,
+            # 最低分
+            min_score = np.min(valid_scores)
 
-            # 录取率统计数据
-            'rank_distribution': threshold_data
-        }
-   # 解析JSON字符串数据，处理可能已经是字典的情况
+            # 计算分位数
+            p5_score = np.percentile(valid_scores, 95)  # 前5%（从高到低）
+            p15_score = np.percentile(valid_scores, 85)  # 前15%
+            p55_score = np.percentile(valid_scores, 45)  # 前55%
+
+            # 计算分布特征
+            skewness = stats.skew(valid_scores)
+            kurtosis = stats.kurtosis(valid_scores)
+
+            result = {
+                'district_name': district.district_name,
+                'select_type': district.select_type,
+                'student_count': len(valid_scores),
+                'mean_score': round(float(mean_score), 2),
+                'median_score': round(float(median_score), 2),
+                'std_score': round(float(std_score), 2),
+                'max_score': round(float(max_score), 2),
+                'max_score_school': max_score_school,
+                'min_score': round(float(min_score), 2),
+                'range': round(float(max_score - min_score), 2),
+                'p5_score': round(float(p5_score), 2),  # 前5%
+                'p15_score': round(float(p15_score), 2),  # 前15%
+                'p55_score': round(float(p55_score), 2),  # 前55%
+                'skewness': round(float(skewness), 4),
+                'kurtosis': round(float(kurtosis), 4)
+            }
+
+            logger.info(f"成功生成区县统计数据: {result}")
+            return result
+
+        except Exception as e:
+            logger.error(f"处理区县 {district.district_name} 统计数据时出错: {str(e)}")
+            return None
+
+    def _get_district_scores(self,exam_id):
+        """
+           获取各区县的分数和学校数据。
+
+           Returns:
+               dict: {
+                   '区县1': {
+                       '理科': [(分数, 学校名), ...],
+                       '文科': [(分数, 学校名), ...]
+                   }
+               }
+           """
+        scores = ScoreStudentBasic.objects.filter(
+            exam_id=exam_id
+        ).values('district_name', 'select_type', 'total_score', 'school_name')
+
+        district_scores = {}
+        for score in scores:
+            district = score['district_name']
+            subject_type = score['select_type']
+            total_score = score['total_score']
+            school_name = score['school_name']
+
+            if district not in district_scores:
+                district_scores[district] = {'理科': [], '文科': []}
+            if subject_type in ['理科', '文科']:
+                district_scores[district][subject_type].append((total_score, school_name))
+
+        return district_scores
 
 
     def parse_json(self,data):

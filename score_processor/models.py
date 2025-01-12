@@ -18,6 +18,22 @@ class BaseExamConfig(models.Model):
     create_time = models.DateTimeField(blank=True, null=True)
     update_time = models.DateTimeField(blank=True, null=True)
 
+    @staticmethod
+    def is_divided(exam_id: str) -> bool:
+        """
+        判断考试是否分科
+        Args:
+            exam_id: 考试ID，例如：202410-CITY-H-2025
+        Returns:
+            bool: 是否分科
+        """
+        try:
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            divided_semesters = ['高一下', '高二上', '高二下', '高三上', '高三下']
+            return bool(exam.semester and any(term in exam.semester for term in divided_semesters))
+        except BaseExamConfig.DoesNotExist:
+            return False
+
     class Meta:
         app_label = 'score_processor'
         managed = False

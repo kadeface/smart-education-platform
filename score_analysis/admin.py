@@ -7,7 +7,8 @@ from django.template.response import TemplateResponse
 from django.db import connection, transaction
 from django import forms
 from django.shortcuts import render
-from django.db.models import Q
+from django.db.models import Q, F
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from .models.statistics import ExamScoreLines, ScoreRankings, StatisticsExamIndicators, ExamLevelAnalysisTask, \
     ExamLevelAnalysisConfig
@@ -401,108 +402,50 @@ class ScoreRankingsAdmin(admin.ModelAdmin):
     def get_list_filter(self, request):
         return [SubjectFilter, StreamTypeFilter, DistrictFilter]
 
-
-
-
-
 @admin.register(StatisticsExamIndicators)
 class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
     """统计指标管理"""
-    print("StatisticsExamIndicatorsAdmin 类被加载")  # 添加这行
-    #change_list_template = 'admin/score_analysis/statisticsexamindicators/exam_list.html'
-    list_display = ['exam_id', 'exam_time', 'has_statistics', 'get_action_button']
 
-    def has_add_permission(self, request):
-        return False
+    #change_list_template = 'admin/score_analysis/statisticsexamindicators/exam_list.html'
+  #  list_display = ['exam_id', 'exam_time', 'has_statistics', 'get_action_button']
+
+    list_display = ('exam_id', 'exam_name', 'exam_date', 'has_statistics', 'actions_column')
 
     def get_queryset(self, request):
-        """获取所有有成绩的考试"""
-        # 1. 从成绩表获取所有考试ID
-        exams_with_scores = list(ScoreStudentBasic.objects.values_list('exam_id', flat=True).distinct())
+        """获取所有考试列表"""
+        queryset = BaseExamConfig.objects.all().order_by('-exam_id')
+        # 将 exam_id 作为 indicator_id
+        return queryset.annotate(indicator_id=F('exam_id'))
 
-        # 2. 获取现有的统计记录，并关联考试名称
-        # 只获取总分记录，避免重复显示
-        existing_stats = StatisticsExamIndicators.objects.filter(
-            exam_id__in=exams_with_scores,
-            select_type='理科',
-            level_type='city',
-            subject_id='total_score'  # 只显示总分记录
-        ).annotate(
-            exam_name=Subquery(
-                BaseExamConfig.objects.filter(
-                    exam_id=OuterRef('exam_id')
-                ).values('exam_name')[:1]
-            )
-        )
-
-        # 3. 如果没有统计记录，为所有考试创建初始记录
-        if not existing_stats.exists():
-            stats_to_create = []
-            for exam_id in exams_with_scores:
-                stats_to_create.append(
-                    StatisticsExamIndicators(
-                        exam_id=exam_id,
-                        select_type='理科',
-                        level_type='city',
-                        subject_id='total_score'  # 确保新建记录是总分
-                    )
-                )
-            if stats_to_create:
-                StatisticsExamIndicators.objects.bulk_create(stats_to_create)
-                # 重新查询，包含考试名称
-                return StatisticsExamIndicators.objects.filter(
-                    exam_id__in=exams_with_scores,
-                    select_type='理科',
-                    level_type='city',
-                    subject_id='total_score'  # 只返回总分记录
-                ).annotate(
-                    exam_name=Subquery(
-                        BaseExamConfig.objects.filter(
-                            exam_id=OuterRef('exam_id')
-                        ).values('exam_name')[:1]
-                    )
-                )
-
-        return existing_stats
-
-    def exam_id(self, obj):
+    def exam_name(self, obj):
         """获取考试名称"""
-        return getattr(obj, 'exam_name', obj.exam_id)
+        return obj.exam_name
 
-    exam_id.short_description = '考试名称'
-
-
-    def exam_time(self, obj):
-        """从考试名称中提取时间"""
-        """从考试ID中提取时间"""
-        if obj.exam_id and len(obj.exam_id) >= 6:
-            year = obj.exam_id[:4]  # 取前4位作为年份
-            month = obj.exam_id[4:6]  # 取第5-6位作为月份
-            result = f"{year}年{month}月"
-            return result
-        return ''
-
-    exam_time.short_description = '考试时间'
-
+    def exam_date(self, obj):
+        """获取考试日期"""
+        return obj.exam_date
 
     def has_statistics(self, obj):
         """是否已生成统计"""
-        try:
-            # 检查是否存在统计数据
-            has_stats = StatisticsExamIndicators.objects.filter(
-                exam_id=obj.exam_id,
-                subject_id='total_score',  # 检查总分统计
-                student_count__gt=0  # 确保 student_count 大于 0
-            ).exists()
+        return StatisticsExamIndicators.objects.filter(
+            exam_id=obj.exam_id,
+            subject_id='total_score'
+        ).exists()
 
-            if has_stats:
-                return mark_safe('<span style="color: green;">✓</span>')
-            return mark_safe('<span style="color: red;">✗</span>')
-        except Exception as e:
-            logger.error(f"检查统计状态失败: {str(e)}")
-            return mark_safe('<span style="color: red;">✗</span>')
+    def actions_column(self, obj):
+        """操作列"""
+        return format_html(
+            '<a class="button" href="{}">重新统计</a> '
+            '<a class="button" href="{}">查看结果</a>',
+            reverse('admin:score_analysis_statisticsexamindicators_generate_statistics', args=[obj.exam_id]),
+            reverse('score_analysis:statistics_preview', args=[obj.exam_id, 'basic'])
+        )
 
+    exam_name.short_description = '考试名称'
+    exam_date.short_description = '考试日期'
     has_statistics.short_description = '已生成统计'
+    has_statistics.boolean = True
+    actions_column.short_description = '操作'
 
     def get_action_button(self, obj):
         """获取操作按钮"""

@@ -1,0 +1,213 @@
+/* 整体布局 */
+.exam-header {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.exam-header h2 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+    font-size: 1.8rem;
+}
+
+.exam-info {
+    display: flex;
+    gap: 2rem;
+    color: #666;
+}
+
+.exam-info span {
+    font-size: 1rem;
+}
+
+/* 标签页样式 */
+.type-tabs {
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #e9ecef;
+    display: flex;
+    gap: 1rem;
+}
+
+.tab-item {
+    padding: 0.75rem 1.5rem;
+    color: #666;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.3s ease;
+}
+
+.tab-item:hover {
+    color: #2c3e50;
+    text-decoration: none;
+}
+
+.tab-item.active {
+    color: #3498db;
+    border-bottom-color: #3498db;
+    font-weight: 500;
+}
+
+/* 内容区域 */
+.tab-content {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.tab-pane {
+    display: none;
+    padding: 1.5rem;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+/* 统计摘要部分 */
+.summary-section {
+    margin-bottom: 2rem;
+}
+
+.summary-section h3 {
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.summary-text {
+    line-height: 1.6;
+}
+
+.summary-text p {
+    margin-bottom: 1rem;
+    color: #4a4a4a;
+}
+
+.summary-text span {
+    color: #2c3e50;
+    font-weight: 500;
+    margin: 0 0.3rem;
+}
+
+/* 区县统计部分 */
+.district-stats {
+    margin-top: 2rem;
+    border-top: 1px solid #e9ecef;
+    padding-top: 1.5rem;
+}
+
+.district-stats h4 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.district-stats ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 2rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.district-stats ul li a {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    color: #666;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.district-stats ul li a:hover {
+    background: #e9ecef;
+    color: #2c3e50;
+}
+
+/* 区县详细信息 */
+.district-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.district-section h4 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.district-summary {
+    line-height: 1.6;
+}
+
+.district-summary p {
+    margin-bottom: 0.8rem;
+    color: #4a4a4a;
+}
+
+.district-summary span {
+    color: #2c3e50;
+    font-weight: 500;
+    margin: 0 0.3rem;
+}
+
+/* 返回顶部链接 */
+.back-to-top {
+    margin-top: 1rem;
+    text-align: right;
+}
+
+.back-to-top a {
+    color: #3498db;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.back-to-top a:hover {
+    text-decoration: underline;
+}
+
+/* 警告信息 */
+.alert {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .exam-info {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .type-tabs {
+        gap: 0.5rem;
+    }
+
+    .tab-item {
+        padding: 0.5rem 1rem;
+    }
+
+    .district-stats ul {
+        flex-direction: column;
+    }
+
+    .district-section {
+        padding: 1rem;
+    }
+}
