@@ -29,7 +29,7 @@ class BaseExamConfig(models.Model):
         """
         try:
             exam = BaseExamConfig.objects.get(exam_id=exam_id)
-            divided_semesters = ['高一下', '高二上', '高二下', '高三上', '高三下']
+            divided_semesters = ['H1-2', 'H2-1', 'H2-2', 'H3-1', 'H3-2']
             return bool(exam.semester and any(term in exam.semester for term in divided_semesters))
         except BaseExamConfig.DoesNotExist:
             return False

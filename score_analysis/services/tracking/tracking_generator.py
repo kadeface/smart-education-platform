@@ -41,7 +41,7 @@ class TrackingGenerator:
         school_level = exam_info['school_level']
         if school_level in ['P', 'M']:  # 小学、初中不分科
             return False
-        if school_level == 'H' and exam_info['semester'] == '高一上':  # 高一上不分科
+        if school_level == 'H' and exam_info['semester'] == 'H1-1':  # 高一上不分科
             return False
         return True
 
@@ -613,7 +613,7 @@ class TrackingGenerator:
             semester = exam_info.get('semester', '')
 
             # 只有高一下、高二、高三需要分科
-            if semester.startswith(('高一下', '高二', '高三')):
+            if semester.startswith(('H1-2', 'H2-1', 'H2-2', 'H3-1', 'H3-2')):
                 return True
 
             return False

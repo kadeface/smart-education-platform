@@ -202,8 +202,8 @@ class ExamOverviewView(TemplateView):
                     context.update(district_context)
                     logger.info("已处理区县考试数据")
             # 在返回之前添加日志
-            logger.info(f"science_data: {context.get('science')}")
-            logger.info(f"arts_data: {context.get('arts')}")
+          #  logger.info(f"science_data: {context.get('science')}")
+          #  logger.info(f"arts_data: {context.get('arts')}")
 
             # 确保数据被正确序列化
             if 'science' in context:
@@ -259,7 +259,7 @@ class ExamOverviewView(TemplateView):
         )
         if science_data:
             context['science'] = science_data
-            logger.info(f"处理后的理科数据: {context['science']}")
+        #    logger.info(f"处理后的理科数据: {context['science']}")
 
         # 处理文科数据
         arts_data = self._get_subject_stats(

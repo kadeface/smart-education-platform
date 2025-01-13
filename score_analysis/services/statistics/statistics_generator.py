@@ -20,7 +20,7 @@ class StatisticsGenerator:
         # 添加日志记录
         # 检查是否包含 -H- 并且后面是年份
         is_high_school = '-H-' in exam_config.exam_id and exam_config.exam_id.split('-H-')[1].isdigit()
-        is_not_first_semester = exam_config.semester not in ['高一上']
+        is_not_first_semester = exam_config.semester not in ['H1-1']
 
         is_division = is_high_school and is_not_first_semester
 
@@ -354,11 +354,8 @@ class StatisticsGenerator:
                             'low_score_rate': 10.0,
                             'rank_distribution': district_rank_counts,
                             'school_distribution': district_distribution,
-                            'threshold_stats': {
-                                'excellent': {'score': q80_score},
-                                'pass': {'score': q20_score},
-                                'low': {'score': q10_score}
-                            }
+                            'threshold_stats': threshold_stats
+
                         }
                     )
 

@@ -1595,7 +1595,7 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
 
     SCIENCE_ARTS_TYPES = ['文科', '理科']
     GENERAL_TYPE = '不确定'
-    DIVIDED_SEMESTERS = ['高一下', '高二上','高二下', '高三上', '高三下']  # 需要分科的学期
+    DIVIDED_SEMESTERS = ['H1-2', 'H2-1', 'H2-2', 'H3-1', 'H3-2']  # 需要分科的学期
     change_list_template = 'admin/exam_level/config_list.html'
     change_form_template = 'admin/exam_level/config_detail.html'
     class Media:

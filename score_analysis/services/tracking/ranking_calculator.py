@@ -188,7 +188,7 @@ class RankingCalculator:
             school_level = exam_id.split('-')[2]
 
             return (school_level == 'H' and
-                    exam_config.semester != '高一上')
+                    exam_config.semester != 'H1-1')
 
         except Exception as e:
             self.logger.error(f"检查考试分科状态时出错: {str(e)}")

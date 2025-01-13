@@ -7,7 +7,8 @@ from score_analysis.models import BaseExamConfig, ScoreStudentBasic
 from score_analysis.models.statistics import ExamLevelAnalysisConfig
 import logging
 logger = logging.getLogger(__name__)
-
+# 临时调整日志级别为 WARNING 或 ERROR
+logger.setLevel(logging.WARNING)  # 或 logging.ERROR
 
 @dataclass
 class ExamOverview:
@@ -94,19 +95,19 @@ class ExamLevelAnalysisGenerator:
             bool: 是否分科
         """
         try:
-            # 获取考试配置
-            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            exam_config = BaseExamConfig.objects.get(exam_id=exam_id)
+            school_level = exam_id.split('-')[2]
 
-            # 判断学期
-            divided_semesters = ['高一下', '高二上', '高二下', '高三上', '高三下']
-            return exam.semester in divided_semesters
+            return (school_level == 'H' and
+                    exam_config.semester != 'H1-1')
 
         except Exception as e:
-            logger.error(f"判断分科状态失败: {str(e)}")
+            self.logger.error(f"检查考试分科状态时出错: {str(e)}")
             return False
 
     def generate_exam_overview(self, exam_id: str, select_type: str) -> ExamOverview:
         """生成考试概况"""
+        logger.info(f"开始生成考试概况: exam_id={exam_id}, select_type={select_type}")
         scores = ScoreStudentBasic.objects.filter(
             exam_id=exam_id,
             select_type=select_type
@@ -135,9 +136,9 @@ class ExamLevelAnalysisGenerator:
 
         score_lines = {}
         total_count = overview_stats['student_count']
-
-        # 使用 _is_divided 判断是否为分科考试
-        if self._is_divided(exam_id):
+        # 在判断分科之前记录关键信息
+        logger.info(f"判断分科状态: exam_id={exam_id}, select_type={select_type}")
+        if select_type in ['文科', '理科']:
             # 分科考试：使用固定分数线
             for line_name, line_score in config.score_lines.items():
                 count = scores.filter(total_score__gte=line_score).count()
@@ -175,7 +176,7 @@ class ExamLevelAnalysisGenerator:
     def generate_score_line_distribution(self) -> ScoreLineDistribution:
         """生成分数线分布数据
 
-        仅在分科考试（文科/理科）时计算分数线分布，未分科时返回空数据。
+        所有分科考试（文科/理科）都计算分数线分布，未分科时返回空数据。
 
         Args:
             无
@@ -193,18 +194,21 @@ class ExamLevelAnalysisGenerator:
         counts = {}
         rates = {}
 
-        # 仅在分科考试时计算分数线分布
+        # 所有分科考试都计算分数线分布
         if self.select_type in ['文科', '理科']:
             all_scores = [
                 score for scores in self.scores_data['total'].values()
                 for score in scores
             ]
 
-            for line_name, line_score in self.config.score_lines.items():
-                lines[line_name] = line_score
-                count = sum(1 for score in all_scores if score >= line_score)
-                counts[line_name] = count
-                rates[line_name] = round(count / len(all_scores) * 100, 2)
+            if hasattr(self.config, 'score_lines') and self.config.score_lines:
+                for line_name, line_score in self.config.score_lines.items():
+                    lines[line_name] = line_score
+                    count = sum(1 for score in all_scores if score >= line_score)
+                    counts[line_name] = count
+                    rates[line_name] = round(count / len(all_scores) * 100, 2) if all_scores else 0
+            else:
+                logger.warning(f"未找到分数线配置: exam_id={self.exam_id}, select_type={self.select_type}")
 
         return ScoreLineDistribution(
             lines=lines,
@@ -213,12 +217,33 @@ class ExamLevelAnalysisGenerator:
         )
 
     def generate_ranking_distribution(self) -> RankingDistribution:
-        """生成排名分布"""
+        """生成排名分布数据
+
+        根据配置的排名范围，计算各学校在不同排名段的学生人数分布。
+
+        Args:
+            无
+
+        Returns:
+            RankingDistribution: 包含排名范围和各学校学生分布的数据结构
+
+        Raises:
+            ValueError: 当成绩数据未设置时抛出
+        """
         if not self.scores_data:
             raise ValueError("请先设置成绩数据")
 
-        # 获取市级排名范围
-        rank_ranges = self.config.rank_ranges.get('市级', [])
+        # 获取并确保排名范围为整数列表
+        try:
+            rank_ranges = [int(rank) for rank in self.config.rank_ranges.get('市级', [])]
+            rank_ranges.sort()  # 确保排名范围有序
+        except (ValueError, TypeError) as e:
+            logger.error(f"处理排名范围配置出错: {str(e)}")
+            return RankingDistribution(rank_ranges=[], school_counts={})
+
+        # 如果没有有效的排名范围，返回空结果
+        if not rank_ranges:
+            return RankingDistribution(rank_ranges=[], school_counts={})
 
         # 计算总体排名
         all_scores = [
@@ -231,13 +256,17 @@ class ExamLevelAnalysisGenerator:
         school_counts = {}
         for rank in rank_ranges:
             if rank <= len(sorted_scores):
-                cutoff = sorted_scores[rank - 1]
-                counts = {}
-                for school, scores in self.scores_data['total'].items():
-                    count = sum(1 for score in scores if score >= cutoff)
-                    if count > 0:
-                        counts[school] = count
-                school_counts[f'TOP{rank}'] = counts
+                try:
+                    cutoff = sorted_scores[rank - 1]
+                    counts = {}
+                    for school, scores in self.scores_data['total'].items():
+                        count = sum(1 for score in scores if score >= cutoff)
+                        if count > 0:
+                            counts[school] = count
+                    school_counts[f'TOP{rank}'] = counts
+                except Exception as e:
+                    logger.error(f"计算TOP{rank}分布时出错: {str(e)}")
+                    continue
 
         return RankingDistribution(
             rank_ranges=rank_ranges,
