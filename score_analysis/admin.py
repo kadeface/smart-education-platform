@@ -1825,6 +1825,12 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
                 '合格': 0.80,  # 前80%
                 '低分': 0.95  # 后5%
             }
+    def _get_default_rank_ranges(self):
+        """获取默认排名范围配置"""
+        return {
+            '市级': [10, 50, 100, 200, 500, 1000, 3000, 9600],
+            'default': [10, 50, 100, 400, 1250]
+        }
 
     def reset_exam_configs(self, request, exam_id):
         """重置单个考试的所有配置"""
@@ -1832,7 +1838,8 @@ class ExamLevelAnalysisConfigAdmin(admin.ModelAdmin):
         try:
             with transaction.atomic():  # 添加事务处理
                 exam = BaseExamConfig.objects.select_for_update().get(exam_id=exam_id)  # 添加行锁
-
+                # 使用统一的数字列表格式
+                default_rank_ranges = self._get_default_rank_ranges()
                 # 根据学期确定需要重置的分科类型
                 if exam.semester in self.DIVIDED_SEMESTERS:
                     select_types = self.SCIENCE_ARTS_TYPES  # 文科、理科

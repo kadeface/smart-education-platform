@@ -604,18 +604,10 @@ class StatisticsGenerator:
                 is_active=True
             ).first()
 
+            # 统一使用数字列表格式
             if not config:
                 logger.warning(f"未找到排名配置: exam_id={exam_id}, select_type={select_type}, 使用默认配置")
-                rank_points = {
-                    'top_10': 10,
-                    'top_50': 50,
-                    'top_100': 100,
-                    'top_200': 200,
-                    'top_500': 400,
-                    'top_1000': 1200,
-                    'top_3000': 3000,
-                    'top_9600': 9600
-                }
+                rank_points = [10, 50, 100, 200, 500, 1000, 3000, 9600]
             else:
                 # 解析配置的排名点
                 rank_ranges = config.rank_ranges
@@ -626,16 +618,11 @@ class StatisticsGenerator:
 
                 if not rank_points:
                     logger.warning("配置的排名点无效，使用默认配置")
-                    rank_points = {
-                        'top_10': 10,
-                        'top_50': 50,
-                        'top_100': 100,
-                        'top_200': 200,
-                        'top_500': 500,
-                        'top_1000': 1000
-                    }
+                    rank_points = [10, 50, 100, 200, 500, 1000]
 
             logger.info(f"使用的排名点配置: {rank_points}")
+
+
 
             # 初始化分组排名统计
             group_rank_counts = {}
