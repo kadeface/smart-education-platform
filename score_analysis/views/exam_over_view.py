@@ -214,34 +214,6 @@ class ExamOverviewView(TemplateView):
         except Exception as e:
             logger.error(f"获取考试信息时出错: {str(e)}")
             return {}
-
-
-    def _get_rank_fields(self, rank_distribution):
-        """
-        从rank_distribution中动态获取排名字段。
-
-        Args:
-            rank_distribution: dict, 排名分布数据
-
-        Returns:
-            list: 排名字段列表，例如 ['top_10', 'top_20', ...]
-        """
-        try:
-            # 获取第一个非空的rank_distribution
-            sample_ranks = next(
-                (ranks for ranks in rank_distribution.values() if ranks),
-                {}
-            )
-            # 提取所有以'top_'开头的键，并排序
-            rank_fields = sorted(
-                [key for key in sample_ranks.keys() if key.startswith('top_')],
-                key=lambda x: int(x.split('_')[1])  # 按数字大小排序
-            )
-            return rank_fields
-        except Exception as e:
-            logger.error(f"获取排名字段时出错: {str(e)}")
-            return []
-
     def _process_city_stats(self, basic_stats, exam_stats):
         """处理市级统计数据"""
         context = {}
@@ -361,11 +333,8 @@ class ExamOverviewView(TemplateView):
                 **{subject: basic_subject_stats['max_score']}
             ).values_list('school_name', flat=True).first() or "暂无数据"
 
-            # 4. 获取统计数据和排名分布
+            # 4. 获取统计数据
             stats_obj = level_stats.filter(select_type=subject_type).first()
-            rank_distribution = stats_obj.rank_distribution if stats_obj else {}
-
-            logger.info(f"获取到排名分布数据: {rank_distribution}")
 
             # 在返回数据之前，添加学校统计数据
             if stats_obj:
@@ -383,9 +352,6 @@ class ExamOverviewView(TemplateView):
 
                     scores_array = np.array([float(score) for score in school_scores if score > 0])
 
-                    # 获取该学校的排名数据
-                    school_ranks = rank_distribution.get(school_name, {})
-
                     if len(scores_array) > 0:
                         # 计算分位数
                         percentiles = np.percentile(scores_array, [5, 15, 55])
@@ -401,17 +367,9 @@ class ExamOverviewView(TemplateView):
                             'p15_score': float(percentiles[1]),
                             'p55_score': float(percentiles[2]),
                             'skewness': float(stats.skew(scores_array)),
-                            'kurtosis': float(stats.kurtosis(scores_array)),
-                            # 添加排名数据
-                            'top_10': school_ranks.get('top_10', 0),
-                            'top_20': school_ranks.get('top_20', 0),
-                            'top_50': school_ranks.get('top_50', 0),
-                            'top_100': school_ranks.get('top_100', 0),
-                            'top_200': school_ranks.get('top_200', 0),
-                            'top_500': school_ranks.get('top_500', 0)
+                            'kurtosis': float(stats.kurtosis(scores_array))
                         }
                         schools_data.append(school_data)
-                        logger.info(f"学校 {school_name} 的统计数据: {school_data}")
 
                 # 添加学校统计数据到结果中
                 result['school_stats'] = schools_data
@@ -421,7 +379,7 @@ class ExamOverviewView(TemplateView):
             return None
 
         except Exception as e:
-            logger.error(f"获取科目统计数据时出错: {str(e)}")
+            logger.error(f"获取{subject_type}-{subject}统计数据时出错: {str(e)}")
             logger.error(f"错误详情: {traceback.format_exc()}")
             return None
 
@@ -452,10 +410,9 @@ class ExamOverviewView(TemplateView):
                 )
 
                 if science_data:
-                    # 2. 获取理科学校数据，传入 level_stats 参数
+                    # 2. 获取理科学校数据
                     science_schools = self._get_schools_stats(
                         basic_stats=basic_stats,
-                        level_stats=districts,  # 添加这个参数
                         subject_type='理科'
                     )
                     science_data['schools'] = science_schools
@@ -472,10 +429,9 @@ class ExamOverviewView(TemplateView):
                 )
 
                 if arts_data:
-                    # 2. 获取文科学校数据，传入 level_stats 参数
+                    # 2. 获取文科学校数据
                     arts_schools = self._get_schools_stats(
                         basic_stats=basic_stats,
-                        level_stats=districts,  # 添加这个参数
                         subject_type='文科'
                     )
                     arts_data['schools'] = arts_schools
@@ -488,25 +444,18 @@ class ExamOverviewView(TemplateView):
             return None
 
 
-    def _get_schools_stats(self, basic_stats, level_stats, subject_type):
+    def _get_schools_stats(self, basic_stats, subject_type):
         """
            获取各学校的统计数据。
 
            Args:
-               basic_stats: QuerySet, 已经过区县筛选的基础统计数据
-               level_stats: QuerySet, 考试级别统计数据
+               basic_stats: QuerySet, 基础统计数据
                subject_type: str, 科目类型（理科/文科）
 
            Returns:
                list: 学校统计数据列表
            """
         try:
-            # 获取排名分布数据
-            stats = level_stats.filter(select_type=subject_type).first()
-            rank_distribution = stats.rank_distribution if stats else {}
-
-            logger.info(f"获取到排名分布数据: {rank_distribution}")
-
             # 按学校分组统计基础指标
             schools_stats = basic_stats.filter(
                 select_type=subject_type
@@ -515,39 +464,36 @@ class ExamOverviewView(TemplateView):
                 max_score=Max('total_score'),
                 mean_score=Avg('total_score'),
                 std_score=StdDev('total_score')
-            ).order_by('-mean_score')
+            ).order_by('-mean_score')  # 按平均分降序排序
 
+            # 处理每个学校的数据
             schools_data = []
             for school in schools_stats:
-                school_name = school['school_name']
-
-                # 获取该学校的排名数据
-                school_ranks = rank_distribution.get(school_name, {})
-                logger.info(f"学校 {school_name} 的排名数据: {school_ranks}")
-                # 获取该学校的分数
+                # 获取该学校的所有分数
                 scores = basic_stats.filter(
                     select_type=subject_type,
-                    school_name=school_name
+                    school_name=school['school_name']
                 ).values_list('total_score', flat=True)
 
+                # 转换为numpy数组并过滤0分
                 scores_array = np.array([float(score) for score in scores if score > 0])
 
                 if len(scores_array) > 0:
+                    # 计算分位数
+                    percentiles = np.percentile(scores_array, [5, 15, 50, 55])
+
                     school_data = {
-                        'school_name': school_name,
+                        'school_name': school['school_name'],
                         'student_count': school['student_count'],
                         'max_score': float(school['max_score']),
                         'mean_score': float(school['mean_score']),
-                        'median_score': float(np.median(scores_array)),
+                        'median_score': float(percentiles[2]),  # 50分位数
                         'std_score': float(school['std_score']),
-                        'top_10': int(school_ranks.get('top_10', 0)),  # 确保转换为整数
-                        'top_20': int(school_ranks.get('top_20', 0)),
-                        'top_50': int(school_ranks.get('top_50', 0)),
-                        'top_100': int(school_ranks.get('top_100', 0)),
-                        'top_200': int(school_ranks.get('top_200', 0)),
-                        'top_500': int(school_ranks.get('top_500', 0)),
-                        #'skewness': float(stats.skew(scores_array)),
-                        #'kurtosis': float(stats.kurtosis(scores_array))
+                        'p5_score': float(percentiles[0]),  # 5分位数
+                        'p15_score': float(percentiles[1]),  # 15分位数
+                        'p55_score': float(percentiles[3]),  # 55分位数
+                        'skewness': float(stats.skew(scores_array)),
+                        'kurtosis': float(stats.kurtosis(scores_array))
                     }
                     schools_data.append(school_data)
 
@@ -555,7 +501,6 @@ class ExamOverviewView(TemplateView):
 
         except Exception as e:
             logger.error(f"获取学校统计数据时出错: {str(e)}")
-            logger.error(f"错误详情: {traceback.format_exc()}")
             return []
 
     def get_context_data_no_subjects(self, exam_id):

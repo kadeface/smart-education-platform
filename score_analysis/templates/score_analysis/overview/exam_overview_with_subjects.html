@@ -269,24 +269,6 @@
 .district-table tbody tr {
     transition: background-color 0.2s;
 }
-.stats-section,
-.rank-section {
-    margin-top: 2rem;
-    margin-bottom: 2rem;
-}
-
-.stats-section h4,
-.rank-section h4 {
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid #007bff;
-    color: #333;
-}
-
-.district-table {
-    margin-bottom: 2rem;
-}
-
 /* 响应式设计 */
 @media (max-width: 1200px) {
     .content-wrapper {
@@ -432,25 +414,22 @@ function renderCityStats(type, data) {
     `;
 
     container.innerHTML = content;
-        initTableSort();
 }
 // 新增区县考试处理函数
 function renderDistrictStats(type, data) {
     console.log(`开始渲染区县${type}数据`);
-    console.log('学校统计数据:', data.school_stats);
-
+     console.log('学校统计数据:', data.school_stats); // 特别检查school_stats
     const container = document.getElementById(type + '-tab');
     if (!container) {
         console.error(`未找到${type}-tab元素`);
         return;
     }
-
+        // 检查必要的数据字段
     if (!data.school_count || !data.student_count) {
         console.error('缺少必要的统计数据');
         container.innerHTML = '<div class="error-message">数据不完整</div>';
         return;
     }
-
     let content = `
         <!-- 基础统计 -->
         <div class="city-stats">
@@ -487,73 +466,47 @@ function renderDistrictStats(type, data) {
             </div>
         </div>
 
-
-${data.school_stats && data.school_stats.length > 0 ? `
-<div class="stats-section">
-    <h4>各校基础统计</h4>
-    <div class="district-table-wrapper">
-        <table class="district-table">
-            <thead>
-                <tr>
-                    <th data-sort="string">学校</th>
-                    <th data-sort="number">考生人数</th>
-                    <th data-sort="number">最高分</th>
-                    <th data-sort="number">平均分</th>
-                    <th data-sort="number">中位数</th>
-                    <th data-sort="number">标准差</th>
-                    <th data-sort="number">偏度</th>
-                    <th data-sort="number">峰度</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${data.school_stats.map(school => `
-                    <tr>
-                        <td class="school-name">${school.school_name}</td>
-                        <td class="number">${school.student_count}</td>
-                        <td class="score">${school.max_score.toFixed(2)}</td>
-                        <td class="score">${school.mean_score.toFixed(2)}</td>
-                        <td class="score">${school.median_score.toFixed(2)}</td>
-                        <td class="number">${school.std_score.toFixed(2)}</td>
-                        <td class="number">${school.skewness.toFixed(4)}</td>
-                        <td class="number">${school.kurtosis.toFixed(4)}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- 学校排名分布表格 -->
-<div class="rank-section">
-    <h4>各校排名分布</h4>
-    <div class="district-table-wrapper">
-        <table class="district-table">
-            <thead>
-                <tr>
-                    <th data-sort="string">学校</th>
-                    <th data-sort="number">前10名</th>
-                    <th data-sort="number">前20名</th>
-                    <th data-sort="number">前50名</th>
-                    <th data-sort="number">前100名</th>
-                    <th data-sort="number">前200名</th>
-                    <th data-sort="number">前500名</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${data.school_stats.map(school => `
-                    <tr>
-                        <td class="school-name">${school.school_name}</td>
-                        <td class="number">${school.top_10}</td>
-                        <td class="number">${school.top_20}</td>
-                        <td class="number">${school.top_50}</td>
-                        <td class="number">${school.top_100}</td>
-                        <td class="number">${school.top_200}</td>
-                        <td class="number">${school.top_500}</td>
-                    </tr>
-                `).join('')}
-            </tbody>
-            </table>
-        </div>
+        <!-- 学校统计表格 -->
+        ${data.school_stats && Array.isArray(data.school_stats) && data.school_stats.length > 0 ? `
+            <div class="school-stats">
+                <h4>各校统计</h4>
+                <div class="district-table-wrapper">
+                    <table class="district-table">
+                        <thead>
+                            <tr>
+                                <th>学校</th>
+                                <th>考生人数</th>
+                                <th>最高分</th>
+                                <th>平均分</th>
+                                <th>中位数</th>
+                                <th>标准差</th>
+                                <th>前5%</th>
+                                <th>前15%</th>
+                                <th>前55%</th>
+                                <th>偏度</th>
+                                <th>峰度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.school_stats.map(school => `
+                                <tr>
+                                    <td class="school-name">${school.school_name}</td>
+                                    <td class="number">${school.student_count}</td>
+                                    <td class="score">${school.max_score.toFixed(2)}</td>
+                                    <td class="score">${school.mean_score.toFixed(2)}</td>
+                                    <td class="score">${school.median_score.toFixed(2)}</td>
+                                    <td class="number">${school.std_score.toFixed(2)}</td>
+                                    <td class="score">${school.p5_score.toFixed(2)}</td>
+                                    <td class="score">${school.p15_score.toFixed(2)}</td>
+                                    <td class="score">${school.p55_score.toFixed(2)}</td>
+                                    <td class="number">${school.skewness.toFixed(4)}</td>
+                                    <td class="number">${school.kurtosis.toFixed(4)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         ` : ''}
     `;
 
