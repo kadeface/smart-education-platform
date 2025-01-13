@@ -285,6 +285,124 @@
         color: #333 !important;
     }
 
+/* 卡片基础样式 */
+.stats-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* 卡片标题样式 */
+.stats-card h4 {
+    color: #1d3557;
+    font-size: 18px;
+    margin: 0 0 20px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #00bfa5;
+}
+
+/* 修改现有的统计区域样式 */
+.city-stats {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.city-stats:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.stats-section {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stats-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.rank-distribution-stats {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rank-distribution-stats:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* 调整表格容器样式 */
+.district-table-wrapper {
+    margin-top: 0;  /* 移除顶部边距，因为已经有卡片padding */
+    border-radius: 8px;
+    overflow: hidden;  /* 确保圆角效果 */
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+    .stats-card,
+    .city-stats,
+    .stats-section,
+    .rank-distribution-stats {
+        padding: 16px;
+        margin-bottom: 16px;
+        border-radius: 8px;
+    }
+
+    .stats-card h4 {
+        font-size: 16px;
+        margin-bottom: 16px;
+    }
+}
+
+/* 内容区域背景 */
+.content-wrapper {
+    background-color: #f5f7fa;  /* 浅灰色背景 */
+    padding: 24px;
+    min-height: 100vh;
+}
+
+/* 调整表格在卡片内的边距 */
+.district-table {
+    margin: 0;  /* 移除表格边距 */
+}
+
+/* 优化卡片内的文字间距 */
+.overview-section p {
+    margin: 12px 0;
+    line-height: 1.8;
+}
+
+/* 调整标题样式 */
+.stats-section h4,
+.rank-distribution-stats h4 {
+    color: #1d3557;
+    font-size: 18px;
+    margin: 0 0 20px 0;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #00bfa5;
+}
 }
 </style>
 <input type="hidden" id="exam-type" value="{{ exam.type }}">
@@ -339,7 +457,7 @@ function renderCityStats(type, data) {
     }
     let content = `
         <!-- 市级统计 -->
-        <div class="city-stats">
+        <div class="stats-card city-stats">
             <div class="overview-section">
                 <p class="overview-text">
                     本次考试，总计有<span class="number-highlight">${data.school_count}所</span>学校，
@@ -375,7 +493,7 @@ function renderCityStats(type, data) {
 
         <!-- 区县统计表格部分 -->
         ${data.district_stats && data.district_stats.length > 0 ? `
-            <div class="district-stats">
+        <div class="stats-card stats-section">
                 <h4>各区县统计</h4>
                 <div class="district-table-wrapper">
                     <table class="district-table">
@@ -418,7 +536,7 @@ function renderCityStats(type, data) {
 
                 <!-- 区县排名分布表格 -->
                 ${data.rank_distribution ? `
-                    <div class="rank-distribution-stats">
+        <div class="stats-card rank-distribution-stats">
                         <h4>区县排名分布</h4>
                         <div class="district-table-wrapper">
                             <table class="district-table">
@@ -470,7 +588,7 @@ function renderDistrictStats(type, data) {
 
     let content = `
         <!-- 基础统计 -->
-        <div class="city-stats">
+    <div class="stats-card city-stats">
             <div class="overview-section">
                 <p class="overview-text">
                     本次考试，总计有<span class="number-highlight">${data.school_count}所</span>学校，
@@ -505,7 +623,7 @@ function renderDistrictStats(type, data) {
         </div>
 
         ${data.school_stats && data.school_stats.length > 0 ? `
-            <div class="stats-section">
+        <div class="stats-card stats-section">
                 <h4>各校基础统计</h4>
                 <div class="district-table-wrapper">
                     <table class="district-table">
@@ -540,7 +658,7 @@ function renderDistrictStats(type, data) {
 
                 <!-- 学校排名分布表格 -->
                 ${data.rank_distribution ? `
-                    <div class="rank-distribution-stats">
+        <div class="stats-card rank-distribution-stats">
                         <h4>学校排名分布</h4>
                         <div class="district-table-wrapper">
                             <table class="district-table">
