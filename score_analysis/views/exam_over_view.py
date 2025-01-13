@@ -190,6 +190,7 @@ class ExamOverviewView(TemplateView):
         except Exception as e:
             logger.error(f"计算分数极差时出错: {str(e)}")
             return 0
+
     def _get_exam_info(self, exam_id):
         """
            从base_exam_config获取考试基本信息。
@@ -364,12 +365,13 @@ class ExamOverviewView(TemplateView):
             # 4. 获取统计数据和排名分布
             stats_obj = level_stats.filter(select_type=subject_type).first()
             rank_distribution = stats_obj.rank_distribution if stats_obj else {}
-
-            logger.info(f"获取到排名分布数据: {rank_distribution}")
+            rank_fields = self._get_rank_fields(rank_distribution)
+            logger.info(f"获取到排名字段: {rank_fields}")
 
             # 在返回数据之前，添加学校统计数据
             if stats_obj:
                 result = self._prepare_stats(stats_obj, basic_subject_stats, top_school)
+                result['rank_fields'] = rank_fields
 
                 # 获取学校统计数据
                 schools_data = []
@@ -411,7 +413,7 @@ class ExamOverviewView(TemplateView):
                             'top_500': school_ranks.get('top_500', 0)
                         }
                         schools_data.append(school_data)
-                        logger.info(f"学校 {school_name} 的统计数据: {school_data}")
+#                        logger.info(f"学校 {school_name} 的统计数据: {school_data}")
 
                 # 添加学校统计数据到结果中
                 result['school_stats'] = schools_data
@@ -505,7 +507,7 @@ class ExamOverviewView(TemplateView):
             stats = level_stats.filter(select_type=subject_type).first()
             rank_distribution = stats.rank_distribution if stats else {}
 
-            logger.info(f"获取到排名分布数据: {rank_distribution}")
+ #           logger.info(f"获取到排名分布数据: {rank_distribution}")
 
             # 按学校分组统计基础指标
             schools_stats = basic_stats.filter(
@@ -523,7 +525,7 @@ class ExamOverviewView(TemplateView):
 
                 # 获取该学校的排名数据
                 school_ranks = rank_distribution.get(school_name, {})
-                logger.info(f"学校 {school_name} 的排名数据: {school_ranks}")
+               # logger.info(f"学校 {school_name} 的排名数据: {school_ranks}")
                 # 获取该学校的分数
                 scores = basic_stats.filter(
                     select_type=subject_type,
@@ -540,15 +542,14 @@ class ExamOverviewView(TemplateView):
                         'mean_score': float(school['mean_score']),
                         'median_score': float(np.median(scores_array)),
                         'std_score': float(school['std_score']),
-                        'top_10': int(school_ranks.get('top_10', 0)),  # 确保转换为整数
-                        'top_20': int(school_ranks.get('top_20', 0)),
-                        'top_50': int(school_ranks.get('top_50', 0)),
-                        'top_100': int(school_ranks.get('top_100', 0)),
-                        'top_200': int(school_ranks.get('top_200', 0)),
-                        'top_500': int(school_ranks.get('top_500', 0)),
                         #'skewness': float(stats.skew(scores_array)),
                         #'kurtosis': float(stats.kurtosis(scores_array))
                     }
+                    # 动态添加排名分布数据
+                    rank_fields = self._get_rank_fields(rank_distribution)
+                    for field in rank_fields:
+                        school_data[field] = int(school_ranks.get(field, 0))  # 确保转换为整数
+
                     schools_data.append(school_data)
 
             return schools_data
@@ -656,8 +657,8 @@ class ExamOverviewView(TemplateView):
            Returns:
                dict: 处理后的区县统计数据
            """
-        logger.info(f"准备区县 {district.district_name} 的统计数据")
-        logger.info(f"收到的分数数据数量: {len(scores) if scores else 0}")
+#        logger.info(f"准备区县 {district.district_name} 的统计数据")
+#        logger.info(f"收到的分数数据数量: {len(scores) if scores else 0}")
 
         if not district or not scores:
             logger.warning(f"缺少必要数据: district={bool(district)}, scores={bool(scores)}")
@@ -667,7 +668,7 @@ class ExamOverviewView(TemplateView):
             # 分离分数和学校名
             scores_data = np.array([(float(score), school) for score, school in scores if float(score) > 0])
             if len(scores_data) == 0:
-                logger.warning(f"区县 {district.district_name} 没有有效分数数据")
+#                logger.warning(f"区县 {district.district_name} 没有有效分数数据")
                 return None
 
             valid_scores = scores_data[:, 0].astype(float)  # 分数列表
@@ -713,7 +714,7 @@ class ExamOverviewView(TemplateView):
                 'kurtosis': round(float(kurtosis), 4)
             }
 
-            logger.info(f"成功生成区县统计数据: {result}")
+#            logger.info(f"成功生成区县统计数据: {result}")
             return result
 
         except Exception as e:
