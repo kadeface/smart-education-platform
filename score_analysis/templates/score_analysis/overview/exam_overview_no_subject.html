@@ -1,0 +1,170 @@
+{% extends "score_analysis/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="header-section">
+        <h2>{{ exam_info.exam_name }}</h2>
+        <p class="exam-info">考试时间：{{ exam_info.exam_date }}</p>
+    </div>
+
+    <!-- 统计数据内容 -->
+    <div class="tab-content">
+        <div id="overall-tab" class="tab-pane active">
+            <script type="application/json" id="overall-data">
+                {{ overall_data|safe }}
+            </script>
+
+            <!-- 基础统计卡片 -->
+            <div class="stats-card city-stats">
+                <div class="overview-section">
+                    <h4>基础统计</h4>
+                    <p class="overview-text">
+                        本次考试，总计有<span class="number-highlight">{{ overall_data.school_count }}所</span>学校，
+                        参考总人数<span class="number-highlight">{{ overall_data.student_count }}人</span>。
+                    </p>
+                    <p class="stats-text">
+                        平均分为<span class="score-highlight">{{ overall_data.mean_score }}分</span>，
+                        中位数为<span class="score-highlight">{{ overall_data.median_score }}分</span>，
+                        标准差为<span class="number-highlight">{{ overall_data.std_score }}</span>。
+                    </p>
+                    <p class="score-text">
+                        最高分为<span class="score-highlight">{{ overall_data.max_score }}分</span>，
+                        所属学校为<span class="school-highlight">{{ overall_data.top_school }}</span>，
+                        分数极差为<span class="score-highlight">{{ overall_data.range }}分</span>。
+                    </p>
+                    <p class="distribution-text">
+                        分布特征：
+                        偏度为<span class="number-highlight">{{ overall_data.skewness }}</span>，
+                        峰度为<span class="number-highlight">{{ overall_data.kurtosis }}</span>。
+                    </p>
+                </div>
+            </div>
+
+            <!-- 区县/学校统计表格 -->
+            {% if overall_data.is_district_exam %}
+            <!-- 学校统计表格 -->
+            <div class="stats-card stats-section">
+                <h4>各校统计</h4>
+                <div class="district-table-wrapper">
+                    <table class="district-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="string">学校<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">考生人数<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">最高分<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">平均分<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">中位数<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">标准差<span class="sort-indicator">⇅</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for school in overall_data.school_stats %}
+                            <tr>
+                                <td class="school-name">{{ school.school_name }}</td>
+                                <td class="number">{{ school.student_count }}</td>
+                                <td class="score">{{ school.max_score }}</td>
+                                <td class="score">{{ school.mean_score }}</td>
+                                <td class="score">{{ school.median_score }}</td>
+                                <td class="number">{{ school.std_score }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <!-- 区县统计表格 -->
+            <div class="stats-card stats-section">
+                <h4>各区县统计</h4>
+                <div class="district-table-wrapper">
+                    <table class="district-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="string">区县<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">考生人数<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">最高分<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="string">最高分学校</th>
+                                <th data-sort="number">平均分<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">中位数<span class="sort-indicator">⇅</span></th>
+                                <th data-sort="number">标准差<span class="sort-indicator">⇅</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for district in overall_data.district_stats %}
+                            <tr>
+                                <td class="district-name">{{ district.district_name }}</td>
+                                <td class="number">{{ district.student_count }}</td>
+                                <td class="score">{{ district.max_score }}</td>
+                                <td class="school-name">{{ district.max_score_school }}</td>
+                                <td class="score">{{ district.mean_score }}</td>
+                                <td class="score">{{ district.median_score }}</td>
+                                <td class="number">{{ district.std_score }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript代码 -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('页面加载完成');
+    initTableSort();
+});
+
+// 表格排序功能
+function initTableSort() {
+    const tables = document.querySelectorAll('.district-table');
+    tables.forEach(table => {
+        const headers = table.querySelectorAll('th[data-sort]');
+        headers.forEach(header => {
+            header.addEventListener('click', function() {
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const index = Array.from(header.parentNode.children).indexOf(header);
+                const isNumeric = header.dataset.sort === 'number';
+
+                // 获取当前排序方向
+                const currentDir = header.getAttribute('data-sort-dir') || 'desc';
+                const newDir = currentDir === 'desc' ? 'asc' : 'desc';
+
+                // 更新所有表头的排序状态
+                headers.forEach(h => {
+                    h.setAttribute('data-sort-dir', '');
+                    h.querySelector('.sort-indicator').textContent = '⇅';
+                });
+
+                // 更新当前表头的排序状态
+                header.setAttribute('data-sort-dir', newDir);
+                header.querySelector('.sort-indicator').textContent = newDir === 'desc' ? '↓' : '↑';
+
+                // 排序行
+                rows.sort((a, b) => {
+                    const cellA = a.cells[index].textContent.trim();
+                    const cellB = b.cells[index].textContent.trim();
+
+                    if (isNumeric) {
+                        return newDir === 'desc' ?
+                            parseFloat(cellB) - parseFloat(cellA) :
+                            parseFloat(cellA) - parseFloat(cellB);
+                    } else {
+                        return newDir === 'desc' ?
+                            cellB.localeCompare(cellA) :
+                            cellA.localeCompare(cellB);
+                    }
+                });
+
+                // 重新插入排序后的行
+                rows.forEach(row => tbody.appendChild(row));
+            });
+        });
+    });
+}
+</script>
+{% endblock %}

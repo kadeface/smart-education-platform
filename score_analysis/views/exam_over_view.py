@@ -33,7 +33,7 @@ class ExamOverviewView(TemplateView):
                 template_name = 'score_analysis/overview/exam_overview_with_subjects.html'
             else:
                 context = self.get_context_data_no_subjects(exam_id)
-                template_name = 'score_analysis/overview/exam_overview_no_subjects.html'
+                template_name = 'score_analysis/overview/exam_overview_no_subject.html'
 
             context.update({
                 'module_type': module_type,
@@ -46,7 +46,70 @@ class ExamOverviewView(TemplateView):
             return render(request, 'score_analysis/client/error.html', {
                 'error_message': f'获取统计数据时发生错误: {str(e)}'
             })
+    def _get_basic_stats(self, exam_id):
+        """获取基础成绩统计数据"""
+        stats = ScoreStudentBasic.objects.filter(
+            exam_id=exam_id,
+            total_score__isnull=False
+        )
+        logger.info(f"基础成绩数据数量: {stats.count()}")
+        return stats
 
+
+    def _get_exam_stats(self, exam_id):
+        """获取考试级别统计数据"""
+        stats = ExamLevelStatistics.objects.filter(exam_id=exam_id)
+        logger.info(f"考试统计数据数量: {stats.count()}")
+        count = stats.count()
+        if count == 0:
+            logger.warning(f"未找到考试ID {exam_id} 的统计数据记录")
+        return stats
+
+
+    def _calculate_score_range(self, scores):
+        """
+        计算有效分数的极差（忽略0分）。
+
+        Args:
+            scores: 分数列表
+
+        Returns:
+            float: 分数极差
+        """
+        try:
+            # 过滤掉0分
+            valid_scores = [score for score in scores if score > 0]
+            if not valid_scores:
+                return 0
+            return max(valid_scores) - min(valid_scores)
+        except Exception as e:
+            logger.error(f"计算分数极差时出错: {str(e)}")
+            return 0
+
+    def _get_exam_info(self, exam_id):
+        """
+           从base_exam_config获取考试基本信息。
+
+           Args:
+               exam_id: 考试ID
+
+           Returns:
+               dict: 包含考试基本信息的字典
+           """
+        try:
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            return {
+                'exam_name': exam.exam_name,
+                'exam_date': exam.exam_date.strftime('%Y-%m-%d') if exam.exam_date else '',
+                'exam_id': exam_id,
+                # 可以添加其他需要的考试信息
+            }
+        except BaseExamConfig.DoesNotExist:
+            logger.error(f"未找到ID为{exam_id}的考试")
+            return {}
+        except Exception as e:
+            logger.error(f"获取考试信息时出错: {str(e)}")
+            return {}
 
     def get_context_data_with_subjects(self, exam_id):
         """
@@ -154,67 +217,7 @@ class ExamOverviewView(TemplateView):
             return {}
 
 
-    def _get_basic_stats(self, exam_id):
-        """获取基础成绩统计数据"""
-        stats = ScoreStudentBasic.objects.filter(
-            exam_id=exam_id,
-            total_score__isnull=False
-        )
-        logger.info(f"基础成绩数据数量: {stats.count()}")
-        return stats
 
-
-    def _get_exam_stats(self, exam_id):
-        """获取考试级别统计数据"""
-        stats = ExamLevelStatistics.objects.filter(exam_id=exam_id)
-        logger.info(f"考试统计数据数量: {stats.count()}")
-        return stats
-
-
-    def _calculate_score_range(self, scores):
-        """
-        计算有效分数的极差（忽略0分）。
-
-        Args:
-            scores: 分数列表
-
-        Returns:
-            float: 分数极差
-        """
-        try:
-            # 过滤掉0分
-            valid_scores = [score for score in scores if score > 0]
-            if not valid_scores:
-                return 0
-            return max(valid_scores) - min(valid_scores)
-        except Exception as e:
-            logger.error(f"计算分数极差时出错: {str(e)}")
-            return 0
-
-    def _get_exam_info(self, exam_id):
-        """
-           从base_exam_config获取考试基本信息。
-
-           Args:
-               exam_id: 考试ID
-
-           Returns:
-               dict: 包含考试基本信息的字典
-           """
-        try:
-            exam = BaseExamConfig.objects.get(exam_id=exam_id)
-            return {
-                'exam_name': exam.exam_name,
-                'exam_date': exam.exam_date.strftime('%Y-%m-%d') if exam.exam_date else '',
-                'exam_id': exam_id,
-                # 可以添加其他需要的考试信息
-            }
-        except BaseExamConfig.DoesNotExist:
-            logger.error(f"未找到ID为{exam_id}的考试")
-            return {}
-        except Exception as e:
-            logger.error(f"获取考试信息时出错: {str(e)}")
-            return {}
 
 
     def _get_rank_fields(self, rank_distribution):
@@ -559,30 +562,141 @@ class ExamOverviewView(TemplateView):
             logger.error(f"错误详情: {traceback.format_exc()}")
             return []
 
+
     def get_context_data_no_subjects(self, exam_id):
-        """获取不分科考试的数据"""
-        context = {}
+        """
+           获取未分科考试的统计数据上下文
 
-        # 获取全市数据
-        city_stats = ExamLevelStatistics.objects.filter(
-            exam_id=exam_id,
-            level_type='city'
-        ).first()
+           Args:
+               exam_id: 考试ID
 
-        context['total_stats'] = self._prepare_stats(city_stats)
+           Returns:
+               dict: 包含统计数据的上下文字典
+           """
+        try:
+            # 获取基础数据
+            basic_stats = self._get_basic_stats(exam_id)
+            exam_stats = self._get_exam_stats(exam_id)
+            exam_info = self._get_exam_info(exam_id)
 
-        # 区数据
-        districts = ExamLevelStatistics.objects.filter(
-            exam_id=exam_id,
-            level_type='district'
-        ).order_by('district_name')
+            if not basic_stats.exists():
+                logger.error(f"未找到考试ID {exam_id} 的基础统计数据")
+                return {'error': '未找到统计数据'}
 
-        context['districts'] = [
-            self._prepare_district_stats(stat) for stat in districts
-        ]
+            # 准备上下文数据
+            context = {
+                'exam_info': exam_info
+            }
 
-        return context
+            # 获取总分列表（排除0分）并转换为numpy数组
+            total_scores = np.array([float(s.total_score) for s in basic_stats if s.total_score > 0])
 
+            # 计算基础统计数据
+            stats_data = {
+                'is_district_exam': exam_stats.first().is_district_exam if exam_stats.exists() else False,
+                'school_count': basic_stats.values('school_name').distinct().count(),
+                'student_count': len(total_scores),
+            }
+
+            # 安全计算统计指标
+            try:
+                stats_data.update({
+                    'mean_score': round(float(np.mean(total_scores)), 2) if len(total_scores) > 0 else 0,
+                    'median_score': round(float(np.median(total_scores)), 2) if len(total_scores) > 0 else 0,
+                    'std_score': round(float(np.std(total_scores)), 2) if len(total_scores) > 0 else 0,
+                    'max_score': round(float(np.max(total_scores)), 2) if len(total_scores) > 0 else 0,
+                    'range': round(float(self._calculate_score_range(total_scores)), 2),
+                })
+
+                # 单独处理偏度和峰度
+                if len(total_scores) > 2:  # 需要至少3个数据点
+                    stats_data.update({
+                        'skewness': round(float(stats.skew(total_scores)), 4),
+                        'kurtosis': round(float(stats.kurtosis(total_scores)), 4)
+                    })
+                else:
+                    stats_data.update({
+                        'skewness': 0,
+                        'kurtosis': 0
+                    })
+            except Exception as e:
+                logger.warning(f"计算统计指标时出错: {str(e)}")
+                stats_data.update({
+                    'mean_score': 0,
+                    'median_score': 0,
+                    'std_score': 0,
+                    'max_score': 0,
+                    'range': 0,
+                    'skewness': 0,
+                    'kurtosis': 0
+                })
+
+            # 获取最高分学校
+            top_score_record = basic_stats.filter(total_score__gt=0).order_by('-total_score').first()
+            stats_data['top_school'] = top_score_record.school_name if top_score_record else '暂无数据'
+
+            if stats_data['is_district_exam']:
+                # 区县考试：计算各学校统计
+                school_stats = []
+                for school in basic_stats.values('school_name').distinct():
+                    school_name = school['school_name']
+                    school_scores = np.array([float(s.total_score) for s in basic_stats.filter(
+                        school_name=school_name,
+                        total_score__gt=0
+                    )])
+
+                    if len(school_scores) > 0:
+                        try:
+                            school_stats.append({
+                                'school_name': school_name,
+                                'student_count': len(school_scores),
+                                'max_score': round(float(np.max(school_scores)), 2),
+                                'mean_score': round(float(np.mean(school_scores)), 2),
+                                'median_score': round(float(np.median(school_scores)), 2),
+                                'std_score': round(float(np.std(school_scores)), 2),
+                                'skewness': round(float(stats.skew(school_scores)), 4) if len(school_scores) > 2 else 0,
+                                'kurtosis': round(float(stats.kurtosis(school_scores)), 4) if len(school_scores) > 2 else 0
+                            })
+                        except Exception as e:
+                            logger.warning(f"计算学校 {school_name} 统计指标时出错: {str(e)}")
+                stats_data['school_stats'] = school_stats
+
+            else:
+                # 市级考试：计算各区县统计
+                district_stats = []
+                for district in basic_stats.values('district_name').distinct():
+                    district_name = district['district_name']
+                    district_records = basic_stats.filter(
+                        district_name=district_name,
+                        total_score__gt=0
+                    )
+                    district_scores = np.array([float(r.total_score) for r in district_records])
+
+                    if len(district_scores) > 0:
+                        try:
+                            top_score_record = district_records.order_by('-total_score').first()
+                            district_stats.append({
+                                'district_name': district_name,
+                                'student_count': len(district_scores),
+                                'max_score': round(float(np.max(district_scores)), 2),
+                                'max_score_school': top_score_record.school_name,
+                                'mean_score': round(float(np.mean(district_scores)), 2),
+                                'median_score': round(float(np.median(district_scores)), 2),
+                                'std_score': round(float(np.std(district_scores)), 2),
+                                'skewness': round(float(stats.skew(district_scores)), 4) if len(district_scores) > 2 else 0,
+                                'kurtosis': round(float(stats.kurtosis(district_scores)), 4) if len(
+                                    district_scores) > 2 else 0
+                            })
+                        except Exception as e:
+                            logger.warning(f"计算区县 {district_name} 统计指标时出错: {str(e)}")
+                stats_data['district_stats'] = district_stats
+
+            context['overall_data'] = json.dumps(stats_data, ensure_ascii=False)
+            return context
+
+        except Exception as e:
+            logger.error(f"处理未分科考试数据时出错: {str(e)}")
+            return {'error': str(e)}
 
     def _prepare_stats(self, stats, basic_stats, top_school):
         """

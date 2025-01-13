@@ -173,36 +173,38 @@ class ExamLevelAnalysisGenerator:
         )
 
     def generate_score_line_distribution(self) -> ScoreLineDistribution:
-        """生成分数线分布"""
+        """生成分数线分布数据
+
+        仅在分科考试（文科/理科）时计算分数线分布，未分科时返回空数据。
+
+        Args:
+            无
+
+        Returns:
+            ScoreLineDistribution: 包含分数线、达线人数和达线比例的数据结构
+
+        Raises:
+            ValueError: 当成绩数据未设置时抛出
+        """
         if not self.scores_data:
             raise ValueError("请先设置成绩数据")
-
-        all_scores = [
-            score for scores in self.scores_data['total'].values()
-            for score in scores
-        ]
 
         lines = {}
         counts = {}
         rates = {}
 
+        # 仅在分科考试时计算分数线分布
         if self.select_type in ['文科', '理科']:
+            all_scores = [
+                score for scores in self.scores_data['total'].values()
+                for score in scores
+            ]
+
             for line_name, line_score in self.config.score_lines.items():
                 lines[line_name] = line_score
                 count = sum(1 for score in all_scores if score >= line_score)
                 counts[line_name] = count
                 rates[line_name] = round(count / len(all_scores) * 100, 2)
-        else:
-            # 未分科按比例计算
-            sorted_scores = sorted(all_scores, reverse=True)
-            for line_name, ratio in self.config.score_lines.items():
-                index = int(len(all_scores) * ratio)
-                if index > 0:
-                    line_score = sorted_scores[index - 1]
-                    lines[line_name] = line_score
-                    count = sum(1 for score in all_scores if score >= line_score)
-                    counts[line_name] = count
-                    rates[line_name] = round(count / len(all_scores) * 100, 2)
 
         return ScoreLineDistribution(
             lines=lines,
