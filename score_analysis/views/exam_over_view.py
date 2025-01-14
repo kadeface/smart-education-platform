@@ -98,15 +98,19 @@ class ExamOverviewView(TemplateView):
            """
         try:
             exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            # 根据exam_id判断考试类型
+            is_district_exam = 'DIST' in exam_id
+            logger.info(f"考试ID: {exam_id}, 是否为区县考试: {is_district_exam}")
             return {
                 'exam_name': exam.exam_name,
                 'exam_date': exam.exam_date.strftime('%Y-%m-%d') if exam.exam_date else '',
                 'exam_id': exam_id,
-                # 可以添加其他需要的考试信息
+                'is_district_exam': is_district_exam
             }
         except BaseExamConfig.DoesNotExist:
             logger.error(f"未找到ID为{exam_id}的考试")
             return {}
+
         except Exception as e:
             logger.error(f"获取考试信息时出错: {str(e)}")
             return {}
@@ -591,9 +595,11 @@ class ExamOverviewView(TemplateView):
             # 获取总分列表（排除0分）并转换为numpy数组
             total_scores = np.array([float(s.total_score) for s in basic_stats if s.total_score > 0])
 
+            # 修改考试类型判断
+            is_district_exam = 'DIST' in exam_id
             # 计算基础统计数据
             stats_data = {
-                'is_district_exam': exam_stats.first().is_district_exam if exam_stats.exists() else False,
+                'is_district_exam': is_district_exam,
                 'school_count': basic_stats.values('school_name').distinct().count(),
                 'student_count': len(total_scores),
             }
@@ -662,7 +668,7 @@ class ExamOverviewView(TemplateView):
                 stats_data['school_stats'] = school_stats
 
             else:
-                # 市级考试：计算各区县统计
+                #市级考试：计算各区县统计
                 district_stats = []
                 for district in basic_stats.values('district_name').distinct():
                     district_name = district['district_name']
@@ -671,9 +677,11 @@ class ExamOverviewView(TemplateView):
                         total_score__gt=0
                     )
                     district_scores = np.array([float(r.total_score) for r in district_records])
-
                     if len(district_scores) > 0:
                         try:
+                            # 获取该区县的统计信息
+                            district_exam_stats = exam_stats.filter(district_name=district_name).first()
+                            threshold_stats = district_exam_stats.threshold_stats if district_exam_stats else {}
                             top_score_record = district_records.order_by('-total_score').first()
                             district_stats.append({
                                 'district_name': district_name,
@@ -685,15 +693,39 @@ class ExamOverviewView(TemplateView):
                                 'std_score': round(float(np.std(district_scores)), 2),
                                 'skewness': round(float(stats.skew(district_scores)), 4) if len(district_scores) > 2 else 0,
                                 'kurtosis': round(float(stats.kurtosis(district_scores)), 4) if len(
-                                    district_scores) > 2 else 0
+                                    district_scores) > 2 else 0,
+                                'excellent_count': threshold_stats.get('excellent', {}).get('count', 0),
+                                'pass_count': threshold_stats.get('pass', {}).get('count', 0),
+                                'low_count': threshold_stats.get('low', {}).get('count', 0)
                             })
                         except Exception as e:
                             logger.warning(f"计算区县 {district_name} 统计指标时出错: {str(e)}")
                 stats_data['district_stats'] = district_stats
-
-            context['overall_data'] = json.dumps(stats_data, ensure_ascii=False)
-            return context
-
+                # 添加排名分布统计
+                city_stats = exam_stats.filter(level_type='city').first()
+                if city_stats and city_stats.rank_distribution:
+                    # 获取所有排名类型（如 top_10, top_50 等）
+                    rank_types = set()
+                    for district_data in city_stats.rank_distribution.values():
+                        rank_types.update(district_data.keys())
+                    rank_types = sorted(rank_types, key=lambda x: int(x.split('_')[1]))  # 按数字大小排序
+                    # 准备排名分布数据
+                    rank_distribution = []
+                    for district_name, district_data in city_stats.rank_distribution.items():
+                        district_ranks = {
+                            'district_name': district_name,
+                        }
+                        # 添加每个排名段的数据
+                        for rank_type in rank_types:
+                            district_ranks[rank_type] = district_data.get(rank_type, 0)
+                        rank_distribution.append(district_ranks)
+                    stats_data['rank_types'] = rank_types  # 用于模板动态生成表头
+                    stats_data['rank_distribution'] = rank_distribution
+                    logger.info(f"排名分布数据: {rank_distribution}")
+                else:
+                    logger.warning(f"未找到考试ID {exam_id} 的市级排名分布数据")
+                context['overall_data'] = stats_data
+                return context
         except Exception as e:
             logger.error(f"处理未分科考试数据时出错: {str(e)}")
             return {'error': str(e)}

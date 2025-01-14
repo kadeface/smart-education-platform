@@ -1,8 +1,237 @@
 {% extends "score_analysis/base.html" %}
-{% load static %}
+{% load custom_filters %}
 
 {% block content %}
+    <!-- 内联CSS样式 -->
+<style>
+/* 整体布局 */
+.content-wrapper {
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+/* 头部标题样式 */
+.header-section {
+    margin-bottom: 20px;
+    padding: 20px 15px;  /* 增加上下内边距 */
+    background-color: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;  /* 使用flex布局居中 */
+}
+
+.header-section h2 {
+    margin: 0;
+    color: #333;
+    font-size: 24px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.exam-info {
+    margin: 10px 0 0;
+    color: #666;
+    font-size: 22px;
+    text-align: center;
+}
+/* 表格样式 */
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+    font-size: 15px;  /* 调整基础字体大小 */
+    color: #333333;   /* 基础文字颜色 */
+}
+/* 头部样式 */
+.header-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.header-section h2 {
+    margin: 0;
+    color: #333;
+    font-size: 24px;
+    font-weight: 500;
+}
+
+.exam-info {
+    margin: 10px 0 0;
+    color: #666;
+    font-size: 14px;
+}
+
+/* 统计卡片样式 */
+.stats-card {
+    margin-bottom: 20px;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.stats-card h4 {
+    margin: 0 0 15px;
+    color: #333;
+    font-size: 18px;
+    font-weight: 500;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 10px;
+}
+
+/* 基础统计文本样式 */
+.overview-text,
+.stats-text,
+.score-text,
+.distribution-text {
+    color: #333333;
+    font-size:  23px;  /* 基础文字大小 */
+}
+
+/* 数据高亮样式 */
+.number-highlight {
+    color: #0052cc;
+    font-weight: 500;
+    font-size: 22px;  /* 数字稍大 */
+    padding: 0 5px;
+}
+
+.score-highlight {
+    color: #bf2600;
+    font-weight: 500;
+    font-size: 22px;  /* 分数稍大 */
+    padding: 0 5px;
+}
+
+.school-highlight {
+    color: #006644;
+    font-weight: 500;
+    font-size: 23px;  /* 学校名称稍大 */
+    padding: 0 5px;
+}
+
+/* 统计卡片标题 */
+.stats-card h4 {
+    color: #333333;
+    font-size: 20px;  /* 标题更大 */
+    font-weight: 500;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #f0f0f0;
+}
+/* 表格样式 */
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+    font-size: 14px;
+}
+
+/* 表头样式 */
+.stats-table th {
+    padding: 12px 8px;
+    border: 1px solid #e8e8e8;
+    white-space: nowrap;
+    background-color: #00bfa5;  /* 新的表头颜色 */
+    color: white;
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    padding-right: 25px;
+}
+
+/* 表头悬停效果 */
+.stats-table th:hover {
+    background-color: #1ac9b3;  /* 稍浅一点的相近颜色 */
+}
+
+/* 排序指示器样式 */
+.sort-indicator {
+    position: absolute;
+    right: 8px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+}
+
+/* 排序状态样式 */
+.stats-table th.sorted-asc .sort-indicator:after {
+    content: "↑";
+    color: white;
+}
+
+.stats-table th.sorted-desc .sort-indicator:after {
+    content: "↓";
+    color: white;
+}
+
+/* 表格内容样式 */
+.stats-table td {
+    padding: 12px 8px;
+    border: 1px solid #e8e8e8;
+    white-space: nowrap;
+}
+
+/* 表格行悬停效果 */
+.stats-table tbody tr:hover {
+    background-color: #e5f8f6;  /* 配套的淡青色背景 */
+    transition: background-color 0.3s ease;
+}
+
+/* 表格样式 */
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: center;
+    font-size: 15px;
+    color: #333333;
+}
+
+/* 表头样式 */
+.stats-table th {
+    padding: 12px 8px;
+    border: 1px solid #e8e8e8;
+    white-space: nowrap;
+    background-color: #00bfa5;
+    color: #ffffff;
+    font-weight: 500;
+    font-size: 18px;
+    cursor: pointer;
+    position: relative;
+    padding-right: 25px;
+    text-align: center;  /* 确保表头居中 */
+}
+
+/* 表格内容样式 */
+.stats-table td {
+    padding: 12px 8px;
+    border: 1px solid #e8e8e8;
+    white-space: nowrap;
+    color: #333333;
+    font-size: 15px;
+    text-align: center;  /* 所有单元格居中 */
+}
+/* 表格奇数行背景色 */
+.stats-table tbody tr:nth-child(odd) {
+    background-color: #ffffff;  /* 白色背景 */
+}
+
+/* 表格偶数行背景色 */
+.stats-table tbody tr:nth-child(even) {
+    background-color: #f8f9fa;  /* 浅灰色背景 */
+}
+
+/* 表格行悬停效果 */
+.stats-table tbody tr:hover {
+    background-color: #e5f8f6;  /* 保持原有的悬停效果 */
+    transition: background-color 0.3s ease;
+}
+</style>
 <div class="content-wrapper">
+    <!-- 考试基本信息 -->
     <div class="header-section">
         <h2>{{ exam_info.exam_name }}</h2>
         <p class="exam-info">考试时间：{{ exam_info.exam_date }}</p>
@@ -11,27 +240,23 @@
     <!-- 统计数据内容 -->
     <div class="tab-content">
         <div id="overall-tab" class="tab-pane active">
-            <script type="application/json" id="overall-data">
-                {{ overall_data|safe }}
-            </script>
-
             <!-- 基础统计卡片 -->
             <div class="stats-card city-stats">
+                <h4>基础统计</h4>
                 <div class="overview-section">
-                    <h4>基础统计</h4>
                     <p class="overview-text">
-                        本次考试，总计有<span class="number-highlight">{{ overall_data.school_count }}所</span>学校，
-                        参考总人数<span class="number-highlight">{{ overall_data.student_count }}人</span>。
+                        本次考试，总计有<span class="number-highlight">{{ overall_data.school_count }}</span>所学校，
+                        参考总人数<span class="number-highlight">{{ overall_data.student_count }}</span>人。
                     </p>
                     <p class="stats-text">
-                        平均分为<span class="score-highlight">{{ overall_data.mean_score }}分</span>，
-                        中位数为<span class="score-highlight">{{ overall_data.median_score }}分</span>，
+                        平均分为<span class="score-highlight">{{ overall_data.mean_score }}</span>分，
+                        中位数为<span class="score-highlight">{{ overall_data.median_score }}</span>分，
                         标准差为<span class="number-highlight">{{ overall_data.std_score }}</span>。
                     </p>
                     <p class="score-text">
-                        最高分为<span class="score-highlight">{{ overall_data.max_score }}分</span>，
+                        最高分为<span class="score-highlight">{{ overall_data.max_score }}</span>分，
                         所属学校为<span class="school-highlight">{{ overall_data.top_school }}</span>，
-                        分数极差为<span class="score-highlight">{{ overall_data.range }}分</span>。
+                        分数极差为<span class="score-highlight">{{ overall_data.range }}</span>分。
                     </p>
                     <p class="distribution-text">
                         分布特征：
@@ -41,65 +266,66 @@
                 </div>
             </div>
 
-            <!-- 区县/学校统计表格 -->
-            {% if overall_data.is_district_exam %}
-            <!-- 学校统计表格 -->
+            {% if not overall_data.is_district_exam %}
+            <!-- 区县统计表格 -->
             <div class="stats-card stats-section">
-                <h4>各校统计</h4>
-                <div class="district-table-wrapper">
-                    <table class="district-table">
+                <h4>各区县统计</h4>
+                <div class="table-wrapper">
+                    <table class="stats-table">
                         <thead>
-                            <tr>
-                                <th data-sort="string">学校<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">考生人数<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">最高分<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">平均分<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">中位数<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">标准差<span class="sort-indicator">⇅</span></th>
-                            </tr>
+                        <tr>
+                            <th data-sort="string">区县<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">考生人数<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">最高分<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="string">最高分学校<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">平均分<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">中位数<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">标准差<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">优秀人数<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">及格人数<span class="sort-indicator">⇅</span></th>
+                            <th data-sort="number">低分人数<span class="sort-indicator">⇅</span></th>
+                        </tr>
                         </thead>
                         <tbody>
-                            {% for school in overall_data.school_stats %}
+                            {% for district in overall_data.district_stats %}
                             <tr>
-                                <td class="school-name">{{ school.school_name }}</td>
-                                <td class="number">{{ school.student_count }}</td>
-                                <td class="score">{{ school.max_score }}</td>
-                                <td class="score">{{ school.mean_score }}</td>
-                                <td class="score">{{ school.median_score }}</td>
-                                <td class="number">{{ school.std_score }}</td>
+                                <td>{{ district.district_name }}</td>
+                                <td>{{ district.student_count }}</td>
+                                <td>{{ district.max_score }}</td>
+                                <td>{{ district.max_score_school }}</td>
+                                <td>{{ district.mean_score }}</td>
+                                <td>{{ district.median_score }}</td>
+                                <td>{{ district.std_score }}</td>
+                                <td>{{ district.excellent_count }}</td>
+                                <td>{{ district.pass_count }}</td>
+                                <td>{{ district.low_count }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-            {% else %}
-            <!-- 区县统计表格 -->
+
+            <!-- 排名分布统计表格 -->
             <div class="stats-card stats-section">
-                <h4>各区县统计</h4>
-                <div class="district-table-wrapper">
-                    <table class="district-table">
+                <h4>排名分布统计</h4>
+                <div class="table-wrapper">
+                    <table class="stats-table">
                         <thead>
                             <tr>
                                 <th data-sort="string">区县<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">考生人数<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">最高分<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="string">最高分学校</th>
-                                <th data-sort="number">平均分<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">中位数<span class="sort-indicator">⇅</span></th>
-                                <th data-sort="number">标准差<span class="sort-indicator">⇅</span></th>
+                                {% for rank_type in overall_data.rank_types %}
+                                    <th data-sort="number">前{{ rank_type|slice:"4:" }}名<span class="sort-indicator">⇅</span></th>
+                                {% endfor %}
                             </tr>
                         </thead>
                         <tbody>
-                            {% for district in overall_data.district_stats %}
+                            {% for district in overall_data.rank_distribution %}
                             <tr>
-                                <td class="district-name">{{ district.district_name }}</td>
-                                <td class="number">{{ district.student_count }}</td>
-                                <td class="score">{{ district.max_score }}</td>
-                                <td class="school-name">{{ district.max_score_school }}</td>
-                                <td class="score">{{ district.mean_score }}</td>
-                                <td class="score">{{ district.median_score }}</td>
-                                <td class="number">{{ district.std_score }}</td>
+                                <td>{{ district.district_name }}</td>
+                                {% for rank_type in overall_data.rank_types %}
+                                    <td>{{ district|get_item:rank_type }}</td>
+                                {% endfor %}
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -110,61 +336,78 @@
         </div>
     </div>
 </div>
-
-<!-- JavaScript代码 -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('页面加载完成');
-    initTableSort();
-});
-
-// 表格排序功能
+<script >
 function initTableSort() {
-    const tables = document.querySelectorAll('.district-table');
+    // 选择所有可排序的表格
+    const tables = document.querySelectorAll('.stats-table');
+
     tables.forEach(table => {
-        const headers = table.querySelectorAll('th[data-sort]');
-        headers.forEach(header => {
-            header.addEventListener('click', function() {
+        const headers = table.querySelectorAll('th');
+
+        headers.forEach((header, index) => {
+            // 添加排序指示器和鼠标样式
+            header.style.cursor = 'pointer';
+            if (!header.querySelector('.sort-indicator')) {
+                header.innerHTML += ' <span class="sort-indicator">⇅</span>';
+            }
+
+            // 添加点击事件
+            header.addEventListener('click', () => {
                 const tbody = table.querySelector('tbody');
                 const rows = Array.from(tbody.querySelectorAll('tr'));
-                const index = Array.from(header.parentNode.children).indexOf(header);
-                const isNumeric = header.dataset.sort === 'number';
+                const isNumeric = index > 0; // 第一列是区县名称，其他都是数字
 
                 // 获取当前排序方向
-                const currentDir = header.getAttribute('data-sort-dir') || 'desc';
+                const currentDir = header.getAttribute('data-sort') || 'desc';
                 const newDir = currentDir === 'desc' ? 'asc' : 'desc';
 
                 // 更新所有表头的排序状态
                 headers.forEach(h => {
-                    h.setAttribute('data-sort-dir', '');
-                    h.querySelector('.sort-indicator').textContent = '⇅';
+                    h.setAttribute('data-sort', '');
+                    const indicator = h.querySelector('.sort-indicator');
+                    if (indicator) {
+                        indicator.textContent = '⇅';
+                    }
+                    h.classList.remove('sorted-asc', 'sorted-desc');
                 });
 
                 // 更新当前表头的排序状态
-                header.setAttribute('data-sort-dir', newDir);
-                header.querySelector('.sort-indicator').textContent = newDir === 'desc' ? '↓' : '↑';
+                header.setAttribute('data-sort', newDir);
+                header.classList.add(newDir === 'desc' ? 'sorted-desc' : 'sorted-asc');
+                const indicator = header.querySelector('.sort-indicator');
+                if (indicator) {
+                    indicator.textContent = newDir === 'desc' ? '↓' : '↑';
+                }
 
                 // 排序行
                 rows.sort((a, b) => {
-                    const cellA = a.cells[index].textContent.trim();
-                    const cellB = b.cells[index].textContent.trim();
+                    let cellA = a.cells[index].textContent.trim();
+                    let cellB = b.cells[index].textContent.trim();
 
                     if (isNumeric) {
-                        return newDir === 'desc' ?
-                            parseFloat(cellB) - parseFloat(cellA) :
-                            parseFloat(cellA) - parseFloat(cellB);
+                        // 数字排序（移除逗号和其他非数字字符）
+                        cellA = cellA.replace(/[^\d.-]/g, '');
+                        cellB = cellB.replace(/[^\d.-]/g, '');
+                        const numA = parseFloat(cellA) || 0;
+                        const numB = parseFloat(cellB) || 0;
+                        return newDir === 'desc' ? numB - numA : numA - numB;
                     } else {
+                        // 文本排序（使用本地化比较）
                         return newDir === 'desc' ?
-                            cellB.localeCompare(cellA) :
-                            cellA.localeCompare(cellB);
+                            cellB.localeCompare(cellA, 'zh-CN') :
+                            cellA.localeCompare(cellB, 'zh-CN');
                     }
                 });
 
                 // 重新插入排序后的行
+                tbody.innerHTML = '';
                 rows.forEach(row => tbody.appendChild(row));
             });
         });
     });
 }
+
+// 页面加载完成后初始化排序功能
+document.addEventListener('DOMContentLoaded', initTableSort);
 </script>
 {% endblock %}
