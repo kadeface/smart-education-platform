@@ -404,7 +404,7 @@ class ScoreRankingsAdmin(admin.ModelAdmin):
 
 @admin.register(StatisticsExamIndicators)
 class StatisticsExamIndicatorsAdmin(admin.ModelAdmin):
-    """统计指标管理"""
+    """基础统计指标生成语管理"""
 
     #change_list_template = 'admin/score_analysis/statisticsexamindicators/exam_list.html'
   #  list_display = ['exam_id', 'exam_time', 'has_statistics', 'get_action_button']

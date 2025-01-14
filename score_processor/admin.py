@@ -20,7 +20,7 @@ from django.template.response import TemplateResponse
 from django.db import models, transaction
 from django.core.cache import cache
 
-
+@admin.register(BaseExamConfig)
 class ExamInfoAdmin(admin.ModelAdmin):
     list_display = ('exam_id', 'exam_name', 'exam_date', 'exam_type', 'status')
     list_filter = ('exam_type', 'status')
