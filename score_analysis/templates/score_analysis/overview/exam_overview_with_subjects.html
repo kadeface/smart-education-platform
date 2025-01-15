@@ -833,7 +833,10 @@ function renderDistrictStats(type, data) {
                                     <tr>
                                         <td class="school-name">${school}</td>
                                         ${Object.entries(data.threshold_distribution.city.thresholds || {}).map(([name, _]) => `
-                                             <td class="number">${stats.thresholds[name]?.count || 0}</td>
+                                         <td class="number">
+                                ${stats.thresholds[name]?.count || 0}
+                                <span class="rate">(${stats.thresholds[name]?.rate || 0}%)</span>
+                            </td>
                                         `).join('')}
                                     </tr>
                                     ` : ''
