@@ -672,8 +672,7 @@ ${data.threshold_distribution ? `
 // 新增区县考试处理函数
 function renderDistrictStats(type, data) {
     console.log(`开始渲染区县${type}数据`);
-    console.log('完整数据:', data);
-    console.log('分数线分布数据:', data.threshold_distribution);
+    console.log('学校统计数据:', data.school_stats);
 
     const container = document.getElementById(type + '-tab');
     if (!container) {
@@ -689,7 +688,7 @@ function renderDistrictStats(type, data) {
 
     let content = `
         <!-- 基础统计 -->
-        <div class="stats-card city-stats">
+    <div class="stats-card city-stats">
             <div class="overview-section">
                 <p class="overview-text">
                     本次考试，总计有<span class="number-highlight">${data.school_count}所</span>学校，
@@ -725,134 +724,74 @@ function renderDistrictStats(type, data) {
 
         ${data.school_stats && data.school_stats.length > 0 ? `
         <div class="stats-card stats-section">
-            <h4>各校基础统计</h4>
-            <div class="district-table-wrapper">
-                <table class="district-table">
-                    <thead>
-                        <tr>
-                            <th data-sort="string">学校</th>
-                            <th data-sort="number">考生人数</th>
-                            <th data-sort="number">最高分</th>
-                            <th data-sort="number">平均分</th>
-                            <th data-sort="number">中位数</th>
-                            <th data-sort="number">标准差</th>
-                            <th data-sort="number">偏度</th>
-                            <th data-sort="number">峰度</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.school_stats.map(school => `
-                            <tr>
-                                <td class="school-name">${school.school_name}</td>
-                                <td class="number">${school.student_count}</td>
-                                <td class="score">${school.max_score.toFixed(2)}</td>
-                                <td class="score">${school.mean_score.toFixed(2)}</td>
-                                <td class="score">${school.median_score.toFixed(2)}</td>
-                                <td class="number">${school.std_score.toFixed(2)}</td>
-                                <td class="number">${school.skewness.toFixed(4)}</td>
-                                <td class="number">${school.kurtosis.toFixed(4)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- 学校排名分布表格 -->
-            ${data.rank_distribution ? `
-            <div class="stats-card rank-distribution-stats">
-                <h4>学校排名分布</h4>
+                <h4>各校基础统计</h4>
                 <div class="district-table-wrapper">
                     <table class="district-table">
                         <thead>
                             <tr>
                                 <th data-sort="string">学校</th>
-                                ${data.rank_fields.map(field => `
-                                    <th data-sort="number">前${field.slice(4)}名</th>
-                                `).join('')}
+                                <th data-sort="number">考生人数</th>
+                                <th data-sort="number">最高分</th>
+                                <th data-sort="number">平均分</th>
+                                <th data-sort="number">中位数</th>
+                                <th data-sort="number">标准差</th>
+                                <th data-sort="number">偏度</th>
+                                <th data-sort="number">峰度</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${Object.entries(data.rank_distribution).map(([school, ranks]) => `
+                            ${data.school_stats.map(school => `
                                 <tr>
-                                    <td class="school-name">${school}</td>
-                                    ${data.rank_fields.map(field => `
-                                        <td class="number">${ranks[field] || 0}</td>
-                                    `).join('')}
+                                    <td class="school-name">${school.school_name}</td>
+                                    <td class="number">${school.student_count}</td>
+                                    <td class="score">${school.max_score.toFixed(2)}</td>
+                                    <td class="score">${school.mean_score.toFixed(2)}</td>
+                                    <td class="score">${school.median_score.toFixed(2)}</td>
+                                    <td class="number">${school.std_score.toFixed(2)}</td>
+                                    <td class="number">${school.skewness.toFixed(4)}</td>
+                                    <td class="number">${school.kurtosis.toFixed(4)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
-            </div>
-            ` : ''}
 
-            <!-- 分数线分布统计 -->
-            ${data.threshold_distribution && data.threshold_distribution.city && data.threshold_distribution.city.thresholds ? `
-            <div class="stats-card threshold-distribution-stats">
-                <h4>分数线分布统计</h4>
-                <div class="district-table-wrapper">
-                    <table class="district-table">
-                        <thead>
-                            <tr>
-                                <th>分数线</th>
-                                <th>达线人数</th>
-                                <th>达线比例</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${Object.entries(data.threshold_distribution.city.thresholds || {}).map(([name, stats]) =>
-                                stats ? `
-                                <tr>
-                                    <td class="threshold-name">${name}</td>
-                                    <td class="number">${stats.count || 0}</td>
-                                    <td class="number">${stats.rate || 0}%</td>
-                                </tr>
-                                ` : ''
-                            ).join('')}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- 学校分布 -->
-                ${data.threshold_distribution && data.threshold_distribution.schools ? `
-                <div class="district-table-wrapper">
-                    <h5>各学校分布</h5>
-                    <table class="district-table">
-                        <thead>
-                            <tr>
-                                <th>学校</th>
-                                ${Object.keys(data.threshold_distribution.city.thresholds || {}).map(name => `
-                                    <th>${name}</th>
-                                `).join('')}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${Object.entries(data.threshold_distribution.schools).map(([district, schools]) =>
-                                Object.entries(schools).map(([school, stats]) =>
-                                    stats && stats.thresholds ? `
+                <!-- 学校排名分布表格 -->
+                ${data.rank_distribution ? `
+        <div class="stats-card rank-distribution-stats">
+                        <h4>学校排名分布</h4>
+                        <div class="district-table-wrapper">
+                            <table class="district-table">
+                                <thead>
                                     <tr>
-                                        <td class="school-name">${school}</td>
-                                        ${Object.entries(data.threshold_distribution.city.thresholds || {}).map(([name, _]) => `
-                                             <td class="number">${stats.thresholds[name]?.count || 0}</td>
+                                        <th data-sort="string">学校</th>
+                                        ${data.rank_fields.map(field => `
+                                            <th data-sort="number">前${field.slice(4)}名</th>
                                         `).join('')}
                                     </tr>
-                                    ` : ''
-                                ).join('')
-                            ).join('')}
-                        </tbody>
-                    </table>
-                </div>
+                                </thead>
+                                <tbody>
+                                    ${Object.entries(data.rank_distribution).map(([school, ranks]) => `
+                                        <tr>
+                                            <td class="school-name">${school}</td>
+                                            ${data.rank_fields.map(field => `
+                                                <td class="number">${ranks[field] || 0}</td>
+                                            `).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 ` : ''}
             </div>
-            ` : ''}
-        </div>
         ` : ''}
     `;
 
     container.innerHTML = content;
+    // 初始化排序功能
     initTableSort();
 }
-
 function initTableSort() {
     // 清除所有已存在的排序指示器
     document.querySelectorAll('.sort-indicator').forEach(indicator => {
