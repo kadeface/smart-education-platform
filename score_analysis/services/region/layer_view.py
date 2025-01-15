@@ -400,14 +400,23 @@ class LayerViewService:
         return result
 
     def _get_exam_name(self, exam_id: str) -> str:
-        """从考试ID生成考试名称"""
+        """
+        从数据库获取考试名称。
+
+        Args:
+            exam_id: str, 考试ID
+
+        Returns:
+            str: 考试名称，如果未找到则返回考试ID
+
+        Raises:
+            DatabaseError: 数据库查询异常时抛出
+        """
         try:
-            year = exam_id[:4]
-            month = exam_id[4:6]
-            exam_type = '全市统考' if 'CITY' in exam_id.upper() else f"{exam_id.split('-')[1]}区统考"
-            return f"{year}年{month}月{exam_type}"
+            exam = BaseExamConfig.objects.filter(exam_id=exam_id).values_list('exam_name', flat=True).first()
+            return exam if exam else exam_id
         except Exception as e:
-            logger.error(f"生成考试名称失败: {str(e)}", exc_info=True)
+            logger.error(f"获取考试名称失败: {str(e)}", exc_info=True)
             return exam_id
 
     def get_layer_types(self, exam_id: str, select_type: str) -> list:

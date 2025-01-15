@@ -2,9 +2,10 @@
 import traceback
 
 import numpy as np
+from django.forms import IntegerField
 from django.shortcuts import render
 from django.views.generic import TemplateView
-from django.db.models import Max, Min, Avg, Count, StdDev, Variance, F
+from django.db.models import Max, Min, Avg, Count, StdDev, Variance, F, Case, When
 from scipy import stats
 import json
 
@@ -426,6 +427,25 @@ class ExamOverviewView(TemplateView):
                 result['school_stats'] = schools_data
                 logger.info(f"{subject_type}学校统计数据数量: {len(schools_data)}")
 
+
+                # 添加分数线的分布统计
+                # 1. 获取分数线配置
+                thresholds = self._get_threshold_scores(level_stats)
+
+                # 2. 获取分数线分布统计（使用_get_threshold_distribution）
+                if thresholds:
+                    city_dist, district_dist, school_dist = self._get_threshold_distribution(
+                        filtered_stats,
+                        thresholds
+                    )
+
+                    # 将分数线分布添加到result中
+                    result['threshold_distribution'] = {
+                        'city': city_dist,
+                        'districts': district_dist,
+                        'schools': school_dist
+                    }
+                    result['thresholds'] = thresholds
                 return result
             return None
 
@@ -749,6 +769,16 @@ class ExamOverviewView(TemplateView):
         school_distribution = self.parse_json(stats.school_distribution) if stats.school_distribution else {}
         rank_distribution = self.parse_json(stats.rank_distribution) if stats.rank_distribution else {}
 
+        # 2. 获取分数线数据（用于分布统计）
+        thresholds = {}
+        if threshold_stats:
+            for name, data in threshold_stats.items():
+                if "score" in data:
+                    thresholds[name] = {
+                        "score": float(data["score"]),
+                        "count": data.get("count", 0),
+                        "rate": data.get("rate", 0)
+                    }
         return {
             # 基础计数
             'school_count': basic_stats.get('school_count', 0),
@@ -907,3 +937,244 @@ class ExamOverviewView(TemplateView):
             except json.JSONDecodeError:
                 return {}
         return {}
+
+
+    def _calculate_threshold_stats(self, scores, thresholds):
+        """
+           一次性计算所有分数线的分布统计。
+
+           Args:
+               scores: numpy.array, 所有分数数组
+               thresholds: dict, 分数线信息
+
+           Returns:
+               dict: 分数线分布统计
+               {
+                   "total": 15000,
+                   "thresholds": {
+                       "≥680分(C9)": {"count": 1500, "rate": 0.1},
+                       ...
+                   }
+               }
+           """
+        try:
+            # 转换为numpy数组（如果不是）
+            scores_array = np.array(scores)
+            total = len(scores_array)
+
+            if total == 0:
+                return {"total": 0, "thresholds": {}}
+
+            # 创建一次性的布尔掩码数组
+            threshold_stats = {}
+            for name, data in thresholds.items():
+                score = data["score"]
+                # 一次性计算所有大于等于该分数线的数量
+                count = np.sum(scores_array >= score)
+                rate = (count / total * 100) if total > 0 else 0
+
+                threshold_stats[f"≥{score}分({name})"] = {
+                    "count": int(count),
+                    "rate": round(rate, 2)
+                }
+
+            return {
+                "total": total,
+                "thresholds": threshold_stats
+            }
+        except Exception as e:
+            logger.error(f"计算分数线分布统计时出错: {str(e)}")
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            return {
+                "total": 0,
+                "thresholds": {},
+                "error": str(e)
+            }
+
+
+    def _get_threshold_distribution(self, filtered_stats, thresholds):
+        """
+           从已过滤的查询集获取各层级的分数线分布。
+
+           Args:
+               filtered_stats: QuerySet, 已经过滤好的成绩查询集
+               thresholds: dict, 分数线信息
+
+           Returns:
+               tuple: (city_stats, district_stats, school_stats)
+           """
+        try:
+            # 使用Django ORM的聚合和分组功能
+
+            # 构建动态的条件表达式
+            conditions = []
+            for name, data in thresholds.items():
+                score = data["score"]
+                conditions.append(
+                    Count(Case(
+                        When(total_score__gte=score, then=1),
+                        output_field=IntegerField(),
+                    )))
+
+            # 学校级统计
+            school_stats = filtered_stats.values(
+                'school_name', 'district_name'
+            ).annotate(
+                total=Count('id'),
+                **{f"ge_{score}": cond for score, cond in zip(thresholds.keys(), conditions)}
+            )
+            # 记录学校统计结果
+            logger.info(f"学校级统计结果: {list(school_stats)}")
+            # 区县级统计
+            district_stats = filtered_stats.values(
+                'district_name'
+            ).annotate(
+                total=Count('id'),
+                **{f"ge_{score}": cond for score, cond in zip(thresholds.keys(), conditions)}
+            )
+
+            # 市级统计
+            city_stats = filtered_stats.aggregate(
+                total=Count('id'),
+                **{f"ge_{score}": cond for score, cond in zip(thresholds.keys(), conditions)}
+            )
+
+            return self._format_threshold_stats(city_stats, district_stats, school_stats, thresholds)
+
+        except Exception as e:
+            logger.error(f"获取分数线分布统计时出错: {str(e)}")
+            return {}, {}, {}
+
+
+    def _format_threshold_stats(self, city_stats, district_stats, school_stats, thresholds):
+        try:
+            # 添加日志查看输入数据
+            logger.info(f"格式化前的数据:")
+            logger.info(f"city_stats: {city_stats}")
+            logger.info(f"thresholds: {thresholds}")
+
+            # 1. 格式化市级数据
+            city_distribution = {
+                "total": city_stats.get('total', 0),
+                "thresholds": {}
+            }
+
+            # 处理市级各分数线统计
+            for name, data in thresholds.items():
+                score = data["score"]
+                # 修改这里的键名匹配
+                count = city_stats.get(f"ge_{name}", 0)  # 使用name而不是score
+                rate = round((count / city_distribution["total"] * 100), 2) if city_distribution["total"] > 0 else 0
+                city_distribution["thresholds"][f"≥{score}分({name})"] = {
+                    "count": count,
+                    "rate": rate
+                }
+
+            # 2. 格式化区县数据
+            district_distribution = {}
+            for dist in district_stats:
+                district_name = dist['district_name']
+                total = dist['total']
+                thresholds_data = {}
+
+                for name, data in thresholds.items():
+                    score = data["score"]
+                    # 这里也需要修改键名匹配
+                    count = dist.get(f"ge_{name}", 0)  # 使用name而不是score
+                    rate = round((count / total * 100), 2) if total > 0 else 0
+                    thresholds_data[f"≥{score}分({name})"] = {
+                        "count": count,
+                        "rate": rate
+                    }
+
+                district_distribution[district_name] = {
+                    "total": total,
+                    "thresholds": thresholds_data
+                }
+
+            # 3. 格式化学校数据
+            school_distribution = {}
+            for school in school_stats:
+                district_name = school['district_name']
+                school_name = school['school_name']
+                total = school['total']
+
+                if district_name not in school_distribution:
+                    school_distribution[district_name] = {}
+
+                thresholds_data = {}
+                for name, data in thresholds.items():
+                    score = data["score"]
+                    # 这里也需要修改键名匹配
+                    count = school.get(f"ge_{name}", 0)  # 使用name而不是score
+                    rate = round((count / total * 100), 2) if total > 0 else 0
+                    thresholds_data[f"≥{score}分({name})"] = {
+                        "count": count,
+                        "rate": rate
+                    }
+
+                school_distribution[district_name][school_name] = {
+                    "total": total,
+                    "thresholds": thresholds_data
+                }
+
+            return city_distribution, district_distribution, school_distribution
+
+        except Exception as e:
+            logger.error(f"格式化分数线分布统计数据时出错: {str(e)}")
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            return {}, {}, {}
+
+
+    def _get_threshold_scores(self, exam_stats):
+        """
+           从考试统计数据中获取分数线信息。
+
+           Args:
+               exam_stats: ExamLevelStatistics对象
+
+           Returns:
+               dict: 排序后的分数线字典
+               例如：{
+                   "C9": {"score": 680, "level": 6},
+                   "211": {"score": 619, "level": 5},
+                   "985": {"score": 600, "level": 4},
+                   "特控": {"score": 530, "level": 3},
+                   "本科": {"score": 420, "level": 2},
+                   "专科": {"score": 270, "level": 1}
+               }
+           """
+        try:
+            # 获取市级数据中的threshold_stats
+            city_stats = exam_stats.filter(level_type='city').first()
+            if not city_stats or not city_stats.threshold_stats:
+                logger.warning("未找到市级分数线数据")
+                return {}
+
+            # 解析threshold_stats
+            threshold_data = self.parse_json(city_stats.threshold_stats)
+
+            # 构建并排序分数线数据
+            thresholds = {}
+            level_mapping = {
+                "C9": 6, "985": 5, "211": 4,
+                "特控": 3, "本科": 2, "专科": 1
+            }
+
+            for name, data in threshold_data.items():
+                if "score" in data:
+                    thresholds[name] = {
+                        "score": float(data["score"]),
+                        "level": level_mapping.get(name, 0)
+                    }
+
+            # 按分数线从高到低排序
+            return dict(sorted(
+                thresholds.items(),
+                key=lambda x: (x[1]["score"], x[1]["level"]),
+                reverse=True
+            ))
+
+        except Exception as e:
+            logger.error(f"获取分数线数据时出错: {str(e)}")
+            return {}

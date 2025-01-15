@@ -562,6 +562,106 @@ function renderCityStats(type, data) {
                         </div>
                     </div>
                 ` : ''}
+
+${data.threshold_distribution ? `
+<div class="stats-card threshold-distribution-stats">
+    <h4>分数线分布统计</h4>
+
+    <!-- 市级总体分布 -->
+    <div class="overview-section">
+        <h5>全市分布</h5>
+        <div class="district-table-wrapper">
+            <table class="district-table">
+                <thead>
+                    <tr>
+                        <th>分数线</th>
+                        <th>达线人数</th>
+                        <th>达线比例</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(data.threshold_distribution.city.thresholds).map(([name, stats]) => `
+                        <tr>
+                            <td class="threshold-name">${name}</td>
+                            <td class="number">${stats.count}</td>
+                            <td class="number">${stats.rate}%</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 区县和学校分布（可折叠结构） -->
+    <div class="overview-section">
+        <h5>各区县分布</h5>
+        <div class="district-accordion">
+            ${Object.entries(data.threshold_distribution.districts).map(([district, districtStats]) => `
+                <div class="district-section">
+                    <!-- 区县标题栏（可点击展开/收起） -->
+                    <div class="district-header" onclick="toggleDistrictSection(this)">
+                        <span class="expand-icon">▶</span>
+                        <span>${district}</span>
+                        <span class="total-count">(总人数: ${districtStats.total})</span>
+                    </div>
+
+                    <!-- 区县详细数据（默认隐藏） -->
+                    <div class="district-content" style="display: none;">
+                        <!-- 区县分数线分布 -->
+                        <div class="district-table-wrapper">
+                            <table class="district-table">
+                                <thead>
+                                    <tr>
+                                        <th>分数线</th>
+                                        <th>达线人数</th>
+                                        <th>达线比例</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Object.entries(districtStats.thresholds).map(([name, stats]) => `
+                                        <tr>
+                                            <td class="threshold-name">${name}</td>
+                                            <td class="number">${stats.count}</td>
+                                            <td class="number">${stats.rate}%</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 该区县下的学校分布 -->
+                        <div class="schools-section">
+                            <h6>各学校分布</h6>
+                            <div class="district-table-wrapper">
+                                <table class="district-table">
+                                    <thead>
+                                        <tr>
+                                            <th>学校</th>
+                                            ${Object.keys(Object.values(data.threshold_distribution.schools[district])[0].thresholds).map(name => `
+                                                <th>${name}</th>
+                                            `).join('')}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Object.entries(data.threshold_distribution.schools[district]).map(([school, stats]) => `
+                                            <tr>
+                                                <td class="school-name">${school}</td>
+                                                ${Object.entries(stats.thresholds).map(([_, threshold]) => `
+                                                    <td class="number">${threshold.rate}%</td>
+                                                `).join('')}
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    </div>
+</div>
+` : ''}
             </div>
         ` : ''}
     `;
@@ -693,19 +793,31 @@ function renderDistrictStats(type, data) {
     initTableSort();
 }
 function initTableSort() {
+    // 清除所有已存在的排序指示器
+    document.querySelectorAll('.sort-indicator').forEach(indicator => {
+        indicator.remove();
+    });
+
     const tables = document.querySelectorAll('.district-table');
 
     tables.forEach(table => {
-        const headers = table.querySelectorAll('th');
+        // 移除所有已存在的事件监听器
+        const newTable = table.cloneNode(true);
+        table.parentNode.replaceChild(newTable, table);
+
+        const headers = newTable.querySelectorAll('th');
 
         headers.forEach((header, index) => {
             // 添加排序指示器和鼠标样式
             header.style.cursor = 'pointer';
-            header.innerHTML += ' <span class="sort-indicator">⇅</span>';
+            const indicator = document.createElement('span');
+            indicator.className = 'sort-indicator';
+            indicator.textContent = '⇅';
+            header.appendChild(indicator);
 
             // 添加点击事件
             header.addEventListener('click', () => {
-                const tbody = table.querySelector('tbody');
+                const tbody = newTable.querySelector('tbody');
                 const rows = Array.from(tbody.querySelectorAll('tr'));
                 const isNumeric = index > 0; // 第一列是学校名称，其他都是数字
 
@@ -730,25 +842,37 @@ function initTableSort() {
                     const cellB = b.cells[index].textContent.trim();
 
                     if (isNumeric) {
-                        // 数字排序
-                        const numA = parseFloat(cellA);
-                        const numB = parseFloat(cellB);
+                        // 数字排序（处理带逗号的数字）
+                        const numA = parseFloat(cellA.replace(/,/g, '')) || 0;
+                        const numB = parseFloat(cellB.replace(/,/g, '')) || 0;
                         return newDir === 'desc' ? numB - numA : numA - numB;
                     } else {
-                        // 文本排序
+                        // 文本排序（使用中文本地化比较）
                         return newDir === 'desc' ?
-                            cellB.localeCompare(cellA) :
-                            cellA.localeCompare(cellB);
+                            cellB.localeCompare(cellA, 'zh-CN') :
+                            cellA.localeCompare(cellB, 'zh-CN');
                     }
                 });
 
                 // 重新插入排序后的行
+                tbody.innerHTML = '';
                 rows.forEach(row => tbody.appendChild(row));
             });
         });
     });
 }
 // 区县标签切换函数
+function toggleDistrictSection(header) {
+    header.classList.toggle('expanded');
+    const content = header.nextElementSibling;
+    const isExpanded = header.classList.contains('expanded');
+
+    // 更新展开图标
+    header.querySelector('.expand-icon').textContent = isExpanded ? '▼' : '▶';
+
+    // 切换内容显示/隐藏
+    content.style.display = isExpanded ? 'block' : 'none';
+}
 // 文理科切换函数
 function switchTab(tabName, event) {
     if (event) {

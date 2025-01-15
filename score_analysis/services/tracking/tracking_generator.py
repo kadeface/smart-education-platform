@@ -277,7 +277,7 @@ class TrackingGenerator:
                     scores=scores,
                     group_by=group_by,
                     student_type='ALL',
-                    exam_info=exam_info  # 添加考试信息
+                    #exam_info=exam_info  # 添加考试信息
                 )
                 key = f"total_score_{dim_name}" if dim_name != 'city' else "total_score"
                 ranks[key] = total_ranks
@@ -290,7 +290,7 @@ class TrackingGenerator:
                             subject=subject,
                             group_by=group_by,
                             student_type='ALL',
-                            exam_info=exam_info  # 添加考试信息
+                            #exam_info=exam_info  # 添加考试信息
                         )
                         key = f"{subject}_{dim_name}" if dim_name != 'city' else subject
                         ranks[key] = subject_ranks
@@ -311,7 +311,7 @@ class TrackingGenerator:
                         scores=science_scores,
                         group_by=group_by,
                         student_type='SCIENCE',
-                        exam_info=exam_info  # 添加考试信息
+                        #exam_info=exam_info  # 添加考试信息
                     )
                     key = f"total_score_{dim_name}" if dim_name != 'city' else "total_score"
                     if key not in ranks:
@@ -326,7 +326,7 @@ class TrackingGenerator:
                                 subject=subject,
                                 group_by=group_by,
                                 student_type='SCIENCE',
-                                exam_info=exam_info  # 添加考试信息
+                               # exam_info=exam_info  # 添加考试信息
                             )
                             key = f"{subject}_{dim_name}" if dim_name != 'city' else subject
                             if key not in ranks:
@@ -341,7 +341,7 @@ class TrackingGenerator:
                         scores=liberal_scores,
                         group_by=group_by,
                         student_type='LIBERAL',
-                        exam_info=exam_info  # 添加考试信息
+                       # exam_info=exam_info  # 添加考试信息
                     )
                     key = f"total_score_{dim_name}" if dim_name != 'city' else "total_score"
                     if key not in ranks:
@@ -356,7 +356,7 @@ class TrackingGenerator:
                                 subject=subject,
                                 group_by=group_by,
                                 student_type='LIBERAL',
-                                exam_info=exam_info  # 添加考试信息
+                               # exam_info=exam_info  # 添加考试信息
                             )
                             key = f"{subject}_{dim_name}" if dim_name != 'city' else subject
                             if key not in ranks:
@@ -371,7 +371,7 @@ class TrackingGenerator:
                     scores=undecided_scores,
                     group_by=group_by,
                     student_type='UNKNOWN',
-                    exam_info=exam_info  # 添加考试信息
+                    #exam_info=exam_info  # 添加考试信息
                 )
                 key = f"total_score_{dim_name}" if dim_name != 'city' else "total_score"
                 if key not in ranks:
@@ -386,7 +386,7 @@ class TrackingGenerator:
                             subject=subject,
                             group_by=group_by,
                             student_type='UNKNOWN',
-                            exam_info=exam_info  # 添加考试信息
+                            #exam_info=exam_info  # 添加考试信息
                         )
                         key = f"{subject}_{dim_name}" if dim_name != 'city' else subject
                         if key not in ranks:

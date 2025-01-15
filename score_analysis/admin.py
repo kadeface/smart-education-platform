@@ -1558,11 +1558,11 @@ class TrackingAdmin(admin.ModelAdmin):
                 exam_id, exam_name, semester, exam_type, has_tracking = row
 
                 # 确定学段
-                if semester and semester.startswith('高'):
+                if semester and semester.startswith('H'):
                     level = 'H'
-                elif semester and semester.startswith('初'):
+                elif semester and semester.startswith('M'):
                     level = 'M'
-                elif semester and semester.startswith('小'):
+                elif semester and semester.startswith('P'):
                     level = 'P'
                 else:
                     continue
