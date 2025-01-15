@@ -1135,24 +1135,27 @@ class ExamOverviewView(TemplateView):
 
            Returns:
                dict: 排序后的分数线字典
-               例如：{
-                   "C9": {"score": 680, "level": 6},
-                   "211": {"score": 619, "level": 5},
-                   "985": {"score": 600, "level": 4},
-                   "特控": {"score": 530, "level": 3},
-                   "本科": {"score": 420, "level": 2},
-                   "专科": {"score": 270, "level": 1}
-               }
            """
         try:
-            # 获取市级数据中的threshold_stats
-            city_stats = exam_stats.filter(level_type='city').first()
-            if not city_stats or not city_stats.threshold_stats:
-                logger.warning("未找到市级分数线数据")
+            # 先检查是否是区县考试
+            is_district_exam = not exam_stats.filter(level_type='city').exists()
+
+            if is_district_exam:
+                # 区县考试：获取区县级数据
+                stats = exam_stats.first()
+                logger.info("获取区县考试分数线数据")
+            else:
+                # 市级考试：获取市级数据
+                stats = exam_stats.filter(level_type='city').first()
+                logger.info("获取市级考试分数线数据")
+
+            if not stats or not stats.threshold_stats:
+                logger.warning(f"未找到{'区县' if is_district_exam else '市级'}分数线数据")
                 return {}
 
             # 解析threshold_stats
-            threshold_data = self.parse_json(city_stats.threshold_stats)
+            threshold_data = self.parse_json(stats.threshold_stats)
+            logger.info(f"解析到的分数线数据: {threshold_data}")
 
             # 构建并排序分数线数据
             thresholds = {}
@@ -1169,12 +1172,16 @@ class ExamOverviewView(TemplateView):
                     }
 
             # 按分数线从高到低排序
-            return dict(sorted(
+            sorted_thresholds = dict(sorted(
                 thresholds.items(),
                 key=lambda x: (x[1]["score"], x[1]["level"]),
                 reverse=True
             ))
 
+            logger.info(f"返回的排序后分数线数据: {sorted_thresholds}")
+            return sorted_thresholds
+
         except Exception as e:
             logger.error(f"获取分数线数据时出错: {str(e)}")
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
             return {}
