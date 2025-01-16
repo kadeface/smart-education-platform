@@ -289,97 +289,103 @@ class MappingGenerator:
             self.logger.error(f"获取已有name_tag时出错: {str(e)}")
             self.logger.error("错误详情:", exc_info=True)
             raise
+
     def _get_existing_mappings(self, data: pd.DataFrame, exam_id: str, school_level: str) -> Dict:
-        """获取已存在的统一考号映射"""
+        """获取已存在的统一考号映射
+
+        Args:
+            data: 预处理后的数据
+            exam_id: 考试ID
+            school_level: 学段代码(H/M/P)
+
+        Returns:
+            Dict: 映射字典，包含多种键的映射记录
+        """
         try:
             self.logger.info("=== 开始获取现有映射 ===")
+            grad_year = exam_id.split('-')[-1][-2:]
 
-            # 1. 从考试ID获取毕业年份（后两位）
-            grad_year = exam_id.split('-')[-1][-2:]  # 例如：2025 -> 25
-            self.logger.info(f"毕业年份: {grad_year}")
-
-            # 2. 构建基础查询，直接加入毕业年份筛选
+            # 基础查询
             base_query = """
                 SELECT 
                     unified_id,
                     student_name,
                     school_name,
-                    name_tag,
+                    class_name,
                     student_id,
-                    id_number
+                    id_number,
+                    name_tag
                 FROM student_mapping
                 WHERE school_level = %s
-                AND SUBSTRING(unified_id, 1, 2) = %s  -- 筛选同一届的学生
+                AND SUBSTRING(unified_id, 1, 2) = %s
             """
             query_params = [school_level, grad_year]
 
-            # 3. 添加其他匹配条件
+            # 构建查询条件（利用已有索引）
             conditions = []
 
-            # 3.1 学籍号匹配
-            if 'student_id' in data.columns:
+            # 1. 学籍号匹配 (idx_student_id)
+            # 1. 学籍号匹配
+            if 'student_id' in data.columns and not data['student_id'].isna().all():
                 student_ids = data['student_id'].dropna().unique().tolist()
                 if student_ids:
                     conditions.append("student_id IN %s")
                     query_params.append(tuple(student_ids))
-                    self.logger.info(f"添加学籍号匹配条件，数量: {len(student_ids)}")
+                    self.logger.info(f"添加学籍号匹配条件: {len(student_ids)}个")
 
-            # 3.2 身份证号匹配
-            if 'id_number' in data.columns:
+            # 2. 身份证号匹配
+            if 'id_number' in data.columns and not data['id_number'].isna().all():
                 id_numbers = data['id_number'].dropna().unique().tolist()
                 if id_numbers:
                     conditions.append("id_number IN %s")
                     query_params.append(tuple(id_numbers))
-                    self.logger.info(f"添加身份证号匹配条件，数量: {len(id_numbers)}")
+                    self.logger.info(f"添加身份证号匹配条件: {len(id_numbers)}个")
 
-            # 3.3 姓名+学校+name_tag组合匹配
-            name_school_tags = data[['student_name', 'school_name', 'name_tag']].drop_duplicates()
-            if not name_school_tags.empty:
-                placeholders = []
-                for _, row in name_school_tags.iterrows():
-                    placeholders.append("(student_name = %s AND school_name = %s AND name_tag = %s)")
-                    query_params.extend([
-                        row['student_name'],
-                        row['school_name'],
-                        row['name_tag'] or ''  # 处理空的name_tag
-                    ])
-                if placeholders:
-                    conditions.append(f"({' OR '.join(placeholders)})")
+            # 3. 姓名+学校匹配
+            if {'student_name', 'school_name'}.issubset(data.columns):
+                name_school_pairs = data[['student_name', 'school_name']].drop_duplicates()
+                if not name_school_pairs.empty:
+                    pairs = [tuple(row) for _, row in name_school_pairs.iterrows()]
+                    conditions.append("(student_name, school_name) IN %s")
+                    query_params.append(tuple(pairs))
+                    self.logger.info(f"添加姓名+学校匹配条件: {len(pairs)}个")
 
-            # 4. 添加其他匹配条件到基础查询
+            # 添加条件到查询
             if conditions:
                 base_query += " AND (" + " OR ".join(conditions) + ")"
 
-            # 5. 执行查询
+            # 执行查询
             all_results = {}
             with connection.cursor() as cursor:
                 self.logger.info(f"执行查询: {base_query}")
-                self.logger.info(f"参数: {query_params}")
-
                 cursor.execute(base_query, query_params)
                 columns = [col[0] for col in cursor.description]
 
                 for row in cursor.fetchall():
                     record = dict(zip(columns, row))
 
-                    # 5.1 用学籍号作为键
+                    # 1. 学籍号作为键
                     if record.get('student_id'):
                         all_results[('student_id', record['student_id'])] = record
 
-                    # 5.2 用身份证号作为键
+                    # 2. 身份证号作为键
                     if record.get('id_number'):
                         all_results[('id_number', record['id_number'])] = record
 
-                    # 5.3 用姓名+学校+name_tag作为键
+                    # 3. 姓名+学校作为键
                     name_key = (
-                        'name_school_tag',
+                        'name_school',
                         record['student_name'],
-                        record['school_name'],
-                        record['name_tag'] or ''
+                        record['school_name']
                     )
                     all_results[name_key] = record
 
-            self.logger.info(f"总共找到 {len(all_results)} 条匹配记录")
+            self.logger.info(f"查询完成:")
+            self.logger.info(f"- 总记录数: {len(all_results)}")
+            self.logger.info(f"- 学籍号匹配: {len([k for k in all_results if k[0] == 'student_id'])}")
+            self.logger.info(f"- 身份证号匹配: {len([k for k in all_results if k[0] == 'id_number'])}")
+            self.logger.info(f"- 姓名学校匹配: {len([k for k in all_results if k[0] == 'name_school'])}")
+
             return all_results
 
         except Exception as e:
@@ -388,95 +394,112 @@ class MappingGenerator:
             raise
 
     def _process_mappings(self, data: pd.DataFrame, exam_id: str, existing_mappings: Dict) -> List[Dict]:
-        """处理学生映射"""
+        """处理学生映射
+
+        优化策略：
+        1. 批量处理匹配
+        2. 减少数据库操作
+        3. 使用DataFrame操作代替循环
+        """
         try:
             self.logger.info("=== 开始处理映射 ===")
 
-            # existing_mappings 已经是按键组织好的字典，直接使用
-            existing_map = existing_mappings  # 不需要重新构建查找字典
+            # 1. 创建结果DataFrame
+            result_df = data.copy()
+            result_df['unified_id'] = None
+            result_df['is_new'] = True
 
-            # 按学校分组处理
-            school_groups = data.groupby('school_name')
-            new_mappings = []
+            # 2. 批量匹配处理
+            # 2.1 学籍号匹配
+            if 'student_id' in result_df.columns:
+                mask = result_df['student_id'].notna()
+                for idx in result_df[mask].index:
+                    key = ('student_id', str(result_df.loc[idx, 'student_id']).strip())
+                    if key in existing_mappings:
+                        result_df.loc[idx, 'unified_id'] = existing_mappings[key]['unified_id']
+                        result_df.loc[idx, 'is_new'] = False
 
-            for school_name, school_data in school_groups:
-                self.logger.info(f"处理学校: {school_name}, 学生数: {len(school_data)}")
-                school_new_mappings = []
+            # 2.2 身份证号匹配
+            if 'id_number' in result_df.columns:
+                mask = (result_df['unified_id'].isna()) & (result_df['id_number'].notna())
+                for idx in result_df[mask].index:
+                    key = ('id_number', str(result_df.loc[idx, 'id_number']).strip())
+                    if key in existing_mappings:
+                        result_df.loc[idx, 'unified_id'] = existing_mappings[key]['unified_id']
+                        result_df.loc[idx, 'is_new'] = False
 
-                # 生成新的统一考号
-                new_ids = self._generate_new_id(
-                    exam_id=exam_id,
-                    school_name=school_name,
-                    count=len(school_data)
-                )
+            # 2.3 姓名+学校匹配
+            mask = result_df['unified_id'].isna()
+            for idx in result_df[mask].index:
+                key = ('name_school', result_df.loc[idx, 'student_name'], result_df.loc[idx, 'school_name'])
+                if key in existing_mappings:
+                    result_df.loc[idx, 'unified_id'] = existing_mappings[key]['unified_id']
+                    result_df.loc[idx, 'is_new'] = False
 
-                # 处理每个学生
-                for (_, row), unified_id in zip(school_data.iterrows(), new_ids):
-                    # 按优先级查找现有映射
-                    existing_mapping = None
+            # 3. 为未匹配记录生成新考号
+            unmatched_df = result_df[result_df['unified_id'].isna()].copy()
+            if not unmatched_df.empty:
+                self.logger.info(f"发现 {len(unmatched_df)} 个未匹配学生")
 
-                    # 1. 通过学籍号查找
-                    if pd.notna(row.get('student_id')):
-                        key = ('student_id', str(row['student_id']).strip())
-                        existing_mapping = existing_map.get(key)
+                # 3.1 按学校分组生成新考号
+                new_mappings_list = []
+                for school_name, school_group in unmatched_df.groupby('school_name'):
+                    new_ids = self._generate_new_id(
+                        exam_id=exam_id,
+                        school_name=school_name,
+                        count=len(school_group)
+                    )
 
-                    # 2. 通过身份证号查找
-                    if not existing_mapping and pd.notna(row.get('id_number')):
-                        key = ('id_number', str(row['id_number']).strip())
-                        existing_mapping = existing_map.get(key)
+                    # 更新未匹配记录的unified_id
+                    school_indices = school_group.index
+                    result_df.loc[school_indices, 'unified_id'] = new_ids
 
-                    # 3. 通过姓名+学校+name_tag查找
-                    if not existing_mapping:
-                        key = (
-                            'name_school_tag',
-                            row['student_name'],
-                            row['school_name'],
-                            row.get('name_tag', '')
-                        )
-                        existing_mapping = existing_map.get(key)
-
-                    # 如果找到现有映射，使用现有的unified_id
-                    if existing_mapping:
-                        new_mappings.append({
-                            'unified_id': existing_mapping['unified_id'],
+                    # 准备批量创建的数据
+                    for idx, unified_id in zip(school_indices, new_ids):
+                        row = result_df.loc[idx]
+                        new_mappings_list.append({
+                            'unified_id': unified_id,
                             'exam_id': exam_id,
                             'original_student_id': row['exam_number'],
                             'student_name': row['student_name'],
                             'school_name': row['school_name'],
                             'class_name': row['class_name'],
-                            'name_tag': row.get('name_tag', ''),
                             'school_level': exam_id.split('-')[2],
                             'student_id': str(row['student_id']).strip() if pd.notna(row.get('student_id')) else None,
                             'id_number': str(row['id_number']).strip() if pd.notna(row.get('id_number')) else None,
-                            'is_new': False
+                            'is_new': True
                         })
-                        continue
 
-                    # 创建新的映射
-                    new_mapping = {
-                        'unified_id': unified_id,
-                        'exam_id': exam_id,
-                        'original_student_id': row['exam_number'],
-                        'student_name': row['student_name'],
-                        'school_name': row['school_name'],
-                        'class_name': row['class_name'],
-                        'name_tag': row.get('name_tag', ''),
-                        'school_level': exam_id.split('-')[2],
-                        'student_id': str(row['student_id']).strip() if pd.notna(row.get('student_id')) else None,
-                        'id_number': str(row['id_number']).strip() if pd.notna(row.get('id_number')) else None,
-                        'is_new': True
-                    }
+                # 3.2 批量创建新记录
+                if new_mappings_list:
+                    StudentMapping.objects.bulk_create([
+                        StudentMapping(**mapping) for mapping in new_mappings_list
+                    ])
 
-                    school_new_mappings.append(StudentMapping(**new_mapping))
-                    new_mappings.append(new_mapping)
+            # 4. 构建最终结果
+            final_mappings = []
+            for _, row in result_df.iterrows():
+                mapping = {
+                    'unified_id': row['unified_id'],
+                    'exam_id': exam_id,
+                    'original_student_id': row['exam_number'],
+                    'student_name': row['student_name'],
+                    'school_name': row['school_name'],
+                    'class_name': row['class_name'],
+                    'school_level': exam_id.split('-')[2],
+                    'student_id': str(row['student_id']).strip() if pd.notna(row.get('student_id')) else None,
+                    'id_number': str(row['id_number']).strip() if pd.notna(row.get('id_number')) else None,
+                    'is_new': row['is_new']
+                }
+                final_mappings.append(mapping)
 
-                # 批量创建新记录
-                if school_new_mappings:
-                    self.logger.info(f"为学校 {school_name} 创建 {len(school_new_mappings)} 条新映射")
-                    StudentMapping.objects.bulk_create(school_new_mappings)
+            # 5. 记录处理结果
+            self.logger.info(f"处理完成:")
+            self.logger.info(f"- 总记录数: {len(final_mappings)}")
+            self.logger.info(f"- 匹配记录: {len(result_df[~result_df['is_new']])}")
+            self.logger.info(f"- 新建记录: {len(result_df[result_df['is_new']])}")
 
-            self.logger.info(f"处理完成，总映射数: {len(new_mappings)}")
-            return new_mappings
+            return final_mappings
 
         except Exception as e:
             self.logger.error(f"处理映射时出错: {str(e)}")

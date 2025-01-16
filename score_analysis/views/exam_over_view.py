@@ -430,7 +430,7 @@ class ExamOverviewView(TemplateView):
 
                 # 添加分数线的分布统计
                 # 1. 获取分数线配置
-                thresholds = self._get_threshold_scores(level_stats)
+                thresholds = self._get_threshold_scores(level_stats,subject_type)
 
                 # 2. 获取分数线分布统计（使用_get_threshold_distribution）
                 if thresholds:
@@ -1126,62 +1126,43 @@ class ExamOverviewView(TemplateView):
             return {}, {}, {}
 
 
-    def _get_threshold_scores(self, exam_stats):
+    def _get_threshold_scores(self, exam_stats, subject_type):
         """
-           从考试统计数据中获取分数线信息。
+           从考试统计数据中获取特定科目类型的分数线信息。
 
            Args:
                exam_stats: ExamLevelStatistics对象
+               subject_type: 科目类型 ('science' 或 'liberal')
 
            Returns:
                dict: 排序后的分数线字典
            """
         try:
-            # 先检查是否是区县考试
-            is_district_exam = not exam_stats.filter(level_type='city').exists()
-
-            if is_district_exam:
-                # 区县考试：获取区县级数据
-                stats = exam_stats.first()
-                logger.info("获取区县考试分数线数据")
-            else:
-                # 市级考试：获取市级数据
-                stats = exam_stats.filter(level_type='city').first()
-                logger.info("获取市级考试分数线数据")
+            # 获取对应科目的市级数据
+            stats = exam_stats.filter(
+                level_type='city',
+                select_type=subject_type
+            ).first()
 
             if not stats or not stats.threshold_stats:
-                logger.warning(f"未找到{'区县' if is_district_exam else '市级'}分数线数据")
+                logger.warning(f"未找到{subject_type}分数线数据")
                 return {}
 
             # 解析threshold_stats
             threshold_data = self.parse_json(stats.threshold_stats)
-            logger.info(f"解析到的分数线数据: {threshold_data}")
-
-            # 构建并排序分数线数据
-            thresholds = {}
-            level_mapping = {
-                "C9": 6, "985": 5, "211": 4,
-                "特控": 3, "本科": 2, "专科": 1
-            }
-
-            for name, data in threshold_data.items():
-                if "score" in data:
-                    thresholds[name] = {
-                        "score": float(data["score"]),
-                        "level": level_mapping.get(name, 0)
-                    }
+            logger.info(f"解析到的{subject_type}分数线数据: {threshold_data}")
 
             # 按分数线从高到低排序
             sorted_thresholds = dict(sorted(
-                thresholds.items(),
-                key=lambda x: (x[1]["score"], x[1]["level"]),
+                threshold_data.items(),
+                key=lambda x: float(x[1]["score"]),
                 reverse=True
             ))
 
-            logger.info(f"返回的排序后分数线数据: {sorted_thresholds}")
+            logger.info(f"返回的{subject_type}排序后分数线数据: {sorted_thresholds}")
             return sorted_thresholds
 
         except Exception as e:
-            logger.error(f"获取分数线数据时出错: {str(e)}")
+            logger.error(f"获取{subject_type}分数线数据时出错: {str(e)}")
             logger.error(f"错误堆栈: {traceback.format_exc()}")
             return {}

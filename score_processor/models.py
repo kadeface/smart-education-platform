@@ -17,22 +17,105 @@ class BaseExamConfig(models.Model):
     status = models.CharField(max_length=10, blank=True, null=True, db_comment='状态：active/inactive')
     create_time = models.DateTimeField(blank=True, null=True)
     update_time = models.DateTimeField(blank=True, null=True)
+    CITY = 'CITY', '市级考试'
+    DISTRICT = 'DIST', '区县级考试'
+    SCHOOL = 'SCHO', '学校级考试'
+    UNKNOWN = 'UNKN', '未知级别'
+    class ExamLevel(models.TextChoices):
+        """考试级别枚举"""
+        CITY = 'CITY', '市级考试'
+        DISTRICT = 'DIST', '区县级考试'
+        SCHOOL = 'SCHO', '学校级考试'
+        UNKNOWN = 'UNKN', '未知级别'
+
+    DIVIDED_SEMESTERS = ['H1-2', 'H2-1', 'H2-2', 'H3-1', 'H3-2']
+
+    @staticmethod
+    def get_exam_level(exam_id: str) -> str:
+        """
+        根据考试ID判断考试级别。
+
+        Args:
+            exam_id: 考试ID，例如：202410-CITY-H-2025, 202410-DIST-H-2025, 202410-SCHO-H-2025
+
+        Returns:
+            str: 考试级别，返回值为 ExamLevel 中定义的值
+        """
+        if not exam_id:
+            return BaseExamConfig.ExamLevel.UNKNOWN
+
+        exam_id = exam_id.upper()
+        if '-CITY-' in exam_id:
+            return BaseExamConfig.ExamLevel.CITY
+        elif '-DIST-' in exam_id:
+            return BaseExamConfig.ExamLevel.DISTRICT
+        elif '-SCHO-' in exam_id:
+            return BaseExamConfig.ExamLevel.SCHOOL
+        return BaseExamConfig.ExamLevel.UNKNOWN
 
     @staticmethod
     def is_divided(exam_id: str) -> bool:
         """
-        判断考试是否分科
+        判断考试是否分科。
+
         Args:
             exam_id: 考试ID，例如：202410-CITY-H-2025
+
         Returns:
             bool: 是否分科
         """
         try:
             exam = BaseExamConfig.objects.get(exam_id=exam_id)
-            divided_semesters = ['H1-2', 'H2-1', 'H2-2', 'H3-1', 'H3-2']
-            return bool(exam.semester and any(term in exam.semester for term in divided_semesters))
+            return bool(exam.semester and any(term in exam.semester for term in BaseExamConfig.DIVIDED_SEMESTERS))
         except BaseExamConfig.DoesNotExist:
             return False
+
+    @property
+    def exam_level(self) -> str:
+        """
+        获取当前考试的级别。
+
+        Returns:
+            str: 考试级别
+        """
+        return self.get_exam_level(self.exam_id)
+
+    @property
+    def is_divided_exam(self) -> bool:
+        """
+        判断当前考试是否分科。
+
+        Returns:
+            bool: 是否分科
+        """
+        return bool(self.semester and any(term in self.semester for term in self.DIVIDED_SEMESTERS))
+
+    def is_city_exam(self) -> bool:
+        """
+        判断是否为市级考试。
+
+        Returns:
+            bool: 是否为市级考试
+        """
+        return self.exam_level == self.ExamLevel.CITY
+
+    def is_district_exam(self) -> bool:
+        """
+        判断是否为区县级考试。
+
+        Returns:
+            bool: 是否为区县级考试
+        """
+        return self.exam_level == self.ExamLevel.DISTRICT
+
+    def is_school_exam(self) -> bool:
+        """
+        判断是否为学校级考试。
+
+        Returns:
+            bool: 是否为学校级考试
+        """
+        return self.exam_level == self.ExamLevel.SCHOOL
 
     class Meta:
         app_label = 'score_processor'
