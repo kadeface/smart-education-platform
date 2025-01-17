@@ -652,7 +652,7 @@ ${data.threshold_distribution ? `
                                             <tr>
                                                 <td class="school-name">${school}</td>
                                                 ${Object.entries(stats.thresholds).map(([_, threshold]) => `
-                                                    <td class="number">${threshold.rate}%</td>
+                                                    <td class="number">${threshold.count}(${threshold.rate}%)</td>
                                                 `).join('')}
                                             </tr>
                                         `).join('')}

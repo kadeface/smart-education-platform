@@ -1131,26 +1131,30 @@ class ExamOverviewView(TemplateView):
            从考试统计数据中获取特定科目类型的分数线信息。
 
            Args:
-               exam_stats: ExamLevelStatistics对象
+               exam_stats: ExamLevelStatistics查询集（已经按level_type筛选）
                subject_type: 科目类型 ('science' 或 'liberal')
 
            Returns:
                dict: 排序后的分数线字典
            """
         try:
-            # 获取对应科目的市级数据
-            stats = exam_stats.filter(
-                level_type='city',
-                select_type=subject_type
-            ).first()
 
-            if not stats or not stats.threshold_stats:
-                logger.warning(f"未找到{subject_type}分数线数据")
+
+            # 直接获取对应科目类型的数据
+            stats = exam_stats.filter(select_type=subject_type).first()
+            logger.info(f"获取{subject_type}分数线数据: select_type={subject_type}")
+
+            if not stats:
+                logger.warning(f"未找到统计数据: select_type={subject_type}")
+                return {}
+
+            if not stats.threshold_stats:
+                logger.warning(f"未找到分数线数据")
                 return {}
 
             # 解析threshold_stats
             threshold_data = self.parse_json(stats.threshold_stats)
-            logger.info(f"解析到的{subject_type}分数线数据: {threshold_data}")
+            logger.info(f"解析到的分数线数据: {threshold_data}")
 
             # 按分数线从高到低排序
             sorted_thresholds = dict(sorted(
@@ -1159,7 +1163,7 @@ class ExamOverviewView(TemplateView):
                 reverse=True
             ))
 
-            logger.info(f"返回的{subject_type}排序后分数线数据: {sorted_thresholds}")
+            logger.info(f"返回的排序后分数线数据: {sorted_thresholds}")
             return sorted_thresholds
 
         except Exception as e:

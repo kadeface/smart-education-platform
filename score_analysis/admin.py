@@ -1504,7 +1504,6 @@ class TrackingAdmin(admin.ModelAdmin):
                     else:
                         # 用户确认重新生成
                         for exam_id in existing_exams:
-                            generator._clear_existing_data(exam_id)
                             generator.generate(
                                 exam_id=exam_id,
                                 generate_t_score=generate_t_score,

@@ -130,8 +130,21 @@ class TrackingGenerator:
                     self.logger.warning(f"未找到考试 {exam_id} 的成绩数据")
                     return []
 
-                self.logger.info(f"获取到 {len(scores)} 条成绩数据")
-                return scores
+                # 清理成绩数据中的None值
+                cleaned_scores = []
+                for score in scores:
+                    cleaned_score = {}
+                    for key, value in score.items():
+                        if key in ['chinese', 'math', 'english', 'physics', 'chemistry',
+                                   'biology', 'politics', 'history', 'geography', 'total_score']:
+                            cleaned_score[key] = -3 if value is None else value
+                        else:
+                            cleaned_score[key] = value
+                    cleaned_scores.append(cleaned_score)
+
+                self.logger.info(f"获取并清理了 {len(cleaned_scores)} 条成绩数据")
+                return cleaned_scores
+
         except Exception as e:
             self.logger.error(f"获取考试成绩数据时出错: {str(e)}")
             raise

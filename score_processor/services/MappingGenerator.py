@@ -141,6 +141,15 @@ class MappingGenerator:
             cleaned_data: 待处理的数据框
             school_level: 学段，'primary'表示小学，'secondary'表示初中和高中
         """
+        # 检查数据
+        # 添加日志
+        self.logger.info("=== 开始处理数据 ===")
+        self.logger.info(f"数据列: {cleaned_data.columns.tolist()}")
+        score_columns = [col for col in cleaned_data.columns
+                         ]
+        for col in score_columns:
+            print(f"列 {col} 的唯一值: {cleaned_data[col].unique()}")
+            print(f"列 {col} 的数据类型: {cleaned_data[col].dtype}")
         # 处理初中和高中的情况
         if school_level in ['middle', 'high']:
             school_level = 'secondary'
@@ -460,13 +469,19 @@ class MappingGenerator:
                         new_mappings_list.append({
                             'unified_id': unified_id,
                             'exam_id': exam_id,
-                            'original_student_id': row['exam_number'],
+                            'original_student_id': str(row['exam_number']),
                             'student_name': row['student_name'],
                             'school_name': row['school_name'],
-                            'class_name': row['class_name'],
+                            'class_name': str(row['class_name']),
                             'school_level': exam_id.split('-')[2],
-                            'student_id': str(row['student_id']).strip() if pd.notna(row.get('student_id')) else None,
-                            'id_number': str(row['id_number']).strip() if pd.notna(row.get('id_number')) else None,
+                            'student_id': (str(row['student_id']).strip()
+                                           if pd.notna(row.get('student_id')) and str(
+                                row['student_id']).strip().lower() != 'nan'
+                                           else None),
+                            'id_number': (str(row['id_number']).strip()
+                                          if pd.notna(row.get('id_number')) and str(
+                                row['id_number']).strip().lower() != 'nan'
+                                          else None),
                             'is_new': True
                         })
 
@@ -511,9 +526,23 @@ class MappingGenerator:
         try:
             # 获取学段
             school_level = exam_id.split('-')[2]  # H/M/P
+            self.logger.info(f"=== 开始更新成绩记录 ===")
+            self.logger.info(f"学段: {school_level}")
+
+            # 检查输入数据
+            self.logger.info("原始数据信息:")
+            self.logger.info(f"- 列名: {data.columns.tolist()}")
+            for col in data.columns:
+                self.logger.info(f"- {col} 类型: {data[col].dtype}")
+                if data[col].isna().any():
+                    null_count = data[col].isna().sum()
+                    self.logger.info(f"  - 空值数量: {null_count}")
+                    null_examples = data[data[col].isna()][col].head()
+                    self.logger.info(f"  - 空值示例: {null_examples.tolist()}")
 
             # 将映射结果转换为DataFrame
             mapping_df = pd.DataFrame(mapping_results)
+            self.logger.info(f"映射数据数量: {len(mapping_df)}")
 
             # 合并数据
             merged_data = pd.merge(
@@ -523,38 +552,57 @@ class MappingGenerator:
                 right_on='original_student_id',
                 how='left'
             )
+            self.logger.info(f"合并后数据数量: {len(merged_data)}")
+
+            # 检查合并后的数据
+            if merged_data['unified_id'].isna().any():
+                missing_count = merged_data['unified_id'].isna().sum()
+                self.logger.error(f"发现 {missing_count} 条记录缺少unified_id")
+                missing_examples = merged_data[merged_data['unified_id'].isna()].head()
+                self.logger.error(f"示例: {missing_examples[['exam_number', 'student_name']].to_dict('records')}")
 
             # 批量创建成绩记录
             score_records = []
-            for _, row in merged_data.iterrows():
-                # 设置科目成绩
-                subject_scores = {
-                    'chinese': row.get('chinese', 0),
-                    'math': row.get('math', 0),
-                    'english': row.get('english', 0),
-                    'physics': row.get('physics', 0),
-                    'chemistry': row.get('chemistry', 0),
-                    'biology': row.get('biology', 0),
-                    'history': row.get('history', 0),
-                    'politics': row.get('politics', 0),
-                    'geography': row.get('geography', 0)
-                }
+            for idx, row in merged_data.iterrows():
+                try:
+                    # 检查科目成绩
+                    subject_scores = {}
+                    for subject in ['chinese', 'math', 'english', 'physics', 'chemistry',
+                                    'biology', 'history', 'politics', 'geography']:
+                        value = row.get(subject, 0)
+                        if pd.isna(value) or str(value).lower() == 'nan':
+                            self.logger.warning(f"行 {idx}: {subject} 的值为 {value}, 类型: {type(value)}")
+                            value = None
+                        subject_scores[subject] = value
 
-                # 在这里调用分科判断
-                select_type = self._determine_select_type(row, exam_id)
+                    # 检查total_score
+                    total_score = row.get('total_score', 0)
+                    if pd.isna(total_score) or str(total_score).lower() == 'nan':
+                        self.logger.warning(f"行 {idx}: total_score 的值为 {total_score}")
+                        total_score = None
 
-                # 创建成绩记录
-                score_records.append(ScoreStudentBasic(
-                    exam_id=exam_id,
-                    student_id=row['unified_id'],
-                    student_name=row['student_name'],
-                    district_name=row['district_name'],
-                    school_name=row['school_name'],
-                    class_field=row['class_name'],
-                    select_type=select_type,  # 这里使用判断结果
-                    **subject_scores,
-                    total_score=row.get('total_score', 0)
-                ))
+                    # 在这里调用分科判断
+                    select_type = self._determine_select_type(row, exam_id)
+
+                    # 创建成绩记录
+                    record = ScoreStudentBasic(
+                        exam_id=exam_id,
+                        student_id=row['unified_id'],
+                        student_name=row['student_name'],
+                        district_name=row['district_name'],
+                        school_name=row['school_name'],
+                        class_field=row['class_name'],
+                        select_type=select_type,
+                        total_score=total_score,
+                        **subject_scores
+                    )
+                    score_records.append(record)
+
+                except Exception as e:
+                    self.logger.error(f"处理第 {idx} 行时出错:")
+                    self.logger.error(f"行数据: {row.to_dict()}")
+                    self.logger.error(f"错误: {str(e)}")
+                    raise
 
             # 输出分科统计
             if score_records:
@@ -577,7 +625,6 @@ class MappingGenerator:
             self.logger.error(f"更新成绩记录时出错: {str(e)}")
             self.logger.error("错误详情:", exc_info=True)
             raise
-
 
     def _find_mapping(self, row: pd.Series, mapping_index: Dict) -> Optional[Dict]:
         """按优先级查找映射"""

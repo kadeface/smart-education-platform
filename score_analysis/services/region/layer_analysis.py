@@ -1,5 +1,7 @@
 from typing import List, Dict, Optional
 import json
+
+from django.db import transaction
 from django.db.models import Avg, Max, Min, StdDev, Count, F, Q
 from decimal import Decimal
 from score_processor.models import ScoreStudentBasic, BaseExamConfig
@@ -95,10 +97,76 @@ class LayerAnalysisService:
         """获取层次对应的学生数量"""
         return self.layer_student_counts[select_type][layer_type]
 
-    def _get_exam_scores(self, exam_id: str, select_type: str=None) -> Dict:
+
+    def _clean_exam_data(self, exam_id: str):
+        """清洗考试数据，处理所有None值"""
+        try:
+            logger.info(f"开始清洗考试 {exam_id} 的数据")
+
+            with transaction.atomic():
+                # 1. 获取所有需要清洗的记录
+                records = ScoreStudentBasic.objects.filter(exam_id=exam_id)
+
+                # 2. 需要处理的成绩字段
+                score_fields = [
+                    'total_score', 'chinese', 'math', 'english',
+                    'physics', 'chemistry', 'biology',
+                    'politics', 'history', 'geography'
+                ]
+
+                # 3. 统计原始数据情况
+                total_records = records.count()
+                null_counts = {
+                    field: records.filter(**{f"{field}__isnull": True}).count()
+                    for field in score_fields
+                }
+                logger.info(f"原始数据统计:")
+                logger.info(f"- 总记录数: {total_records}")
+                logger.info(f"- 空值统计: {null_counts}")
+
+                # 4. 批量更新所有字段的None值为-3
+                update_fields = {field: -3 for field in score_fields}
+                updated_count = 0
+
+                # 分批处理以避免内存问题
+                batch_size = 1000
+                for i in range(0, total_records, batch_size):
+                    batch = records[i:i + batch_size]
+                    for record in batch:
+                        record_updated = False
+                        for field in score_fields:
+                            if getattr(record, field) is None:
+                                setattr(record, field, -3)
+                                record_updated = True
+                        if record_updated:
+                            record.save()
+                            updated_count += 1
+
+                # 5. 记录清洗结果
+                after_null_counts = {
+                    field: records.filter(**{f"{field}__isnull": True}).count()
+                    for field in score_fields
+                }
+
+                logger.info(f"数据清洗完成:")
+                logger.info(f"- 更新记录数: {updated_count}")
+                logger.info(f"- 清洗后空值统计: {after_null_counts}")
+
+                return updated_count
+
+        except Exception as e:
+            logger.error(f"清洗考试数据时出错: {str(e)}")
+            logger.error("错误详情:", exc_info=True)
+            raise
+    def _get_exam_scores(self, exam_id: str, select_type: str = None) -> Dict:
+
         """获取并预处理考试成绩数据"""
         try:
             logger.info(f"开始获取考试 {exam_id} {select_type} 的成绩数据")
+
+            # 先进行数据清洗
+            cleaned_count = self._clean_exam_data(exam_id)
+            logger.info(f"清洗了 {cleaned_count} 条数据")
 
             # 构建基础查询条件
             query_params = {'exam_id': exam_id}
@@ -115,6 +183,7 @@ class LayerAnalysisService:
                 '-math',
                 '-chinese'
             )
+
             # 打印SQL查询
             logger.debug(f"成绩查询SQL: {str(query.query)}")
 
@@ -141,8 +210,7 @@ class LayerAnalysisService:
 
             # 2. 统计区县总人数
             district_counts = ScoreStudentBasic.objects.filter(
-                exam_id=exam_id,
-                select_type=select_type
+                **query_params
             ).values('district_name').annotate(
                 total_count=Count('id')
             )
@@ -151,39 +219,19 @@ class LayerAnalysisService:
 
             # 3. 统计学校总人数
             school_counts = ScoreStudentBasic.objects.filter(
-                exam_id=exam_id,
-                select_type=select_type
-            ).values('district_name', 'school_name').annotate(
+                **query_params
+            ).values('school_name').annotate(
                 total_count=Count('id')
             )
 
-            logger.info(f"学校统计数量: {school_counts.count()} 所学校")
-            logger.debug(f"学校统计样本（前3所）: {list(school_counts)[:3]}")
-
-            # 4. 构建返回数据
-            result = {
+            return {
                 'all_scores': all_scores,
-                'district_stats': {
-                    item['district_name']: item['total_count']
-                    for item in district_counts
-                },
-                'school_stats': {
-                    f"{item['district_name']}_{item['school_name']}": item['total_count']
-                    for item in school_counts
-                }
+                'district_counts': list(district_counts),
+                'school_counts': list(school_counts)
             }
 
-            # 打印统计信息
-            logger.info(f"""数据统计:
-                - 总成绩记录数: {len(all_scores)}
-                - 区县数量: {len(result['district_stats'])}
-                - 学校数量: {len(result['school_stats'])}
-            """)
-
-            return result
-
         except Exception as e:
-            logger.error(f"获取考试成绩数据失败: {str(e)}", exc_info=True)
+            logger.error(f"获取考试成绩数据时出错: {str(e)}")
             raise
 
     def _generate_base_layer_analysis(self, exam_id: str, select_type: str = None,
@@ -202,12 +250,22 @@ class LayerAnalysisService:
 
             # 3. 生成排名
             all_scores = scores['all_scores']
-            sorted_scores = sorted(all_scores,
-                                   key=lambda x: (float(x['total_score']),
-                                                  float(x.get('math', 0)),
-                                                  float(x.get('chinese', 0)),
-                                                  x['student_id']),
-                                   reverse=True)
+            # 过滤掉总分为None的记录
+            valid_scores = [score for score in all_scores if score['total_score'] is not None]
+            if not valid_scores:
+                logger.warning("没有有效的成绩数据")
+                return []
+
+            sorted_scores = sorted(
+                valid_scores,
+                key=lambda x: (
+                    float(x['total_score']),
+                    float(x.get('math', 0)) if x.get('math') is not None else -1,
+                    float(x.get('chinese', 0)) if x.get('chinese') is not None else -1,
+                    x['student_id']
+                ),
+                reverse=True
+            )
 
             # 添加排名信息
             current_rank = 1
@@ -467,12 +525,25 @@ class LayerAnalysisService:
             """)
 
             # 4. 生成总排名
-            sorted_scores = sorted(scores['all_scores'],
-                                   key=lambda x: (float(x['total_score']),
-                                                  float(x.get('math', 0)),
-                                                  float(x.get('chinese', 0)),
-                                                  x['student_id']),
-                                   reverse=True)
+
+            # 首先过滤掉总分为None的记录
+            valid_scores = [score for score in scores['all_scores']
+                            if score['total_score'] is not None
+                            and str(score['total_score']).lower() != 'nan']
+
+            # 然后进行排序
+            sorted_scores = sorted(
+                valid_scores,
+                key=lambda x: (
+                    float(x['total_score']),
+                    float(x.get('math', 0)) if x.get('math') is not None and str(
+                        x.get('math', 0)).lower() != 'nan' else -1,
+                    float(x.get('chinese', 0)) if x.get('chinese') is not None and str(
+                        x.get('chinese', 0)).lower() != 'nan' else -1,
+                    x['student_id']
+                ),
+                reverse=True
+            )
 
             # 5. 添加排名信息
             current_rank = 1
