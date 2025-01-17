@@ -50,15 +50,25 @@ class RankingCalculator:
         """计算总分排名"""
         if not scores:
             return {}
-
+        self.logger.info(f"Score sample fields: {list(scores[0].keys())}")
+        self.logger.info(f"First score record: {scores[0]}")
         exam_id = scores[0].get('exam_id')
+        self.logger.info(f"开始计算总分排名，数据量：{len(scores)}")
+        self.logger.info(f"exam_id: {exam_id}")
         is_stream_divided = self._check_stream_divided(exam_id)
+        self.logger.info(f"是否分科：{is_stream_divided}")
         sort_key = self._get_sort_key_function('total_score')
-
+        # 转换student_type到select_type的映射
+        type_mapping = {
+            'SCIENCE': '理科',
+            'LIBERAL': '文科',
+            'ALL': 'ALL'
+        }
+        select_type = type_mapping.get(student_type, student_type)
         # 如果不分科或指定了student_type，直接计算
-        if not is_stream_divided or student_type != 'ALL':
-            valid_scores = [s for s in scores if student_type == 'ALL' or
-                          s.get('select_type') == student_type]
+        if not is_stream_divided or select_type != 'ALL':
+            valid_scores = [s for s in scores if select_type == 'ALL' or
+                            s.get('select_type') == select_type]
             return self._calculate_group_ranks(valid_scores, group_by, sort_key)
 
         # 分科情况：按文理分别计算
@@ -66,7 +76,7 @@ class RankingCalculator:
             '理科': [s for s in scores if s.get('select_type') == '理科'],
             '文科': [s for s in scores if s.get('select_type') == '文科']
         }
-
+        self.logger.info(f"分科处理，理科：{len(stream_groups['理科'])}，文科：{len(stream_groups['文科'])}")
         return {
             student_id: rank
             for stream_scores in stream_groups.values()
@@ -76,7 +86,7 @@ class RankingCalculator:
         }
 
     def calculate_subject_rank(self, scores: List[Dict], subject: str,
-                             group_by: str = None, student_type: str = 'ALL') -> Dict[str, int]:
+                               group_by: str = None, student_type: str = 'ALL') -> Dict[str, int]:
         """计算单科排名"""
         if not scores:
             return {}
@@ -88,10 +98,18 @@ class RankingCalculator:
         # 筛选有效成绩
         valid_scores = self._filter_valid_scores(scores, subject, is_stream_divided)
 
+        # 转换student_type到select_type的映射
+        type_mapping = {
+            'SCIENCE': '理科',
+            'LIBERAL': '文科',
+            'ALL': 'ALL'
+        }
+        select_type = type_mapping.get(student_type, student_type)
+
         # 如果不分科或指定了student_type，直接计算
-        if not is_stream_divided or student_type != 'ALL':
-            filtered_scores = [s for s in valid_scores if student_type == 'ALL' or
-                             s.get('select_type') == student_type]
+        if not is_stream_divided or select_type != 'ALL':
+            filtered_scores = [s for s in valid_scores if select_type == 'ALL' or
+                               s.get('select_type') == select_type]
             return self._calculate_group_ranks(filtered_scores, group_by, sort_key)
 
         # 分科情况：按文理分别计算
@@ -184,12 +202,7 @@ class RankingCalculator:
     def _check_stream_divided(self, exam_id: str) -> bool:
         """检查考试是否分科（使用缓存优化）"""
         try:
-            exam_config = BaseExamConfig.objects.get(exam_id=exam_id)
-            school_level = exam_id.split('-')[2]
-
-            return (school_level == 'H' and
-                    exam_config.semester != 'H1-1')
-
+            return BaseExamConfig.is_divided(exam_id)
         except Exception as e:
             self.logger.error(f"检查考试分科状态时出错: {str(e)}")
             return False

@@ -4,6 +4,7 @@ from typing import List, Dict
 from django.db import transaction, connection
 from .statistics_calculator import StatisticsCalculator
 from .ranking_calculator import RankingCalculator
+from ...models import BaseExamConfig
 
 
 class TrackingGenerator:
@@ -38,12 +39,12 @@ class TrackingGenerator:
 
     def _is_stream_divided(self, exam_info: dict) -> bool:
         """判断是否分科"""
-        school_level = exam_info['school_level']
-        if school_level in ['P', 'M']:  # 小学、初中不分科
+
+        try:
+            return BaseExamConfig.is_divided(exam_info['exam_id'])
+        except Exception as e:
+            self.logger.error(f"检查考试分科状态时出错: {str(e)}")
             return False
-        if school_level == 'H' and exam_info['semester'] == 'H1-1':  # 高一上不分科
-            return False
-        return True
 
     def _get_subjects_config(self, school_level: str) -> List[str]:
         """获取不同学段的科目配置"""
@@ -119,10 +120,11 @@ class TrackingGenerator:
                         select_type,
                         school_name,
                         district_name,
-                        class_name
-                    FROM score_student_basic
-                    WHERE exam_id = %s
-                """, [exam_id])
+                        class_name,
+                    %s as exam_id
+                FROM score_student_basic
+                WHERE exam_id = %s
+            """, [exam_id, exam_id])
                 columns = [col[0] for col in cursor.description]
                 scores = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
@@ -289,7 +291,7 @@ class TrackingGenerator:
                 total_ranks = self.rank_calculator.calculate_total_rank(
                     scores=scores,
                     group_by=group_by,
-                    student_type='ALL',
+                    student_type='未确定',
                     #exam_info=exam_info  # 添加考试信息
                 )
                 key = f"total_score_{dim_name}" if dim_name != 'city' else "total_score"
@@ -302,7 +304,7 @@ class TrackingGenerator:
                             scores=scores,
                             subject=subject,
                             group_by=group_by,
-                            student_type='ALL',
+                            student_type='未确定',
                             #exam_info=exam_info  # 添加考试信息
                         )
                         key = f"{subject}_{dim_name}" if dim_name != 'city' else subject
@@ -376,35 +378,7 @@ class TrackingGenerator:
                                 ranks[key] = {}
                             ranks[key].update(subject_ranks)
 
-        # 未分科的学生单独计算
-        if undecided_scores:
-            for dim_name, group_by in dimensions:
-                # 总分排名
-                total_ranks = self.rank_calculator.calculate_total_rank(
-                    scores=undecided_scores,
-                    group_by=group_by,
-                    student_type='UNKNOWN',
-                    #exam_info=exam_info  # 添加考试信息
-                )
-                key = f"total_score_{dim_name}" if dim_name != 'city' else "total_score"
-                if key not in ranks:
-                    ranks[key] = {}
-                ranks[key].update(total_ranks)
 
-                # 单科排名
-                for subject in subjects:
-                    if subject != 'total_score':
-                        subject_ranks = self.rank_calculator.calculate_subject_rank(
-                            scores=undecided_scores,
-                            subject=subject,
-                            group_by=group_by,
-                            student_type='UNKNOWN',
-                            #exam_info=exam_info  # 添加考试信息
-                        )
-                        key = f"{subject}_{dim_name}" if dim_name != 'city' else subject
-                        if key not in ranks:
-                            ranks[key] = {}
-                        ranks[key].update(subject_ranks)
 
         return ranks
 
