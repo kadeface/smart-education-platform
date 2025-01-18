@@ -20,7 +20,7 @@ class LayerAnalysisService:
         
         # 区县层次配置
         self.district_layer_types = {
-            '文科': ['top10', 'top50', 'top100', 'top200', 'top300','top350', 'top400'],
+            '文科': ['top10', 'top50', 'top100', 'top200', 'top300','top350', 'top500'],
             '理科': ['top10', 'top50', 'top100', 'top200', 'top350','top400', 'top1250']
         }
         # 未分科情况的配置
@@ -36,8 +36,8 @@ class LayerAnalysisService:
                 'top100': 100,  #开平市文科优分层
                 'top200': 200,
                 'top300': 300,
-                'top350': 350,  #开平市文科本科层
-                'top400': 400,
+                'top350': 350,
+                'top500': 500,  #开平市文科本科层
                 'top600': 600,  #江门市文科优分层
                 'top3800': 3800 #江门市文科本科层
             },
@@ -234,10 +234,16 @@ class LayerAnalysisService:
             logger.error(f"获取考试成绩数据时出错: {str(e)}")
             raise
 
-    def _generate_base_layer_analysis(self, exam_id: str, select_type: str = None,
+    def _generate_base_layer_analysis(self, exam_id: str, select_type: str=None ,
                                       scores: Dict = None) -> List[LayerAnalysis]:
         """生成基础层次分析"""
         try:
+            logger.info(f"开始生成基础层次分析 - exam_id: {exam_id}, select_type: {select_type}")
+
+            # 如果是不分科，select_type 设为默认值
+            if select_type is None:
+                select_type = '未确定'
+                logger.info(f"不分科考试，设置默认 select_type: {select_type}")
             # 1. 获取考试信息和分科状态
             exam_info = self._get_exam_info(exam_id)
             is_divided = self._is_stream_divided(exam_info)
@@ -431,11 +437,21 @@ class LayerAnalysisService:
             LayerAnalysis.objects.filter(exam_id=exam_id).delete()
             RegionLayerDetail.objects.filter(layer__exam_id=exam_id).delete()
 
-            # 分别处理文理科
-            for select_type in ['文科', '理科']:
-                # 统一使用 _generate_analysis_by_type
-                # 在 _get_layer_types 中会根据考试ID返回对应的层次配置
-                self._generate_analysis_by_type(exam_id, select_type)
+            # 获取考试信息
+            exam_info = self._get_exam_info(exam_id)
+            is_divided = self._is_stream_divided(exam_info)
+
+            logger.info(f"考试信息 - exam_id: {exam_id}, is_divided: {is_divided}")
+
+            if is_divided:
+                # 分科考试，分别处理文理科
+                logger.info(f"分科考试，开始处理文理科数据")
+                for select_type in ['文科', '理科']:
+                    self._generate_analysis_by_type(exam_id, select_type)
+            else:
+                # 不分科考试，统一处理
+                logger.info(f"不分科考试，统一处理数据")
+                self._generate_analysis_by_type(exam_id)
 
             logger.info(f"考试 {exam_id} 的分层分析生成完成")
             return True
@@ -452,44 +468,28 @@ class LayerAnalysisService:
             select_type: 科类（文科/理科/None）
         """
         try:
-            # 获取考试信息
-            exam_info = self._get_exam_info(exam_id)
-            is_divided = self._is_stream_divided(exam_info)
+            logger.info(f"开始生成分析 - exam_id: {exam_id}, select_type: {select_type}")
 
-            if is_divided and select_type:
-                # 分科情况，使用原有逻辑
-                logger.info(f"开始生成分科地市级分析: {exam_id} {select_type}")
+            # 1. 获取成绩数据
+            scores = self._get_exam_scores(exam_id, select_type)
+            if not scores:
+                logger.warning(f"未找到考试成绩数据 - exam_id: {exam_id}, select_type: {select_type}")
+                return False
 
-                # 1. 获取成绩数据（分科）
-                scores = self._get_exam_scores(exam_id, select_type)
-                if not scores:
-                    logger.warning(f"未找到考试成绩数据: {exam_id} {select_type}")
-                    return False
-
-            else:
-                # 未分科情况
-                logger.info(f"开始生成未分科地市级分析: {exam_id}")
-
-                # 1. 获取成绩数据（不分科）
-                scores = self._get_exam_scores(exam_id)
-                if not scores:
-                    logger.warning(f"未找到考试成绩数据: {exam_id}")
-                    return False
-
-            # 2. 生成基础层次分析（统一调用方式）
+            # 2. 生成基础层次分析
             layer_analyses = self._generate_base_layer_analysis(
                 exam_id, select_type, scores
             )
 
-            # 3. 生成区县层次详情（包含学校统计）- 通用逻辑
+            # 3. 生成区县层次详情（包含学校统计）
             self._generate_district_layer_details(layer_analyses, scores)
 
-            logger.info(f"地市级分析生成完成: {exam_id} {select_type if select_type else '未分科'}")
+            logger.info(f"分析生成完成 - exam_id: {exam_id}, select_type: {select_type}")
             return True
 
         except Exception as e:
             logger.error(
-                f"地市级分析生成失败: {exam_id} {select_type if select_type else '未分科'} - {str(e)}",
+                f"分析生成失败 - exam_id: {exam_id}, select_type: {select_type}, error: {str(e)}",
                 exc_info=True
             )
             raise
@@ -698,53 +698,47 @@ class LayerAnalysisService:
             logger.error(f"生成区县层次详情失败: {str(e)}", exc_info=True)
             raise
 
-    def _get_exam_info(self, exam_id: str) -> dict:
+    def _get_exam_info(self, exam_id: str) -> BaseExamConfig:
         """
         获取考试基本信息
+
         Args:
             exam_id: 考试ID
+
         Returns:
-            dict: 考试信息字典
+            BaseExamConfig: 考试配置对象
         """
         try:
-            exam_info = BaseExamConfig.objects.filter(exam_id=exam_id).values(
-                'exam_id',
-                'exam_name',
-                'school_level',  # P/M/H (小学/初中/高中)
-                'semester',  # 学期 例如：H1-1 表示高一上
-                'exam_date'
-            ).first()
+            exam = BaseExamConfig.objects.get(exam_id=exam_id)
+            logger.info(f"获取到考试信息: {exam_id}, 考试名称: {exam.exam_name}")
+            return exam
 
-            if not exam_info:
-                logger.error(f"未找到考试 {exam_id} 的配置信息")
-                return {}
-
-            return exam_info
-
+        except BaseExamConfig.DoesNotExist:
+            logger.error(f"未找到考试信息: {exam_id}")
+            raise
         except Exception as e:
-            logger.error(f"获取考试信息失败: {str(e)}")
-            return {}
+            logger.error(f"获取考试信息失败: {str(e)}", exc_info=True)
+            raise
 
-    def _is_stream_divided(self, exam_info: dict) -> bool:
+    def _is_stream_divided(self, exam_info: BaseExamConfig) -> bool:
         """
         判断是否为分科考试
+
         Args:
-            exam_info: 考试信息字典
+            exam_info: BaseExamConfig 对象
+
         Returns:
             bool: 是否分科
         """
         try:
-            # 只有高中才可能分科
-            if exam_info.get('school_level') != 'H':
+            if not exam_info:
+                logger.warning("考试信息为空，默认为不分科")
                 return False
 
-            # 高一上学期不分科
-            if exam_info.get('semester') == 'H1-1':
-                return False
-
-            # 其他高中年级都分科
-            return True
+            is_divided = exam_info.is_divided_exam
+            logger.info(f"考试分科判断 - exam_id: {exam_info.exam_id}, is_divided: {is_divided}")
+            return is_divided
 
         except Exception as e:
-            logger.error(f"判断分科状态失败: {str(e)}")
+            logger.error(f"判断是否分科失败: {str(e)}", exc_info=True)
             return False

@@ -477,22 +477,3 @@ class LayerViewService:
             logger.error(f"获取区县列表失败: {str(e)}", exc_info=True)
             return []
 
-    def _is_stream_divided(self, exam_id: str) -> bool:
-        """
-        判断是否为分科考试
-        Args:
-            exam_id: 考试ID
-        Returns:
-            bool: 是否分科
-        """
-        try:
-            # 获取考试配置
-            exam = BaseExamConfig.objects.get(exam_id=exam_id)
-
-            # 判断学期
-            divided_semesters = ['H1-2', 'H2-1', 'H2-2', 'H3-1', 'H3-2']
-            return exam.semester in divided_semesters
-
-        except Exception as e:
-            logger.error(f"判断分科状态失败: {str(e)}")
-            return False
