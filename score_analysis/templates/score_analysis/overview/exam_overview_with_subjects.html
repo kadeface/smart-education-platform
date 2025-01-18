@@ -419,11 +419,23 @@
         <p class="exam-info">考试时间：{{ exam_info.exam_date }}</p>
     </div>
 
-    <!-- 文理分科标签 -->
-    <div class="type-tabs">
-        <a href="#" class="tab-item" onclick="switchTab('science', event)">理科</a>
-        <a href="#" class="tab-item" onclick="switchTab('arts', event)">文科</a>
+<div class="type-tabs">
+    <a href="#" class="tab-item active" onclick="switchTab('science', event)">理科</a>
+    <a href="#" class="tab-item" onclick="switchTab('arts', event)">文科</a>
+</div>
+
+<div class="tab-content">
+    <div id="science-tab" class="tab-pane active" style="display: block;">
+        <script type="application/json" id="science-data">
+            {{ science_data|safe }}
+        </script>
     </div>
+    <div id="arts-tab" class="tab-pane" style="display: none;">
+        <script type="application/json" id="arts-data">
+            {{ arts_data|safe }}
+        </script>
+    </div>
+</div>
 
     <!-- 统计数据内容 -->
     <div class="tab-content">
@@ -947,6 +959,8 @@ function switchTab(tabName, event) {
         event.preventDefault();
     }
 
+    console.log(`切换到${tabName}标签`);
+
     // 移除所有tab的active类
     document.querySelectorAll('.type-tabs .tab-item').forEach(tab => {
         tab.classList.remove('active');
@@ -955,13 +969,39 @@ function switchTab(tabName, event) {
     // 隐藏所有内容
     document.querySelectorAll('.tab-pane').forEach(content => {
         content.classList.remove('active');
+        content.style.display = 'none';  // 确保内容被隐藏
     });
 
     // 激活选中的tab
     event.target.classList.add('active');
 
-    // 显示对应的内容
-    document.getElementById(tabName + '-tab').classList.add('active');
+    // 显示对应的内容并渲染数据
+    const selectedPane = document.getElementById(tabName + '-tab');
+    selectedPane.classList.add('active');
+    selectedPane.style.display = 'block';  // 确保内容显示
+
+    // 获取并渲染数据
+    const dataEl = document.getElementById(tabName + '-data');
+    if (dataEl) {
+        try {
+            // 预处理数据，将NaN替换为null
+            const rawData = dataEl.textContent
+                .replace(/:\s*NaN/g, ': null')
+                .replace(/:\s*Infinity/g, ': null')
+                .replace(/:\s*-Infinity/g, ': null');
+
+            const data = JSON.parse(rawData);
+
+            if (data.is_district_exam) {
+                renderDistrictStats(tabName, data);
+            } else {
+                renderCityStats(tabName, data);
+            }
+        } catch (error) {
+            console.error('数据解析错误:', error);
+            console.log('原始数据:', dataEl.textContent);
+        }
+    }
 }
 function switchDistrictTab(type, districtName) {
     const tabContent = document.getElementById(`${type}-tab`);
