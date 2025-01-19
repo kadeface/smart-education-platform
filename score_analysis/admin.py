@@ -1342,7 +1342,17 @@ class LayerAnalysisAdmin(admin.ModelAdmin):
         return redirect('admin:score_analysis_layeranalysis_changelist')
 
     def view_analysis(self, request, exam_id):
-        """查看分层分析结果"""
+        """查看分层分析结果。
+
+        根据考试ID显示分层分析结果。根据考试配置决定是否显示文理科切换。
+
+        Args:
+            request: HTTP请求对象
+            exam_id: 考试ID
+
+        Returns:
+            TemplateResponse: 渲染后的分析结果页面
+        """
         try:
             # 检查数据是否存在
             analyses = LayerAnalysis.objects.filter(exam_id=exam_id)
@@ -1350,24 +1360,29 @@ class LayerAnalysisAdmin(admin.ModelAdmin):
                 messages.error(request, f'未找到考试 {exam_id} 的分层分析数据')
                 return redirect('admin:score_analysis_layeranalysis_changelist')
 
-            # 获取请求参数
-            select_type = request.GET.get('select_type', '理科')
-            selected_districts = request.GET.getlist('districts')
-
-            # 使用服务类获取数据
+            # 使用服务类获取所有数据
             service = LayerViewService()
             exam_info = service.get_exam_info(exam_id)
+            selected_districts = request.GET.getlist('districts')
+
+            # 根据考试信息决定是否分科
+            is_divided = exam_info.get('is_divided', False)
+            select_type = request.GET.get('select_type', '理科') if is_divided else '未确定'
+
             district_analysis = service.get_district_analysis(exam_id, select_type)
             school_analysis = service.get_school_analysis(exam_id, select_type, selected_districts)
             all_districts = service.get_all_districts(exam_id)
 
-            # 构建URL
-            science_url = f"?select_type=理科"
-            liberal_url = f"?select_type=文科"
-            if selected_districts:
-                for district in selected_districts:
-                    science_url += f"&districts={district}"
-                    liberal_url += f"&districts={district}"
+            # 只有分科考试才构建文理科切换URL
+            science_url = ""
+            liberal_url = ""
+            if is_divided:
+                science_url = f"?select_type=理科"
+                liberal_url = f"?select_type=文科"
+                if selected_districts:
+                    for district in selected_districts:
+                        science_url += f"&districts={district}"
+                        liberal_url += f"&districts={district}"
 
             context = {
                 'title': f'考试 {exam_id} 分层分析结果',
@@ -1381,6 +1396,7 @@ class LayerAnalysisAdmin(admin.ModelAdmin):
                 'science_url': science_url,
                 'liberal_url': liberal_url,
                 'is_city_exam': 'CITY' in exam_id.upper(),
+                'is_divided': is_divided,
                 **self.admin_site.each_context(request),
             }
 

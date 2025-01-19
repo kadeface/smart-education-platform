@@ -68,30 +68,59 @@ class LayerAnalysisService:
         }
 
     def _get_layer_types(self, exam_id: str, select_type: str) -> List[str]:
-        """根据考试ID获取对应的层次类型配置"""
-        # 获取考试信息
-        exam_info = self._get_exam_info(exam_id)
-        is_divided = self._is_stream_divided(exam_info)
+        """获取考试的层次类型配置。
 
-        # 根据是否分科返回不同的层次配置
-        if is_divided and select_type:
-            # 分科情况，使用原有逻辑
-            if 'CITY' in exam_id.upper():
-                return list(set(
-                    self.city_layer_types[select_type] +
-                    self.district_layer_types[select_type]
-                ))
+        根据考试ID和科类获取对应的层次类型配置。首先判断考试是否分科，
+        然后根据考试级别（市级/区级）返回相应的层次类型列表。
+
+        Args:
+            exam_id: 考试ID，例如：202501-CITY-H-2025
+            select_type: 科类，可选值：文科/理科/未确定
+
+        Returns:
+            List[str]: 层次类型列表，例如：['top500', 'top1000', ...]
+
+        Raises:
+            BaseExamConfig.DoesNotExist: 当考试信息不存在时抛出
+        """
+        # 1. 获取考试信息
+        exam_info = self._get_exam_info(exam_id)
+
+        logger.info(f"""
+        获取层次类型配置:
+        - exam_id: {exam_id}
+        - select_type: {select_type}
+        - is_divided: {exam_info.is_divided_exam}
+        - is_city_exam: {exam_info.is_city_exam()}
+        - undivided_layer_types: {self.undivided_layer_types}
+        """)
+
+        try:
+            if exam_info.is_divided_exam:
+                logger.info("使用分科考试配置")
+                if exam_info.is_city_exam():
+                    types = list(set(
+                        self.city_layer_types[select_type] +
+                        self.district_layer_types[select_type]
+                    ))
+                else:
+                    types = self.district_layer_types[select_type]
             else:
-                return self.district_layer_types[select_type]
-        else:
-            # 未分科情况，使用新配置
-            if 'CITY' in exam_id.upper():
-                return list(set(
-                    self.undivided_layer_types['city'] +
-                    self.undivided_layer_types['district']
-                ))
-            else:
-                return self.undivided_layer_types['district']
+                logger.info("使用不分科考试配置")
+                if exam_info.is_city_exam():
+                    types = list(set(
+                        self.undivided_layer_types['city'] +
+                        self.undivided_layer_types['district']
+                    ))
+                else:
+                    types = self.undivided_layer_types['district']
+
+            logger.info(f"获取到的层次类型: {types}")
+            return types
+
+        except Exception as e:
+            logger.error(f"获取层次类型失败: {str(e)}", exc_info=True)
+            return []
 
     def _get_student_count(self, select_type: str, layer_type: str) -> int:
         """获取层次对应的学生数量"""
@@ -699,18 +728,31 @@ class LayerAnalysisService:
             raise
 
     def _get_exam_info(self, exam_id: str) -> BaseExamConfig:
-        """
-        获取考试基本信息
+        """获取考试的基本信息。
+
+        从数据库获取考试的完整信息，包括考试名称、日期、类型等。
+        使用单次查询获取所有需要的信息，避免重复访问数据库。
 
         Args:
-            exam_id: 考试ID
+            exam_id: 考试ID，例如：202501-CITY-H-2025
 
         Returns:
-            BaseExamConfig: 考试配置对象
+            BaseExamConfig: 包含考试完整信息的对象
+
+        Raises:
+            BaseExamConfig.DoesNotExist: 当考试信息不存在时抛出
+            DatabaseError: 数据库查询异常时抛出
         """
         try:
             exam = BaseExamConfig.objects.get(exam_id=exam_id)
-            logger.info(f"获取到考试信息: {exam_id}, 考试名称: {exam.exam_name}")
+            logger.info(f"""
+            获取到考试信息:
+            - exam_id: {exam.exam_id}
+            - exam_name: {exam.exam_name}
+            - exam_type: {exam.exam_type}
+            - grade_level: {exam.grade_level}
+            - semester: {exam.semester}
+            """)
             return exam
 
         except BaseExamConfig.DoesNotExist:
