@@ -6,10 +6,51 @@
 {% block title %}层次分析 - {{ exam_info.exam_name }}{% endblock %}
 
 {% block analysis_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 <link rel="stylesheet" href="{% static 'score_analysis/css/layer_analysis.css' %}">
 {% endblock %}
 
 {% block analysis_content %}
+    <style>
+    /* 排序图标容器 */
+    .sort-icons {
+        position: absolute;
+        right: 5px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    /* 排序图标样式 */
+    .sort-icons i {
+        font-size: 12px;
+        color: #ccc;
+        cursor: pointer;
+        transition: color 0.2s;
+    }
+
+    .sort-icons i:hover {
+        color: #666;
+    }
+
+    .sort-icons i.active {
+        color: #00bfa5;
+    }
+
+    /* 表头单元格相对定位 */
+    .analysis-table th.layer-header,
+    .school-table th.sortable-header {
+        position: relative;
+        padding-right: 25px;  /* 为图标留出空间 */
+    }
+
+    /* 确保图标在固定表头中也可见 */
+    .sort-icons {
+        z-index: 2;
+    }
+</style>
 <div class="exam-header">
     <h2>{{ exam_info.exam_name }}</h2>
     <div class="exam-info">
@@ -18,167 +59,283 @@
             <span>理科总人数: {{ exam_info.total_students.理科|default:0 }}</span>
             <span>文科总人数: {{ exam_info.total_students.文科|default:0 }}</span>
         {% else %}
-            <span>总人数: {{ exam_info.total_students|default:0 }}</span>
+            <span>总人数: {{ exam_info.total_students.未确定|default:0 }}</span>
         {% endif %}
     </div>
 </div>
+<th class="layer-header">
+    {{ layer_type }}
+    <div class="sort-icons">
+        <i class="fas fa-sort-up"></i>
+        <i class="fas fa-sort-down"></i>
+    </div>
+</th>
+<!-- 区县层次分析表格 -->
+<div class="district-analysis">
+    <h3>区县层次分析</h3>
+    {% if is_divided %}
+        <div class="type-tabs">
+            <a href="{{ science_url }}" {% if select_type == '理科' %}class="active"{% endif %}>理科</a>
+            <a href="{{ liberal_url }}" {% if select_type == '文科' %}class="active"{% endif %}>文科</a>
+        </div>
+    {% endif %}
+    <table class="analysis-table">
+        <thead>
+            <tr>
+                <th rowspan="2">区县</th>
+                <th rowspan="2">指标</th>
+                {% for layer_type in layer_types %}
+                <th class="layer-header">
+                    {{ layer_type }}
+                    <div class="sort-icons">
+                        <i class="fas fa-sort-up {% if district_sort_param == layer_type|add:'-count-asc' %}active{% endif %}"
+                           data-layer="{{ layer_type }}" data-type="count" data-sort="asc"></i>
+                        <i class="fas fa-sort-down {% if district_sort_param == layer_type|add:'-count-desc' %}active{% endif %}"
+                           data-layer="{{ layer_type }}" data-type="count" data-sort="desc"></i>
+                    </div>
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            <!-- 市级统计行 -->
+            <tr>
+                <td>市级统计</td>
+                <td>均分</td>
+                {% for layer_type in layer_types %}
+                {% with city_data=district_analysis.city_stats|get_item:layer_type %}
+                <td>{{ city_data.avg_score|format_score }}</td>
+                {% endwith %}
+                {% endfor %}
+            </tr>
 
+            <!-- 区县统计行 -->
+            {% for district in district_analysis.district_stats.keys %}
+            <tr data-district="{{ district }}">
+                <td rowspan="4">{{ district }}</td>
+                <td class="count-cell">人数</td>
+                {% with dist_data=district_analysis.district_stats|get_item:district %}
+                {% for layer_type in layer_types %}
+                <td data-layer="{{ layer_type }}" data-type="count">
+                    {{ dist_data|get_item:layer_type|get_item:'count'|default:'-' }}
+                </td>
+                {% endfor %}
+                {% endwith %}
+            </tr>
+            <tr data-district="{{ district }}">
+                <td>占比</td>
+                {% with dist_data=district_analysis.district_stats|get_item:district %}
+                {% for layer_type in layer_types %}
+                <td data-layer="{{ layer_type }}" data-type="ratio">
+                    {{ dist_data|get_item:layer_type|get_item:'ratio'|format_ratio }}
+                </td>
+                {% endfor %}
+                {% endwith %}
+            </tr>
+            <tr>
+                <td>均分</td>
+                {% with dist_data=district_analysis.district_stats|get_item:district %}
+                {% for layer_type in layer_types %}
+                <td>{{ dist_data|get_item:layer_type|get_item:'avg_score'|format_score }}</td>
+                {% endfor %}
+                {% endwith %}
+            </tr>
+            <tr>
+                <td>差值</td>
+                {% with dist_data=district_analysis.district_stats|get_item:district %}
+                {% for layer_type in layer_types %}
+                    <td {% if dist_data|get_item:layer_type|get_item:'diff' > 0 %}class="positive"{% elif dist_data|get_item:layer_type|get_item:'diff' < 0 %}class="negative"{% endif %}>
+                        {{ dist_data|get_item:layer_type|get_item:'diff'|format_diff }}
+                    </td>
+                {% endfor %}
+                {% endwith %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 
+<!-- 学校分析部分 -->
+<div class="school-analysis">
+    <h3>学校层次分析</h3>
 
-   <!-- 3. 区县层次分析表格 -->
-    <div class="district-analysis">
-        <h3> 区县层次分析</h3>
-        <!-- 2. 文理科切换 -->
-            {% if is_divided %}
-                <div class="type-tabs">
-                    <a href="{{ science_url }}" {% if select_type == '理科' %}class="active"{% endif %}>理科</a>
-                    <a href="{{ liberal_url }}" {% if select_type == '文科' %}class="active"{% endif %}>文科</a>
-                </div>
+    <!-- 分科切换 -->
+    {% if is_divided %}
+        <div class="type-tabs">
+            <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}{% if district_sort_param %}&district_sort={{ district_sort_param }}{% endif %}"
+               class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
+            <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}{% if district_sort_param %}&district_sort={{ district_sort_param }}{% endif %}"
+               class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
+        </div>
+    {% endif %}
+
+    <!-- 区县选择器 -->
+    <div class="district-filter" id="district-filter">
+        <form method="get" action="{{ request.path }}#district-filter">
+            <input type="hidden" name="select_type" value="{{ select_type }}">
+            {% if sort_param %}
+            <input type="hidden" name="sort" value="{{ sort_param }}">
             {% endif %}
-        <table class="analysis-table">
+            {% if district_sort_param %}
+            <input type="hidden" name="district_sort" value="{{ district_sort_param }}">
+            {% endif %}
+            {% for district in all_districts %}
+            <label class="checkbox-label">
+                <input type="checkbox" name="districts" value="{{ district }}"
+                       {% if district in selected_districts %}checked{% endif %}>
+                {{ district }}
+            </label>
+            {% endfor %}
+            <button type="submit" class="filter-btn">确定</button>
+        </form>
+    </div>
+
+    <!-- 学校数据表格 -->
+    <div id="school-table">
+        <table class="school-table">
             <thead>
                 <tr>
+                    <th rowspan="2">学校名称</th>
                     <th rowspan="2">区县</th>
-                    <th rowspan="2">指标</th>
-                    {% for layer_type in layer_types %}
-                    <th>{{ layer_type }}</th>
+                    {% for layer in layer_types %}
+                    <th colspan="2" class="layer-header">{{ layer }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for layer in layer_types %}
+                    <th class="sortable-header" data-layer="{{ layer }}" data-level="city">
+                        市级
+                          <div class="sort-icons">
+                        <i class="fas fa-sort-up {% if sort_param == layer|add:'-city-asc' %}active{% endif %}"
+                           data-sort="asc"></i>
+                        <i class="fas fa-sort-down {% if sort_param == layer|add:'-city-desc' %}active{% endif %}"
+                           data-sort="desc"></i>
+                    </div>
+                    </th>
+                    <th class="sortable-header" data-layer="{{ layer }}" data-level="district">
+                        区县
+                    <div class="sort-icons">
+                        <i class="fas fa-sort-up {% if sort_param == layer|add:'-district-asc' %}active{% endif %}"
+                           data-sort="asc"></i>
+                        <i class="fas fa-sort-down {% if sort_param == layer|add:'-district-desc' %}active{% endif %}"
+                           data-sort="desc"></i>
+                    </div>
+
+                    </th>
                     {% endfor %}
                 </tr>
             </thead>
             <tbody>
-                <!-- 市级统计行 -->
+                {% for school in school_analysis %}
                 <tr>
-                    <td>市级统计</td>
-                    <td>均分</td>
-                    {% for layer_type in layer_types %}
-                    {% with city_data=district_analysis.city_stats|get_item:layer_type %}
-                    <td>{{ city_data.avg_score|format_score }}</td>
-                    {% endwith %}
+                    <td>{{ school.school_name }}</td>
+                    <td>{{ school.district }}</td>
+                    {% for layer in layer_types %}
+                    <td data-layer="{{ layer }}" data-level="city">
+                        {{ school.layers|get_item:layer|get_item:'city'|default:'-' }}
+                    </td>
+                    <td data-layer="{{ layer }}" data-level="district">
+                        {{ school.layers|get_item:layer|get_item:'district'|default:'-' }}
+                    </td>
                     {% endfor %}
-                </tr>
-
-                <!-- 区县统计行 -->
-                {% for district in district_analysis.district_stats.keys %}
-                <tr>
-                    <td rowspan="4">{{ district }}</td>
-                    <td>人数</td>
-                    {% with dist_data=district_analysis.district_stats|get_item:district %}
-                    {% for layer_type in layer_types %}
-                    <td>{{ dist_data|get_item:layer_type|get_item:'count'|default:'-' }}</td>
-                    {% endfor %}
-                    {% endwith %}
-                </tr>
-                <tr>
-                    <td>占比</td>
-                    {% with dist_data=district_analysis.district_stats|get_item:district %}
-                    {% for layer_type in layer_types %}
-                    <td>{{ dist_data|get_item:layer_type|get_item:'ratio'|format_ratio }}</td>
-                    {% endfor %}
-                    {% endwith %}
-                </tr>
-                <tr>
-                    <td>均分</td>
-                    {% with dist_data=district_analysis.district_stats|get_item:district %}
-                    {% for layer_type in layer_types %}
-                    <td>{{ dist_data|get_item:layer_type|get_item:'avg_score'|format_score }}</td>
-                    {% endfor %}
-                    {% endwith %}
-                </tr>
-                <tr>
-                    <td>差值</td>
-                    {% with dist_data=district_analysis.district_stats|get_item:district %}
-                    {% for layer_type in layer_types %}
-                        <td {% if dist_data|get_item:layer_type|get_item:'diff' > 0 %}class="positive"{% elif dist_data|get_item:layer_type|get_item:'diff' < 0 %}class="negative"{% endif %}>
-                            {{ dist_data|get_item:layer_type|get_item:'diff'|format_diff }}
-                        </td>
-                    {% endfor %}
-                    {% endwith %}
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-
-
-    <!-- 4. 学校分析部分 -->
-    <div class="school-analysis">
-        <h3>学校层次分析</h3>
-
-        <!-- 分科切换 -->
-            {% if is_divided %}
-                <div class="type-tabs">
-                    <a href="?select_type=理科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
-                       class="tab-item {% if select_type == '理科' %}active{% endif %}">理科</a>
-                    <a href="?select_type=文科{% if selected_districts %}&districts={{ selected_districts|join:',' }}{% endif %}{% if sort_param %}&sort={{ sort_param }}{% endif %}"
-                       class="tab-item {% if select_type == '文科' %}active{% endif %}">文科</a>
-                </div>
-            {% endif %}
-
-    <!-- 区县选择器 -->
-        <!-- 区县选择器 -->
-        <div class="district-filter" id="district-filter">
-            <form method="get" action="{{ request.path }}#district-filter">
-                <input type="hidden" name="select_type" value="{{ select_type }}">
-                {% if sort_param %}
-                <input type="hidden" name="sort" value="{{ sort_param }}">
-                {% endif %}
-                {% if district_sort_param %}
-                <input type="hidden" name="district_sort" value="{{ district_sort_param }}">
-                {% endif %}
-                {% for district in all_districts %}
-                <label class="checkbox-label">
-                    <input type="checkbox" name="districts" value="{{ district }}"
-                           {% if district in selected_districts %}checked{% endif %}>
-                    {{ district }}
-                </label>
-                {% endfor %}
-                <button type="submit" class="filter-btn">确定</button>
-            </form>
-        </div>
-
-        <!-- 学校数据表格 -->
-        <div id="school-table">
-            <table class="school-table">
-                <thead>
-                    <tr>
-                        <th rowspan="2">学校名称</th>
-                        <th rowspan="2">区县</th>
-                        {% for layer in layer_types %}
-                        <th colspan="2" class="sortable-header" data-layer="{{ layer }}">
-                            {{ layer }}
-                            <div class="sort-icons">
-                                <i class="fas fa-sort-up {% if sort_param == layer|add:'-asc' %}active{% endif %}"
-                                   data-sort="asc"></i>
-                                <i class="fas fa-sort-down {% if sort_param == layer|add:'-desc' %}active{% endif %}"
-                                   data-sort="desc"></i>
-                            </div>
-                        </th>
-                        {% endfor %}
-                    </tr>
-                    <tr>
-                        {% for layer in layer_types %}
-                        <th>市级</th>
-                        <th>区县</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for school in school_analysis %}
-                    <tr>
-                        <td>{{ school.school_name }}</td>
-                        <td>{{ school.district }}</td>
-                        {% for layer in layer_types %}
-                        <td>{{ school.layers|get_item:layer|get_item:'city'|default:'-' }}</td>
-                        <td>{{ school.layers|get_item:layer|get_item:'district'|default:'-' }}</td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+</div>
 {% endblock %}
 
+{% block analysis_js %}
+<script>
+// 区县表格排序函数
+function sortDistrictTable(tableSelector, columnIndex, ascending) {
+    const tbody = document.querySelector(tableSelector + ' tbody');
+    const rows = Array.from(tbody.rows);
 
+    // 保存第一行（市级统计行）
+    const firstRow = rows[0];
+    const dataRows = rows.slice(1);
 
+    // 按4行一组分组
+    const groups = [];
+    for (let i = 0; i < dataRows.length; i += 4) {
+        groups.push(dataRows.slice(i, i + 4));
+    }
 
+    // 排序组
+    groups.sort((a, b) => {
+        const aVal = Number(a[0].cells[columnIndex].textContent) || 0;
+        const bVal = Number(b[0].cells[columnIndex].textContent) || 0;
+        return ascending ? aVal - bVal : bVal - aVal;
+    });
+
+    // 重建表格
+    tbody.innerHTML = '';
+    tbody.appendChild(firstRow);
+    groups.forEach(group => {
+        group.forEach(row => tbody.appendChild(row));
+    });
+}
+
+// 学校表格排序函数
+function sortSchoolTable(tableSelector, columnIndex, ascending) {
+    const tbody = document.querySelector(tableSelector + ' tbody');
+    const rows = Array.from(tbody.rows);
+
+    // 排序行
+    rows.sort((a, b) => {
+        const aVal = Number(a.cells[columnIndex].textContent) || 0;
+        const bVal = Number(b.cells[columnIndex].textContent) || 0;
+        return ascending ? aVal - bVal : bVal - aVal;
+    });
+
+    // 重建表格
+    tbody.innerHTML = '';
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// 区县表格点击事件处理
+document.querySelectorAll('.district-analysis .sort-icons i').forEach(icon => {
+    icon.onclick = function() {
+        // 获取列索引
+        const th = this.closest('th');
+        const columnIndex = Array.from(th.parentElement.children).indexOf(th);
+
+        // 获取排序方向
+        const ascending = this.classList.contains('fa-sort-up');
+
+        // 执行排序
+        sortDistrictTable('.analysis-table', columnIndex, ascending);
+
+        // 更新图标状态
+        document.querySelectorAll('.district-analysis .sort-icons i').forEach(i =>
+            i.classList.remove('active')
+        );
+        this.classList.add('active');
+    };
+});
+
+// 学校表格点击事件处理
+document.querySelectorAll('.school-table .sortable-header .sort-icons i').forEach(icon => {
+    icon.onclick = function() {
+        // 获取列索引
+        const th = this.closest('th');
+        const headerRow = th.parentElement;
+        const columnIndex = Array.from(headerRow.children).indexOf(th);
+
+        // 获取排序方向
+        const ascending = this.classList.contains('fa-sort-up');
+
+        // 执行排序
+        sortSchoolTable('.school-table', columnIndex, ascending);
+
+        // 更新图标状态
+        document.querySelectorAll('.school-table .sort-icons i').forEach(i =>
+            i.classList.remove('active')
+        );
+        this.classList.add('active');
+    };
+});
+</script>
+{% endblock %}

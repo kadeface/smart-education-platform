@@ -339,3 +339,143 @@
     height: 2px;
     background-color: #00bfa5;  /* 使用主题色绿色 */
 }
+
+/* 考试信息头部样式增强 */
+.exam-header h2 {
+    font-size: 32px;
+    color: #1d3557;
+    margin: 0;
+    font-weight: 500;
+}
+
+.exam-header .exam-info {
+    margin: 15px 0 30px;
+    color: #595959;
+    font-size: 14px;
+}
+
+.exam-header .exam-info span {
+    margin-right: 30px;
+}
+
+/* 区县和学校层次分析标题样式 */
+.district-analysis h3,
+.school-analysis h3 {
+    position: relative;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.district-analysis h3::after,
+.school-analysis h3::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #00bfa5;
+}
+
+/* 文理科切换标签样式增强 */
+.type-tabs a,
+.type-tabs .tab-item {
+    border: 1px solid #00bfa5;
+    color: #00bfa5;
+}
+
+.type-tabs a.active,
+.type-tabs .tab-item.active {
+    background-color: #00bfa5;
+}
+
+.type-tabs a:hover,
+.type-tabs .tab-item:hover {
+    background-color: #e6f7ff;
+    text-decoration: none;
+}
+
+/* 区县层次分析表格样式增强 */
+.analysis-table th {
+    background-color: #00bfa5;
+    color: white;
+    font-weight: 500;
+}
+
+#district-table {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.analysis-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+/* 区县表格样式增强 */
+.analysis-table td:first-child {
+    font-weight: 500;
+    background-color: #f8f9fa;
+}
+
+.analysis-table td:nth-child(2) {
+    background-color: #f8f9fa;
+}
+
+/* 特殊单元格样式 */
+.analysis-table tr:nth-child(4n-2) td:not(:first-child):not(:nth-child(2)) {
+    color: #2196f3;
+    background-color: #f3f8ff;
+}
+
+.analysis-table tr:nth-child(4n-1) td:not(:first-child):not(:nth-child(2)) {
+    color: #00bcd4;
+    background-color: #e6fffb;
+}
+
+.analysis-table tr:nth-child(4n) td:not(:first-child):not(:nth-child(2)) {
+    color: #e91e63;
+    background-color: #fff0f6;
+}
+
+/* 学校表格样式增强 */
+.school-table td:first-child {
+    text-align: left;
+    padding-left: 12px;
+    white-space: nowrap;
+}
+
+.school-table td:nth-child(2) {
+    white-space: nowrap;
+}
+
+.school-table td:not(:first-child):not(:nth-child(2)) {
+    font-family: "SF Mono", Monaco, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+}
+
+/* 学校表格交替行背景色 */
+.school-table tbody > tr:nth-child(odd) {
+    background-color: #f3f8ff !important;
+}
+
+.school-table tbody > tr:nth-child(even) {
+    background-color: #fff0f6 !important;
+}
+
+.school-table tbody > tr:hover {
+    background-color: #e6f7ff !important;
+}
+
+/* 区县筛选器样式增强 */
+.district-filter {
+    border: 1px solid #e0e0e0;
+}
+
+.filter-btn {
+    background-color: #00bfa5;
+}
+
+.filter-btn:hover {
+    background-color: #00a896;
+}

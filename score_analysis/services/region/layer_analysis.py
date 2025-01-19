@@ -15,7 +15,7 @@ class LayerAnalysisService:
         # 市级层次配置
         self.city_layer_types = {
             '文科': ['top10', 'top50', 'top100', 'top200', 'top600', 'top3800'],
-            '理科': ['top10', 'top50', 'top100', 'top200', 'top3000', 'top9500']
+            '理科': ['top10', 'top50', 'top100', 'top200', 'top3000', 'top9600']
         }
         
         # 区县层次配置
@@ -50,7 +50,7 @@ class LayerAnalysisService:
                 'top400': 400,
                 'top1250': 1250, #开平市理科本科层
                 'top3000': 3000, #江门市理科优分层
-                'top9500': 9500  #江门市理科本科层
+                'top9500': 9600  #江门市理科本科层
             }
 
         }

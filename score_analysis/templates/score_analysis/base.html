@@ -1,5 +1,4 @@
 <!-- templates/score_analysis/base.html -->
-
 {% extends "base.html" %}
 {% load static %}
 
@@ -12,10 +11,13 @@
 {% endblock %}
 
 {% block content %}
-
-
 <!-- 主要内容区域 -->
 <div class="analysis-content">
     {% block analysis_content %}{% endblock %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- score_analysis 通用 JavaScript -->
+{% block analysis_js %}{% endblock %}
 {% endblock %}
