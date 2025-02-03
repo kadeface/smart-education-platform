@@ -1,0 +1,465 @@
+<!-- templates/score_analysis/tracking/score_trends.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="score-trend-analysis">
+    <div class="card">
+        <!-- 1. 头部查询区域 -->
+        <div class="card-header">
+            <h2 class="card-title">学生进步分析报告</h2>
+
+            <!-- 学生查询表单 -->
+            <div class="search-area">
+                <form method="get" class="form-inline" id="studentSearchForm">
+                    <div class="form-group">
+                        <label for="studentName">学生姓名：</label>
+                        <input type="text"
+                               class="form-control"
+                               id="studentName"
+                               name="student_name"
+                               value="{{ request.GET.student_name }}"
+                               placeholder="请输入学生姓名"
+                               autocomplete="off"
+                               required>
+                        <button type="submit" class="btn btn-primary">查询</button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- 2. 内容显示区域 -->
+        {% if selected_student and trend_data %}
+        <div class="card-body">
+    <!-- 学生基本信息 -->
+            <div class="student-info">
+                <div class="info-item">
+                    <span class="label">姓名：</span>
+                    <span class="value">{{ selected_student.name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">学校：</span>
+                    <span class="value">{{ selected_student.school_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">班级：</span>
+                    <span class="value">{{ selected_student.class_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">学号：</span>
+                    <span class="value">{{ selected_student.student_number }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">学科类型：</span>
+                    <span class="value">{{ selected_student.select_type }}</span>
+                </div>
+            </div>
+
+            <!-- 整体趋势 -->
+            <section class="trend-section">
+                <h3>整体趋势</h3>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>考试名称</th>
+                                <th>总分</th>
+                                <th>历次总分均值</th>
+                                <th>市级排名</th>
+                                <th>排名变化</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in trend_data %}
+                            <tr>
+                                <td>{{ item.exam_period }}</td>
+                                <td>{{ item.t_score }}</td>
+                                <td>{{ item.rolling_avg|default:"-" }}</td>
+                                <td>{{ item.city_rank }}</td>
+                                <td class="rank-change {% if item.rank_change|first == '↑' %}up{% elif item.rank_change|first == '↓' %}down{% endif %}">
+                                    {{ item.rank_change }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 趋势图表 -->
+                <div id="trendChart" class="chart-container"></div>
+            </section>
+
+            <!-- 学科贡献分析 -->
+            <section class="subject-section">
+                <h3>学科贡献分析</h3>
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>科目</th>
+                                <th>T分变化</th>
+                                <th>权重贡献</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in subject_analysis %}
+                            <tr>
+                                <td>{{ item.subject }}</td>
+                                <td class="score-change {% if item.t_score_change|first == '+' %}positive{% else %}negative{% endif %}">
+                                    {{ item.t_score_change }}
+                                </td>
+                                <td class="contribution {% if item.weighted_contribution > 0 %}positive{% else %}negative{% endif %}">
+                                    {{ item.weighted_contribution }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 贡献分析图表 -->
+                <div id="contributionChart" class="chart-container"></div>
+            </section>
+
+            <!-- 分位跃迁 -->
+            <section class="percentile-section">
+                <h3>分位跃迁</h3>
+                <div class="percentile-info">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <div class="info-label">排名变化</div>
+                                <div class="info-value">{{ percentile_data.percentile_change }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <div class="info-label">超越情况</div>
+                                <div class="info-value">{{ percentile_data.surpass_info }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        {% elif student_list %}
+        <div class="card-body">
+            <div class="alert alert-info">
+                找到多个匹配的学生，请在上方选择具体学生
+            </div>
+        </div>
+        {% elif request.GET.student_name %}
+        <div class="card-body">
+            <div class="alert alert-warning">
+                未找到匹配的学生
+            </div>
+        </div>
+        {% else %}
+        <div class="card-body">
+            <div class="alert alert-info">
+                请输入学生姓名进行查询
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+/* 整体布局 */
+.score-trend-analysis {
+    padding: 20px;
+}
+
+.card {
+    box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+}
+
+/* 头部样式 */
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #ebeef5;
+    padding: 20px;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 18px;
+    color: #303133;
+}
+
+/* 搜索区域 */
+.search-area {
+    margin: 20px 0;
+}
+
+.search-area .form-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-area label {
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+.student-select-area {
+    margin-top: 10px;
+}
+
+/* 考试选择器 */
+.exam-selector {
+    margin-top: 20px;
+}
+
+.exam-selector .form-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 学生信息 */
+.student-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.student-info .info-item {
+    display: flex;
+    align-items: center;
+}
+
+.student-info .label {
+    color: #666;
+    margin-right: 5px;
+    font-size: 14px;
+}
+
+.student-info .value {
+    font-weight: 500;
+    color: #303133;
+}
+
+/* 内容区域 */
+.card-body {
+    padding: 20px;
+}
+
+section {
+    margin-bottom: 30px;
+}
+
+section h3 {
+    color: #1890ff;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+/* 表格样式 */
+.table {
+    margin-bottom: 20px;
+}
+
+.table th {
+    background-color: #fafafa;
+    color: #606266;
+}
+
+.rank-change.up {
+    color: #52c41a;
+}
+
+.rank-change.down {
+    color: #f5222d;
+}
+
+.score-change.positive,
+.contribution.positive {
+    color: #52c41a;
+}
+
+.score-change.negative,
+.contribution.negative {
+    color: #f5222d;
+}
+
+/* 图表容器 */
+.chart-container {
+    height: 300px;
+    margin-top: 20px;
+}
+
+/* 分位跃迁 */
+.percentile-info {
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.info-card {
+    text-align: center;
+    padding: 20px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.info-label {
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.info-value {
+    font-size: 18px;
+    font-weight: 500;
+    color: #303133;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .search-area .form-group,
+    .exam-selector .form-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .student-info {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 姓名查询表单验证
+    const studentSearchForm = document.getElementById('studentSearchForm');
+    studentSearchForm.addEventListener('submit', function(e) {
+        const studentName = document.getElementById('studentName').value.trim();
+        if (!studentName) {
+            e.preventDefault();
+            alert('请输入学生姓名');
+        }
+    });
+
+
+
+// 图表初始化
+{% if selected_student and trend_data %}
+// 趋势图表
+const trendChart = echarts.init(document.getElementById('trendChart'));
+const trendOption = {
+    tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+            type: 'shadow'
+        }
+    },
+    legend: {
+        data: ['总分', '滚动均值']  // 修改这里
+    },
+    grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
+    },
+    xAxis: {
+        type: 'category',
+        data: [{% for item in trend_data %}'{{ item.exam_period }}'{% if not forloop.last %}, {% endif %}{% endfor %}]
+    },
+    yAxis: {
+        type: 'value',
+        name: '总分'  // 已经是总分了
+    },
+    series: [
+        {
+            name: '总分',  // 修改这里
+            type: 'line',
+            data: [{% for item in trend_data %}{{ item.t_score }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 8,
+            lineStyle: {
+                width: 3
+            }
+        },
+        {
+            name: '滚动均值',
+            type: 'line',
+            data: [{% for item in trend_data %}{% if item.rolling_avg %}{{ item.rolling_avg }}{% else %}null{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}],
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 8,
+            lineStyle: {
+                type: 'dashed',
+                width: 2
+            }
+        }
+    ]
+};
+    trendChart.setOption(trendOption);
+
+    // 贡献分析图表
+    const contributionChart = echarts.init(document.getElementById('contributionChart'));
+    const contributionOption = {
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'value',
+            name: '权重贡献'
+        },
+        yAxis: {
+            type: 'category',
+            data: [{% for item in subject_analysis %}'{{ item.subject }}'{% if not forloop.last %}, {% endif %}{% endfor %}]
+        },
+        series: [
+            {
+                type: 'bar',
+                data: [{% for item in subject_analysis %}{{ item.weighted_contribution }}{% if not forloop.last %}, {% endif %}{% endfor %}],
+                label: {
+                    show: true,
+                    position: 'right',
+                    formatter: '{c}'
+                },
+                itemStyle: {
+                    color: function(params) {
+                        return params.value >= 0 ? '#52c41a' : '#f5222d';
+                    }
+                }
+            }
+        ]
+    };
+    contributionChart.setOption(contributionOption);
+
+    // 响应式调整
+    window.addEventListener('resize', function() {
+        trendChart.resize();
+        contributionChart.resize();
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

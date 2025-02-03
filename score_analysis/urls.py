@@ -50,19 +50,19 @@ urlpatterns = [
     # 发展跟踪的子功能模块
     path('tracking/scores/<str:module_type>/<str:exam_id>/',
          ScoreRankingView.as_view(),
-         name='score_ranking'),
+         name='score_ranking'),  #个体分数排名
 
     path('tracking/trends/<str:module_type>/<str:exam_id>/',
          ScoreTrendView.as_view(),
-         name='score_trends'),
+         name='score_trends'),    #个体发展趋势
 
     path('tracking/groups/<str:module_type>/<str:exam_id>/',
          StudentGroupView.as_view(),
-         name='student_groups'),
+         name='student_groups'),  #群体发展趋势
 
     path('tracking/warnings/<str:module_type>/<str:exam_id>/',
          WarningPredictionView.as_view(),
-         name='warnings'),
+         name='warnings'),  #预警预测
 
 
  #   path('api/statistics/data/', StatisticsDataAPIView.as_view(), name='statistics-data'),

@@ -21,7 +21,11 @@
     <main class="main-content">
         {% block content %}{% endblock %}
     </main>
+    <!-- 基础 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
 
+    <!-- 扩展 JS 块 -->
+    {% block extra_js %}{% endblock %}
     <footer class="site-footer">
         <p>开平市教师发展中心&copy; 2024 高中学业质量监测系统</p>
         <p>廖作东 联系电话 0750-2022186</p>
