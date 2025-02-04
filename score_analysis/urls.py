@@ -60,6 +60,8 @@ urlpatterns = [
          StudentGroupView.as_view(),
          name='student_groups'),  #群体发展趋势
 
+
+
     path('tracking/warnings/<str:module_type>/<str:exam_id>/',
          WarningPredictionView.as_view(),
          name='warnings'),  #预警预测

@@ -3,13 +3,18 @@
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views import View
-from django.db.models import Avg, Count, Max, Min
-
+from django.db.models import (
+    Count, F, Q, Case, When, Value, CharField,
+    Avg, StdDev, FloatField,Max, Min,ExpressionWrapper
+)
+from django.db.models.functions import JSONObject, Cast
 from score_processor.models import StudentMapping, BaseExamConfig
 from ..models.Tracking import TrackingRecord
 from django.db.models import F
 from django.core.paginator import Paginator
 from ..models.source import ScoreStudentBasic
+from ..models.statistics import ExamLevelAnalysisConfig
+
 
 class TrackingAnalysisView(View):
     """发展跟踪分析主页面视图"""
@@ -814,22 +819,474 @@ class ScoreTrendView(View):
         }
         return subjects.get(school_level, [])
 
+
+from django.views import View
+from django.shortcuts import render
+from django.http import JsonResponse
+from django.db import connection
+from decimal import Decimal
+import json
+
+
 class StudentGroupView(View):
-    """学生群体分析视图"""
+    """学生群体分析视图类。
+
+    该视图类处理学生群体分析相关的请求，包括群体统计、学校分布、
+    学科分析和预警信息等功能。
+
+    Attributes:
+        template_name: 模板文件路径
+    """
+
     template_name = 'score_analysis/tracking/student_groups.html'
 
-    def get(self, request, module_type, exam_id):
+    def get_thresholds(self, exam_id, select_type='理科'):
+        """获取分数线阈值。
+
+        从考试分层分析配置表获取特控群和本科群的分数线。
+
+        Args:
+            exam_id (str): 考试ID
+            select_type (str): 分科类型，默认为'理科'
+
+        Returns:
+            dict: 包含特控和本科分数线的字典
+                {
+                    'special_score': float,  # 特控分数线
+                    'regular_score': float   # 本科分数线
+                }
+
+        Raises:
+            Exception: 当配置不存在时抛出异常
+        """
+        config = ExamLevelAnalysisConfig.objects.filter(
+            exam_id=exam_id,
+            select_type=select_type,
+            is_active=True
+        ).values('score_lines').first()
+
+        if not config:
+            raise Exception(f"未找到考试{exam_id}的{select_type}分数线配置")
+
+        score_lines = config['score_lines']
+        return {
+            'special_score': float(score_lines.get('特控', 0)),
+            'regular_score': float(score_lines.get('本科', 0))
+        }
+
+    def get_group_statistics(self, exam_id, select_type='理科', district_name='开平市', compare_exam_id=None):
+        """获取群体统计数据。
+
+        群体划分标准：
+        - 特控群：分数 >= 特控线
+        - 特控临界群：特控线 > 分数 >= 特控线-10
+        - 本科群：分数 >= 本科线
+        - 本科临界群：本科线 > 分数 >= 本科线-10
+        """
         try:
-            records = TrackingRecord.objects.filter(exam_id=exam_id)
+            thresholds = self.get_thresholds(exam_id, select_type)
+
+            # 定义群体顺序和名称
+            group_order = ['special', 'special_margin', 'regular', 'regular_margin']
+            group_names = {
+                'special': '特控群',
+                'special_margin': '特控临界群',
+                'regular': '本科群',
+                'regular_margin': '本科临界群'
+            }
+
+            # 获取当前考试的群体分布
+            current_stats = ScoreStudentBasic.objects.filter(
+                exam_id=exam_id,
+                select_type=select_type,
+                district_name=district_name
+            ).aggregate(
+                special=Count(
+                    'id',
+                    filter=Q(total_score__gte=thresholds['special_score'])
+                ),
+                special_margin=Count(
+                    'id',
+                    filter=Q(
+                        total_score__lt=thresholds['special_score'],
+                        total_score__gte=thresholds['special_score'] - 10
+                    )
+                ),
+                regular=Count(
+                    'id',
+                    filter=Q(total_score__gte=thresholds['regular_score'])
+                ),
+                regular_margin=Count(
+                    'id',
+                    filter=Q(
+                        total_score__lt=thresholds['regular_score'],
+                        total_score__gte=thresholds['regular_score'] - 10
+                    )
+                )
+            )
+
+            # 如果没有指定比较考试，获取上一次考试ID
+            if not compare_exam_id:
+                previous_exam = ScoreStudentBasic.objects.filter(
+                    exam_id__lt=exam_id,
+                    select_type=select_type,
+                    district_name=district_name
+                ).values('exam_id').distinct().order_by('-exam_id').first()
+
+                if previous_exam:
+                    compare_exam_id = previous_exam['exam_id']
+
+            print(f"当前考试: {exam_id}")
+            print(f"比较考试: {compare_exam_id} ({'用户选择' if compare_exam_id else '默认上一次'})")
+            print(f"查询条件: select_type={select_type}, district_name={district_name}")
+
+            # 获取比较考试的群体分布
+            previous_stats = {}
+            if compare_exam_id:
+                prev_thresholds = self.get_thresholds(compare_exam_id, select_type)
+                previous_stats = ScoreStudentBasic.objects.filter(
+                    exam_id=compare_exam_id,
+                    select_type=select_type,
+                    district_name=district_name
+                ).aggregate(
+                    special=Count(
+                        'id',
+                        filter=Q(total_score__gte=prev_thresholds['special_score'])
+                    ),
+                    special_margin=Count(
+                        'id',
+                        filter=Q(
+                            total_score__lt=prev_thresholds['special_score'],
+                            total_score__gte=prev_thresholds['special_score'] - 10
+                        )
+                    ),
+                    regular=Count(
+                        'id',
+                        filter=Q(total_score__gte=prev_thresholds['regular_score'])
+                    ),
+                    regular_margin=Count(
+                        'id',
+                        filter=Q(
+                            total_score__lt=prev_thresholds['regular_score'],
+                            total_score__gte=prev_thresholds['regular_score'] - 10
+                        )
+                    )
+                )
+
+            # 按指定顺序整理返回数据
+            from collections import OrderedDict
+            group_stats = OrderedDict()
+
+            for group_type in group_order:
+                current_count = current_stats.get(group_type, 0)
+                previous_count = previous_stats.get(group_type, 0)
+
+                group_stats[group_type] = {
+                    'name': group_names[group_type],
+                    'current_count': current_count,
+                    'change': current_count - previous_count,
+                    'compare_exam_id': compare_exam_id  # 添加比较考试ID到返回数据
+                }
+
+            return group_stats
+
+        except Exception as e:
+            raise Exception(f"统计数据获取失败: {str(e)}")
+
+    def get_school_distribution(self, exam_id, select_type='理科', district_name='开平市', compare_exam_id=None):
+        """获取学校分布数据。"""
+        try:
+            thresholds = self.get_thresholds(exam_id, select_type)
+
+            # 获取当前考试的学校分布，按本科人数降序排序
+            current_distribution = ScoreStudentBasic.objects.filter(
+                exam_id=exam_id,
+                district_name=district_name,
+                select_type=select_type
+            ).values('school_name').annotate(
+                student_count=Count('id'),
+                regular_count=Count(  # 添加本科人数统计
+                    'id',
+                    filter=Q(total_score__gte=thresholds['regular_score'])
+                ),
+                group_distribution=JSONObject(
+                    special=Count(
+                        'id',
+                        filter=Q(total_score__gte=thresholds['special_score'])
+                    ),
+                    special_margin=Count(
+                        'id',
+                        filter=Q(
+                            total_score__lt=thresholds['special_score'],
+                            total_score__gte=thresholds['special_score'] - 10
+                        )
+                    ),
+                    regular=Count(
+                        'id',
+                        filter=Q(total_score__gte=thresholds['regular_score'])
+                    ),
+                    regular_margin=Count(
+                        'id',
+                        filter=Q(
+                            total_score__lt=thresholds['regular_score'],
+                            total_score__gte=thresholds['regular_score'] - 10
+                        )
+                    )
+                )
+            ).order_by('-regular_count', '-student_count')  # 首先按本科人数降序，其次按总人数降序
+
+            # 如果没有指定比较考试，获取上一次考试ID
+            if not compare_exam_id:
+                previous_exam = ScoreStudentBasic.objects.filter(
+                    exam_id__lt=exam_id,
+                    select_type=select_type,
+                    district_name=district_name
+                ).values('exam_id').distinct().order_by('-exam_id').first()
+
+                if previous_exam:
+                    compare_exam_id = previous_exam['exam_id']
+
+            print(f"当前考试: {exam_id}")
+            print(f"比较考试: {compare_exam_id} ({'用户选择' if compare_exam_id else '默认上一次'})")
+
+            # 如果有比较考试（用户选择或默认上一次），获取其分布数据
+            if compare_exam_id:
+                prev_thresholds = self.get_thresholds(compare_exam_id, select_type)
+
+                previous_distribution = ScoreStudentBasic.objects.filter(
+                    exam_id=compare_exam_id,
+                    district_name=district_name,
+                    select_type=select_type
+                ).values('school_name').annotate(
+                    student_count=Count('id'),
+                    group_distribution=JSONObject(
+                        special=Count(
+                            'id',
+                            filter=Q(total_score__gte=prev_thresholds['special_score'])
+                        ),
+                        special_margin=Count(
+                            'id',
+                            filter=Q(
+                                total_score__lt=prev_thresholds['special_score'],
+                                total_score__gte=prev_thresholds['special_score'] - 10
+                            )
+                        ),
+                        regular=Count(
+                            'id',
+                            filter=Q(total_score__gte=prev_thresholds['regular_score'])
+                        ),
+                        regular_margin=Count(
+                            'id',
+                            filter=Q(
+                                total_score__lt=prev_thresholds['regular_score'],
+                                total_score__gte=prev_thresholds['regular_score'] - 10
+                            )
+                        )
+                    )
+                )
+
+                # 转换为字典方便查找
+                prev_data = {
+                    school['school_name']: school
+                    for school in previous_distribution
+                }
+
+                # 添加变化量到当前数据
+                current_distribution = list(current_distribution)
+                for school in current_distribution:
+                    prev_school = prev_data.get(school['school_name'], {})
+                    prev_counts = prev_school.get('group_distribution', {})
+
+                    # 计算各群体的变化量
+                    changes = {
+                        key: school['group_distribution'][key] - prev_counts.get(key, 0)
+                        for key in ['special', 'special_margin', 'regular', 'regular_margin']
+                    }
+
+                    school['changes'] = changes
+                    school['total_change'] = (
+                            school['student_count'] -
+                            prev_school.get('student_count', 0)
+                    )
+
+            return current_distribution
+
+        except Exception as e:
+            raise Exception(f"学校分布数据获取失败: {str(e)}")
+
+    def get_subject_analysis(self, exam_id, select_type='理科', district_name='开平市'):
+        """获取学科分析数据。
+
+        Args:
+            exam_id (str): 考试ID
+            select_type (str): 分科类型，默认为'理科'
+            district_name (str): 区域名称，默认为'开平市'
+
+        Returns:
+            dict: 包含各学科统计数据的字典
+
+        Raises:
+            Exception: 当数据查询失败时抛出异常
+        """
+        try:
+            return ScoreStudentBasic.objects.filter(
+                exam_id=exam_id,
+                district_name=district_name,
+                select_type=select_type
+            ).aggregate(
+                math_avg=Avg('math'),
+                physics_avg=Avg('physics'),
+                chemistry_avg=Avg('chemistry'),
+                math_std=StdDev('math'),
+                physics_std=StdDev('physics'),
+                chemistry_std=StdDev('chemistry')
+            )
+
+        except Exception as e:
+            raise Exception(f"学科分析数据获取失败: {str(e)}")
+
+    def get_warnings(self, exam_id, select_type='理科', district_name='开平市'):
+        """获取预警信息。
+
+        Args:
+            exam_id (str): 考试ID
+            select_type (str): 分科类型，默认为'理科'
+            district_name (str): 区域名称，默认为'开平市'
+
+        Returns:
+            list: 包含预警信息的列表
+
+        Raises:
+            Exception: 当数据查询失败时抛出异常
+        """
+        try:
+            thresholds = self.get_thresholds(exam_id, select_type)
+
+            warnings = []
+            records = TrackingRecord.objects.filter(
+                exam_id=exam_id,
+                score_student_basic__district_name=district_name,
+                score_student_basic__select_type=select_type
+            ).select_related('score_student_basic').annotate(
+                math_score=Cast('subject_scores__math', FloatField()),
+                physics_score=Cast('subject_scores__physics', FloatField())
+            ).filter(
+                Q(weighted_improvement__lt=-10) |
+                Q(math_score__isnull=False, physics_score__isnull=False) &
+                Q(total_score__gte=thresholds['special_score'] - 10)
+            )
+
+            for record in records:
+                warning = {
+                    'school_name': record.score_student_basic.school_name
+                }
+
+                if record.weighted_improvement < -10:
+                    warning.update({
+                        'warning_type': '成绩下滑',
+                        'warning_message': (
+                            f"{record.score_student_basic.school_name} - "
+                            f"成绩下滑({record.weighted_improvement:.1f})"
+                        )
+                    })
+                elif (record.math_score and record.physics_score and
+                      abs(record.math_score - record.physics_score) > 20):
+                    warning.update({
+                        'warning_type': '学科不均衡',
+                        'warning_message': (
+                            f"{record.score_student_basic.school_name} - "
+                            "数理差异过大"
+                        )
+                    })
+
+                if warning.get('warning_type'):
+                    warnings.append(warning)
+
+            return sorted(
+                warnings,
+                key=lambda x: (
+                    x['warning_type'] != '成绩下滑',
+                    x['warning_type'] != '学科不均衡'
+                )
+            )[:5]
+
+        except Exception as e:
+            raise Exception(f"预警信息获取失败: {str(e)}")
+
+    def get(self, request, module_type, exam_id):
+        """处理GET请求。
+
+        Args:
+            request: HTTP请求对象
+            module_type: 模块类型
+            exam_id: 考试ID
+
+        Returns:
+            渲染后的模板响应或错误JSON响应
+        """
+        try:
+            select_type = request.GET.get('select_type', '理科')
+            district_name = request.GET.get('district_name', '开平市')
+            compare_exam_id = request.GET.get('compare_exam_id')  # 获取比较的考试ID
+
+            # 获取可选的历史考试列表
+            available_exams = ScoreStudentBasic.objects.filter(
+                exam_id__lt=exam_id,
+                select_type=select_type,
+                district_name=district_name
+            ).values(
+                'exam_id'
+            ).distinct().order_by('-exam_id')[:5]  # 获取最近5次考试
+
+            print(f"当前考试: {exam_id}")
+            print(f"可比较考试列表: {list(available_exams)}")
+            print(f"选择的比较考试: {compare_exam_id}")
+
+            # 如果没有指定比较的考试，使用最近一次
+            if not compare_exam_id and available_exams:
+                compare_exam_id = available_exams[0]['exam_id']
+                print(f"使用默认比较考试: {compare_exam_id}")
+
             context = {
                 'module_type': module_type,
                 'exam_id': exam_id,
-                'records': records,
+                'select_type': select_type,
+                'district_name': district_name,
+                'available_exams': available_exams,
+                'compare_exam_id': compare_exam_id,
+                'group_stats': self.get_group_statistics(
+                    exam_id,
+                    select_type,
+                    district_name,
+                    compare_exam_id
+                ),
+                'school_distribution': self.get_school_distribution(
+                    exam_id,
+                    select_type,
+                    district_name,
+                    compare_exam_id
+                ),
+                'subject_analysis': self.get_subject_analysis(
+                    exam_id,
+                    select_type,
+                    district_name
+                )
             }
             return render(request, self.template_name, context)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
 
+        except Exception as e:
+            error_msg = f"处理请求失败: {str(e)}"
+            print(f"错误: {error_msg}")
+            print(f"参数: exam_id={exam_id}, select_type={select_type}, "
+                  f"district_name={district_name}, compare_exam_id={compare_exam_id}")
+
+            return JsonResponse({
+                'error': error_msg,
+                'exam_id': exam_id,
+                'select_type': select_type,
+                'district_name': district_name,
+                'compare_exam_id': compare_exam_id
+            }, status=500)
 class WarningPredictionView(View):
     """预警与预测视图"""
     template_name = 'score_analysis/tracking/warnings.html'

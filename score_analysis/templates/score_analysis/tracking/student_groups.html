@@ -1,0 +1,320 @@
+<!-- templates/score_analysis/tracking/student_groups.html -->
+{% extends 'base.html' %}
+
+{% block content %}
+<!-- 筛选条件 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label class="form-label">当前考试</label>
+                        <input type="text" class="form-control" value="{{ exam_id }}" readonly>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label">对比考试</label>
+                        <select name="compare_exam_id" class="form-select">
+                            {% for exam in available_exams %}
+                                <option value="{{ exam.exam_id }}"
+                                        {% if exam.exam_id == compare_exam_id %}selected{% endif %}>
+                                    {{ exam.exam_id }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label">类型</label>
+                        <select name="select_type" class="form-select">
+                            <option value="理科" {% if select_type == '理科' %}selected{% endif %}>理科</option>
+                            <option value="文科" {% if select_type == '文科' %}selected{% endif %}>文科</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label">区域</label>
+                        <select name="district_name" class="form-select">
+                            <option value="开平市" {% if district_name == '开平市' %}selected{% endif %}>开平市</option>
+                            <!-- 其他区域选项 -->
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary d-block">筛选</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 顶部统计卡片 -->
+<div class="row mb-4">
+    {% for group_type, stats in group_stats.items %}
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{{ stats.name }}</h5>
+                <div class="d-flex justify-content-between align-items-center">
+                    <h3>{{ stats.current_count }}人</h3>
+                    <small class="{% if stats.change > 0 %}text-success{% elif stats.change < 0 %}text-danger{% endif %}">
+                        较上次 {% if stats.change > 0 %}+{% endif %}{{ stats.change }}
+                    </small>
+                </div>
+                <div class="mt-2">
+                    <div class="progress" style="height: 5px;">
+                        <div class="progress-bar" role="progressbar"
+                             style="width: {{ stats.qualified_rate }}%"></div>
+                    </div>
+                    <small class="mt-1 d-block">达标率: {{ stats.qualified_rate }}%</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="row mb-4">
+    <!-- 左侧：学校分布 -->
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">学校分布</h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="exportToExcel()">
+                        <i class="bi bi-download"></i> 导出
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="schoolTable">
+                        <thead>
+                            <tr>
+                                <th>学校</th>
+                                <th>总人数</th>
+                                <th>特控群</th>
+                                <th>特控临界</th>
+                                <th>本科群</th>
+                                <th>本科临界</th>
+                                <th>达标率</th>
+                                <th>风险人数</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for school in school_distribution %}
+                            <tr>
+                                <td>{{ school.school_name }}</td>
+                                <td>
+                                    {{ school.student_count }}
+                                    {% if school.total_change %}
+                                        <small class="{% if school.total_change > 0 %}text-success{% elif school.total_change < 0 %}text-danger{% endif %}">
+                                            {% if school.total_change > 0 %}+{% endif %}{{ school.total_change }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ school.group_distribution.special|default:0 }}
+                                    {% if school.changes.special %}
+                                        <small class="{% if school.changes.special > 0 %}text-success{% elif school.changes.special < 0 %}text-danger{% endif %}">
+                                            {% if school.changes.special > 0 %}+{% endif %}{{ school.changes.special }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ school.group_distribution.special_margin|default:0 }}
+                                    {% if school.changes.special_margin %}
+                                        <small class="{% if school.changes.special_margin > 0 %}text-success{% elif school.changes.special_margin < 0 %}text-danger{% endif %}">
+                                            {% if school.changes.special_margin > 0 %}+{% endif %}{{ school.changes.special_margin }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ school.group_distribution.regular|default:0 }}
+                                    {% if school.changes.regular %}
+                                        <small class="{% if school.changes.regular > 0 %}text-success{% elif school.changes.regular < 0 %}text-danger{% endif %}">
+                                            {% if school.changes.regular > 0 %}+{% endif %}{{ school.changes.regular }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ school.group_distribution.regular_margin|default:0 }}
+                                    {% if school.changes.regular_margin %}
+                                        <small class="{% if school.changes.regular_margin > 0 %}text-success{% elif school.changes.regular_margin < 0 %}text-danger{% endif %}">
+                                            {% if school.changes.regular_margin > 0 %}+{% endif %}{{ school.changes.regular_margin }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% widthratio school.qualified_count school.student_count 100 %}%
+                                </td>
+                                <td>{{ school.risk_count }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary"
+                                            onclick="showStudentList('{{ school.school_name }}')">
+                                        <i class="bi bi-list-ul"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：学科分析和预警信息 -->
+    <div class="col-md-5">
+        <!-- 学科分析 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">学科分析</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-7">
+                        <canvas id="subjectChart"></canvas>
+                    </div>
+                    <div class="col-md-5">
+                        <ul class="list-unstyled mt-3">
+                            <li class="mb-2">
+                                <strong>数学：</strong>{{ subject_analysis.math_avg|floatformat:1 }}
+                                <small class="text-muted d-block">
+                                    标准差: {{ subject_analysis.math_std|floatformat:1 }}
+                                </small>
+                            </li>
+                            <li class="mb-2">
+                                <strong>物理：</strong>{{ subject_analysis.physics_avg|floatformat:1 }}
+                                <small class="text-muted d-block">
+                                    标准差: {{ subject_analysis.physics_std|floatformat:1 }}
+                                </small>
+                            </li>
+                            <li class="mb-2">
+                                <strong>化学：</strong>{{ subject_analysis.chemistry_avg|floatformat:1 }}
+                                <small class="text-muted d-block">
+                                    标准差: {{ subject_analysis.chemistry_std|floatformat:1 }}
+                                </small>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 预警信息 -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">预警信息</h5>
+            </div>
+            <div class="card-body">
+                {% if warnings %}
+                    {% for warning in warnings %}
+                    <div class="alert alert-warning">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>{{ warning.warning_type }}</strong>
+                            <span class="badge bg-warning text-dark">{{ warning.school_name }}</span>
+                        </div>
+                        <p class="mb-0 mt-1">{{ warning.warning_message }}</p>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center text-muted">
+                        <i class="bi bi-check-circle"></i>
+                        <p>暂无预警信息</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 学生列表模态框 -->
+<div class="modal fade" id="studentListModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">学生列表</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="studentListContent">
+                    <!-- 动态加载学生列表 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化学科分析图表
+    const ctx = document.getElementById('subjectChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['数学', '物理', '化学'],
+            datasets: [{
+                label: '学科平均分',
+                data: [
+                    {{ subject_analysis.math_avg|default:0 }},
+                    {{ subject_analysis.physics_avg|default:0 }},
+                    {{ subject_analysis.chemistry_avg|default:0 }}
+                ],
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 150,
+                    ticks: {
+                        stepSize: 30
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+});
+
+// 查看学生列表
+function showStudentList(schoolName) {
+    const url = new URL('/api/students/', window.location.origin);
+    url.searchParams.set('school_name', schoolName);
+    url.searchParams.set('exam_id', '{{ exam_id }}');
+    url.searchParams.set('select_type', '{{ select_type }}');
+    url.searchParams.set('district_name', '{{ district_name }}');
+
+    fetch(url)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('studentListContent').innerHTML = html;
+            new bootstrap.Modal(document.getElementById('studentListModal')).show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('获取学生列表失败');
+        });
+}
+
+// 导出Excel
+function exportToExcel() {
+    const table = document.getElementById('schoolTable');
+    const wb = XLSX.utils.table_to_book(table, {sheet: "学校分布"});
+    const fileName = `学校分布-{{ exam_id }}-${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+}
+</script>
+{% endblock %}
