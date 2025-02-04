@@ -2,6 +2,9 @@ from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
+from score_analysis.models import ScoreStudentBasic
+
+
 class TrackingGroup(models.Model):
     """跟踪分组"""
     SCHOOL_LEVEL_CHOICES = [
@@ -174,3 +177,151 @@ class TrackingTarget(models.Model):
         verbose_name_plural = verbose_name
 
 
+class TaggedStudent(models.Model):
+    """标签学生群模型"""
+
+    # 标签类型选项
+    TAG_TYPES = [
+        ('elite', '尖子生'),
+        ('potential_elite', '潜力尖子'),
+        ('potential_special', '潜力特控'),
+        ('potential_regular', '潜力本科')
+    ]
+
+    # 文理分科选项
+    SUBJECT_TYPES = [
+        ('理科', '理科'),
+        ('文科', '文科')
+    ]
+
+    # 数据库字段
+    id = models.BigAutoField(primary_key=True)
+    tag_type = models.CharField(
+        max_length=20,
+        choices=TAG_TYPES,
+        verbose_name='标签类型',
+        help_text='标签类型:尖子生/潜力尖子/潜力特控/潜力本科'
+    )
+    subject_type = models.CharField(
+        max_length=10,
+        choices=SUBJECT_TYPES,
+        verbose_name='文理分科',
+        help_text='文理分科:理科/文科'
+    )
+    features = models.JSONField(
+        null=True,
+        verbose_name='特征数据',
+        help_text="""
+        {
+            'advantages': ['数学', '物理'],  # 优势学科
+            'potential_points': ['逻辑思维', '学习态度'],  # 潜力特征点
+            'growth_rate': 0.15,  # 成长率
+            'stability': 0.85,  # 稳定性
+            'competition_awards': ['数学竞赛省一等奖'],  # 竞赛获奖
+            'special_talents': ['科技创新']  # 特殊才能
+        }
+        """
+    )
+    remarks = models.TextField(
+        null=True,
+        verbose_name='备注'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='是否有效'
+    )
+    marked_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='标记时间'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='更新时间'
+    )
+    exam_id = models.CharField(
+        max_length=32,
+        verbose_name='考试ID'
+    )
+    school_name = models.CharField(
+        max_length=32,
+        verbose_name='学校名称'
+    )
+    student_id = models.CharField(
+        max_length=32,
+        verbose_name='学生ID'
+    )
+
+    class Meta:
+        db_table = 'tagged_student'
+        verbose_name = '标签学生'
+        verbose_name_plural = '标签学生'
+        unique_together = ['student_id', 'exam_id', 'tag_type']
+        indexes = [
+            models.Index(fields=['student_id', 'exam_id'], name='idx_student_exam'),
+        ]
+
+    def __str__(self):
+        return f"{self.student_id}-{self.get_tag_type_display()}"
+
+    def get_student_info(self):
+        """获取学生基本信息"""
+        return ScoreStudentBasic.objects.filter(
+            student_id=self.student_id,
+            exam_id=self.exam_id
+        ).first()
+
+    @property
+    def score_info(self):
+        """获取成绩信息"""
+        student = self.get_student_info()
+        if student:
+            return {
+                'student_name': student.student_name,
+                'total_score': student.total_score,
+                'rank': student.rank,
+                'subject_scores': {
+                    '语文': student.chinese_score,
+                    '数学': student.math_score,
+                    '英语': student.english_score,
+                    # 根据文理科添加其他科目
+                    **self._get_optional_subjects(student)
+                },
+                't_scores': {
+                    '语文': student.chinese_t_score,
+                    '数学': student.math_t_score,
+                    '英语': student.english_t_score,
+                    # 根据文理科添加其他科目T分
+                    **self._get_optional_t_scores(student)
+                }
+            }
+        return None
+
+    def _get_optional_subjects(self, student):
+        """获取选考科目成绩"""
+        if self.subject_type == '理科':
+            return {
+                '物理': student.physics_score,
+                '化学': student.chemistry_score,
+                '生物': student.biology_score
+            }
+        else:
+            return {
+                '政治': student.politics_score,
+                '历史': student.history_score,
+                '地理': student.geography_score
+            }
+
+    def _get_optional_t_scores(self, student):
+        """获取选考科目T分"""
+        if self.subject_type == '理科':
+            return {
+                '物理': student.physics_t_score,
+                '化学': student.chemistry_t_score,
+                '生物': student.biology_t_score
+            }
+        else:
+            return {
+                '政治': student.politics_t_score,
+                '历史': student.history_t_score,
+                '地理': student.geography_t_score
+            }

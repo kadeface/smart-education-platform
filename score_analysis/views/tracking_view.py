@@ -9,7 +9,7 @@ from django.db.models import (
 )
 from django.db.models.functions import JSONObject, Cast
 from score_processor.models import StudentMapping, BaseExamConfig
-from ..models.Tracking import TrackingRecord
+from ..models.Tracking import TrackingRecord, TaggedStudent
 from django.db.models import F
 from django.core.paginator import Paginator
 from ..models.source import ScoreStudentBasic
@@ -102,11 +102,11 @@ class TrackingAnalysisView(View):
                 'description': '分析不同层次学生群体的表现'
             },
             {
-                'id': 'warnings',
-                'name': '预警与预测',
-                'icon': 'fas fa-exclamation-triangle',
-                'url': 'score_analysis:warnings',
-                'description': '识别成绩异常和预测发展趋势'
+                'id': 'elite_portrait',
+                'name': '尖子生画像',
+                'icon': 'fas fa-user-graduate',
+                'url': 'score_analysis:tracking_elite_portrait',
+                'description': '查看尖子生群体的详细画像和特征分析'
             }
         ]
 
@@ -1502,19 +1502,160 @@ class StudentGroupView(View):
                 'district_name': district_name,
                 'compare_exam_id': compare_exam_id
             }, status=500)
-class WarningPredictionView(View):
-    """预警与预测视图"""
-    template_name = 'score_analysis/tracking/warnings.html'
 
-    def get(self, request, module_type, exam_id):
+
+class ElitePortraitView(View):
+    """尖子生群体画像视图"""
+    template_name = 'score_analysis/tracking/elite_portrait.html'
+
+    def get(self, request, exam_id):
         try:
-            records = TrackingRecord.objects.filter(exam_id=exam_id)
+            # 获取各学校的尖子生数据
+            schools_elite = self._get_schools_elite_data(exam_id)
+
+            # 准备上下文数据
             context = {
-                'module_type': module_type,
                 'exam_id': exam_id,
-                'records': records,
+                'schools_elite': schools_elite,
+                'total_stats': self._get_total_stats(exam_id),
             }
             return render(request, self.template_name, context)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+
+    def _get_schools_elite_data(self, exam_id):
+        """获取各学校尖子生数据"""
+        schools_data = {}
+
+        # 获取所有相关学校
+        schools = TaggedStudent.objects.filter(
+            exam_id=exam_id,
+            is_active=True
+        ).values_list('school_name', flat=True).distinct()
+
+        for school_name in schools:
+            school_data = {
+                'name': school_name,
+                'science': {  # 理科
+                    'elite': self._get_elite_students(exam_id, school_name, '理科', 'elite'),
+                    'potential': self._get_elite_students(exam_id, school_name, '理科', 'potential_elite'),
+                },
+                'liberal': {  # 文科
+                    'elite': self._get_elite_students(exam_id, school_name, '文科', 'elite'),
+                    'potential': self._get_elite_students(exam_id, school_name, '文科', 'potential_elite'),
+                },
+                'features': self._get_school_features(exam_id, school_name),
+            }
+            schools_data[school_name] = school_data
+
+        return schools_data
+
+    def _get_elite_students(self, exam_id, school_name, subject_type, tag_type):
+        """获取指定类型的尖子生列表"""
+        tagged_students = TaggedStudent.objects.filter(
+            exam_id=exam_id,
+            school_name=school_name,
+            subject_type=subject_type,
+            tag_type=tag_type,
+            is_active=True
+        ).values('student_id', 'features', 'remarks')
+
+        student_details = []
+        for tagged in tagged_students:
+            # 获取成绩信息
+            score = ScoreStudentBasic.objects.filter(
+                student_id=tagged['student_id'],
+                exam_id=exam_id
+            ).values(
+                'student_name', 'total_score', 'rank',
+                'chinese_score', 'math_score', 'english_score',
+                'chinese_t_score', 'math_t_score', 'english_t_score',
+                'physics_score', 'chemistry_score', 'biology_score',
+                'physics_t_score', 'chemistry_t_score', 'biology_t_score',
+                'politics_score', 'history_score', 'geography_score',
+                'politics_t_score', 'history_t_score', 'geography_t_score'
+            ).first()
+
+            if score:
+                student_detail = {
+                    'student_id': tagged['student_id'],
+                    'student_name': score['student_name'],
+                    'total_score': score['total_score'],
+                    'rank': score['rank'],
+                    'features': tagged['features'],
+                    'remarks': tagged['remarks'],
+                    'subject_scores': {},
+                    't_scores': {}
+                }
+
+                # 添加科目成绩
+                base_subjects = ['chinese', 'math', 'english']
+                if subject_type == '理科':
+                    subjects = base_subjects + ['physics', 'chemistry', 'biology']
+                else:
+                    subjects = base_subjects + ['politics', 'history', 'geography']
+
+                for subject in subjects:
+                    score_key = f'{subject}_score'
+                    t_score_key = f'{subject}_t_score'
+                    if score[score_key] is not None:
+                        student_detail['subject_scores'][subject] = score[score_key]
+                        student_detail['t_scores'][subject] = score[t_score_key]
+
+                student_details.append(student_detail)
+
+        return student_details
+
+    def _get_school_features(self, exam_id, school_name):
+        """获取学校特色"""
+        stats = TaggedStudent.objects.filter(
+            exam_id=exam_id,
+            school_name=school_name,
+            is_active=True
+        ).aggregate(
+            science_count=Count('id', filter=Q(subject_type='理科')),
+            liberal_count=Count('id', filter=Q(subject_type='文科')),
+            science_avg=Avg('total_score', filter=Q(subject_type='理科')),
+            liberal_avg=Avg('total_score', filter=Q(subject_type='文科'))
+        )
+
+        # 分析优势学科
+        advantages = self._analyze_school_advantages(exam_id, school_name)
+
+        return {
+            'stats': stats,
+            'advantages': advantages,
+            'description': self._get_school_description(school_name, stats, advantages)
+        }
+
+    def _analyze_school_advantages(self, exam_id, school_name):
+        """分析学校优势学科"""
+        return TaggedStudent.objects.filter(
+            exam_id=exam_id,
+            school_name=school_name,
+            is_active=True
+        ).values_list('features__advantages', flat=True).distinct()
+
+    def _get_school_description(self, school_name, stats, advantages):
+        """生成学校特色描述"""
+        description = f"{school_name}的特色分析：\n"
+        description += f"理科尖子生{stats['science_count']}人，平均分{stats['science_avg']:.1f}\n"
+        description += f"文科尖子生{stats['liberal_count']}人，平均分{stats['liberal_avg']:.1f}\n"
+        if advantages:
+            description += f"优势学科：{', '.join(advantages)}"
+        return description
+
+    def _get_total_stats(self, exam_id):
+        """计算总体统计数据"""
+        return TaggedStudent.objects.filter(
+            exam_id=exam_id,
+            is_active=True
+        ).aggregate(
+            science_elite=Count('id', filter=Q(subject_type='理科', tag_type='elite')),
+            science_potential=Count('id', filter=Q(subject_type='理科', tag_type='potential_elite')),
+            liberal_elite=Count('id', filter=Q(subject_type='文科', tag_type='elite')),
+            liberal_potential=Count('id', filter=Q(subject_type='文科', tag_type='potential_elite')),
+            science_avg=Avg('total_score', filter=Q(subject_type='理科')),
+            liberal_avg=Avg('total_score', filter=Q(subject_type='文科'))
+        )
 

@@ -17,7 +17,7 @@ from .views.layer_view import LayerView
 from .views.tracking_view import (ScoreRankingView,
                                   ScoreTrendView,
                                   StudentGroupView,
-                                  WarningPredictionView)
+                                  ElitePortraitView)
 
 app_name = 'score_analysis'
 urlpatterns = [
@@ -60,11 +60,13 @@ urlpatterns = [
          StudentGroupView.as_view(),
          name='student_groups'),  #群体发展趋势
 
+    path('tracking/<str:module_type>/<str:exam_id>/elite-portrait/',
+         ElitePortraitView.as_view(),
+         name='tracking_elite_portrait'),  # 尖子生群体画像
 
-
-    path('tracking/warnings/<str:module_type>/<str:exam_id>/',
-         WarningPredictionView.as_view(),
-         name='warnings'),  #预警预测
+#    path('tracking/warnings/<str:module_type>/<str:exam_id>/',
+#         WarningPredictionView.as_view(),
+#         name='warnings'),  #预警预测
 
 
  #   path('api/statistics/data/', StatisticsDataAPIView.as_view(), name='statistics-data'),

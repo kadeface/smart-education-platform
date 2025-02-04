@@ -1,0 +1,170 @@
+<!-- templates/score_analysis/tracking/elite_portrait.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">尖子生群体画像</h5>
+                </div>
+                <div class="card-body">
+                    <!-- 总体统计 -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">理科尖子生</h6>
+                                    <p class="card-text">
+                                        尖子生：{{ total_stats.science_elite }}人<br>
+                                        潜力生：{{ total_stats.science_potential }}人<br>
+                                        平均分：{{ total_stats.science_avg|floatformat:1 }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h6 class="card-title">文科尖子生</h6>
+                                    <p class="card-text">
+                                        尖子生：{{ total_stats.liberal_elite }}人<br>
+                                        潜力生：{{ total_stats.liberal_potential }}人<br>
+                                        平均分：{{ total_stats.liberal_avg|floatformat:1 }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 学校列表 -->
+                    {% for school_name, school in schools_elite.items %}
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">{{ school.name }}</h6>
+                        </div>
+                        <div class="card-body">
+                            <!-- 理科尖子生 -->
+                            {% if school.science.elite %}
+                            <h6>理科尖子生</h6>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>姓名</th>
+                                            <th>总分</th>
+                                            <th>排名</th>
+                                            <th>语文</th>
+                                            <th>数学</th>
+                                            <th>英语</th>
+                                            <th>物理</th>
+                                            <th>化学</th>
+                                            <th>生物</th>
+                                            <th>特征</th>
+                                            <th>备注</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for student in school.science.elite %}
+                                        <tr>
+                                            <td>{{ student.student_name }}</td>
+                                            <td>{{ student.total_score }}</td>
+                                            <td>{{ student.rank }}</td>
+                                            <td>{{ student.subject_scores.语文 }}</td>
+                                            <td>{{ student.subject_scores.数学 }}</td>
+                                            <td>{{ student.subject_scores.英语 }}</td>
+                                            <td>{{ student.subject_scores.物理 }}</td>
+                                            <td>{{ student.subject_scores.化学 }}</td>
+                                            <td>{{ student.subject_scores.生物 }}</td>
+                                            <td>{{ student.features|safe }}</td>
+                                            <td>{{ student.remarks }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+
+                            <!-- 文科尖子生 -->
+                            {% if school.liberal.elite %}
+                            <h6 class="mt-4">文科尖子生</h6>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>姓名</th>
+                                            <th>总分</th>
+                                            <th>排名</th>
+                                            <th>语文</th>
+                                            <th>数学</th>
+                                            <th>英语</th>
+                                            <th>政治</th>
+                                            <th>历史</th>
+                                            <th>地理</th>
+                                            <th>特征</th>
+                                            <th>备注</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for student in school.liberal.elite %}
+                                        <tr>
+                                            <td>{{ student.student_name }}</td>
+                                            <td>{{ student.total_score }}</td>
+                                            <td>{{ student.rank }}</td>
+                                            <td>{{ student.subject_scores.语文 }}</td>
+                                            <td>{{ student.subject_scores.数学 }}</td>
+                                            <td>{{ student.subject_scores.英语 }}</td>
+                                            <td>{{ student.subject_scores.政治 }}</td>
+                                            <td>{{ student.subject_scores.历史 }}</td>
+                                            <td>{{ student.subject_scores.地理 }}</td>
+                                            <td>{{ student.features|safe }}</td>
+                                            <td>{{ student.remarks }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% endif %}
+
+                            <!-- 学校特色 -->
+                            {% if school.features %}
+                            <div class="mt-4">
+                                <h6>学校特色</h6>
+                                <p>{{ school.features.description }}</p>
+                                {% if school.features.advantages %}
+                                <h6>优势学科</h6>
+                                <ul>
+                                    {% for advantage in school.features.advantages %}
+                                    <li>{{ advantage }}</li>
+                                    {% endfor %}
+                                </ul>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'vendor/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'vendor/datatables/dataTables.bootstrap4.min.js' %}"></script>
+<script>
+$(document).ready(function() {
+    $('.table').DataTable({
+        "language": {
+            "url": "{% static 'vendor/datatables/Chinese.json' %}"
+        },
+        "order": [[1, "desc"]],
+        "pageLength": 25
+    });
+});
+</script>
+{% endblock %}
