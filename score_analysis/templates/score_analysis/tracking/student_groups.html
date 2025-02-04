@@ -1,7 +1,120 @@
 <!-- templates/score_analysis/tracking/student_groups.html -->
 {% extends 'base.html' %}
+{% load custom_filters %}
+{% block styles %}
+<style>
+/* 通用表格样式 */
+.analysis-table {
+    font-size: 0.875rem;
+}
 
+.analysis-table th,
+.analysis-table td {
+    padding: 0.4rem;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* 表头样式 */
+.analysis-table thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.analysis-table th.subject-header {
+    background-color: #e9ecef;
+    border-left: 2px solid #dee2e6;
+}
+
+/* 学校名称样式 */
+.school-name {
+    max-width: 120px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left !important;
+    position: relative;
+}
+
+.school-name:hover {
+    overflow: visible;
+}
+
+.school-tooltip {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 100%;
+    background: white;
+    padding: 0.4rem;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+    white-space: normal;
+    max-width: 200px;
+}
+
+.school-name:hover .school-tooltip {
+    display: block;
+}
+
+/* 数据变化样式 */
+.change-value {
+    font-weight: 500;
+}
+
+.change-positive {
+    color: #28a745;
+}
+
+.change-negative {
+    color: #dc3545;
+}
+
+/* 统计卡片样式 */
+.card-title {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+.progress {
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    background-color: #28a745;
+}
+
+/* 预警信息样式 */
+.alert {
+    margin-bottom: 0.5rem;
+    padding: 0.75rem;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffecb5;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .analysis-table {
+        font-size: 0.75rem;
+    }
+
+    .school-name {
+        max-width: 100px;
+    }
+
+    .card-title {
+        font-size: 0.8rem;
+    }
+}
+</style>
+{% endblock %}
 {% block content %}
+
 <!-- 筛选条件 -->
 <div class="row mb-4">
     <div class="col-12">
@@ -74,8 +187,9 @@
 </div>
 
 <div class="row mb-4">
-    <!-- 左侧：学校分布 -->
-    <div class="col-md-7">
+<!-- 学校分布 -->
+<div class="row mb-4">
+    <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">学校分布</h5>
@@ -163,46 +277,132 @@
             </div>
         </div>
     </div>
+</div>
 
-    <!-- 右侧：学科分析和预警信息 -->
-    <div class="col-md-5">
-        <!-- 学科分析 -->
-        <div class="card mb-4">
+<!-- 学科分析 -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">学科分析</h5>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-7">
-                        <canvas id="subjectChart"></canvas>
-                    </div>
-                    <div class="col-md-5">
-                        <ul class="list-unstyled mt-3">
-                            <li class="mb-2">
-                                <strong>数学：</strong>{{ subject_analysis.math_avg|floatformat:1 }}
-                                <small class="text-muted d-block">
-                                    标准差: {{ subject_analysis.math_std|floatformat:1 }}
-                                </small>
-                            </li>
-                            <li class="mb-2">
-                                <strong>物理：</strong>{{ subject_analysis.physics_avg|floatformat:1 }}
-                                <small class="text-muted d-block">
-                                    标准差: {{ subject_analysis.physics_std|floatformat:1 }}
-                                </small>
-                            </li>
-                            <li class="mb-2">
-                                <strong>化学：</strong>{{ subject_analysis.chemistry_avg|floatformat:1 }}
-                                <small class="text-muted d-block">
-                                    标准差: {{ subject_analysis.chemistry_std|floatformat:1 }}
-                                </small>
-                            </li>
-                        </ul>
-                    </div>
+                <div class="table-responsive">
+                    <table class="table table-sm analysis-table">  <!-- 添加 analysis-table 类 -->
+                        <thead>
+                            <!-- 第一行：主要分类 -->
+                            <tr>
+                                <th rowspan="3" class="align-middle school-name-header">学校</th>
+                                <th colspan="4" class="text-center">班级人数</th>
+                                {% for subject in subject_analysis.subjects %}
+                                    <th colspan="4" class="text-center subject-header">
+                                        {{ subject_analysis.subject_names|get_item:subject }}
+                                    </th>
+                                {% endfor %}
+                            </tr>
+                            <!-- 第二行：群体分类 -->
+                            <tr>
+                                <th colspan="2" class="text-center">特控群</th>
+                                <th colspan="2" class="text-center">本科群</th>
+                                {% for subject in subject_analysis.subjects %}
+                                    <th colspan="2" class="text-center border-start">特控群</th>
+                                    <th colspan="2" class="text-center">本科群</th>
+                                {% endfor %}
+                            </tr>
+                            <!-- 第三行：具体指标 -->
+                            <tr>
+                                <th class="text-center small">人数</th>
+                                <th class="text-center small">变化</th>
+                                <th class="text-center small">人数</th>
+                                <th class="text-center small">变化</th>
+                                {% for subject in subject_analysis.subjects %}
+                                    <th class="text-center small border-start">均分</th>
+                                    <th class="text-center small">变化</th>
+                                    <th class="text-center small">均分</th>
+                                    <th class="text-center small">变化</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+<tbody>
+    {% for school in subject_analysis.school_stats %}
+    <tr>
+        <td class="school-name">{{ school.school_name|school_short_name }}</td>
+        <td>{{ school.special_count|default:0 }}</td>
+        <td>
+            {% if school.special_count_change %}
+                <span class="{% if school.special_count_change > 0 %}text-success{% elif school.special_count_change < 0 %}text-danger{% endif %}">
+                    {% if school.special_count_change > 0 %}+{% endif %}{{ school.special_count_change }}
+                </span>
+            {% endif %}
+        </td>
+        <td>{{ school.regular_count|default:0 }}</td>
+        <td>
+            {% if school.regular_count_change %}
+                <span class="{% if school.regular_count_change > 0 %}text-success{% elif school.regular_count_change < 0 %}text-danger{% endif %}">
+                    {% if school.regular_count_change > 0 %}+{% endif %}{{ school.regular_count_change }}
+                </span>
+            {% endif %}
+        </td>
+        {% for subject in subject_analysis.subjects %}
+            <td>
+                {% with field_name='special_'|add:subject|add:'_avg' %}
+                    {% with avg=school|get_item:field_name %}
+                        {% if avg != None and avg != -3 %}
+                            {{ avg|floatformat:1 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    {% endwith %}
+                {% endwith %}
+            </td>
+            <td>
+                {% with field_name='special_'|add:subject|add:'_avg_change' %}
+                    {% with change=school|get_item:field_name %}
+                        {% if change and change != -3 %}
+                            <span class="{% if change > 0 %}text-success{% elif change < 0 %}text-danger{% endif %}">
+                                {% if change > 0 %}+{% endif %}{{ change|floatformat:1 }}
+                            </span>
+                        {% endif %}
+                    {% endwith %}
+                {% endwith %}
+            </td>
+            <td>
+                {% with field_name='regular_'|add:subject|add:'_avg' %}
+                    {% with avg=school|get_item:field_name %}
+                        {% if avg != None and avg != -3 %}
+                            {{ avg|floatformat:1 }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    {% endwith %}
+                {% endwith %}
+            </td>
+            <td>
+                {% with field_name='regular_'|add:subject|add:'_avg_change' %}
+                    {% with change=school|get_item:field_name %}
+                        {% if change and change != -3 %}
+                            <span class="{% if change > 0 %}text-success{% elif change < 0 %}text-danger{% endif %}">
+                                {% if change > 0 %}+{% endif %}{{ change|floatformat:1 }}
+                            </span>
+                        {% endif %}
+                    {% endwith %}
+                {% endwith %}
+            </td>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+</tbody>
+
+                    </table>
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- 预警信息 -->
+<!-- 预警信息 -->
+<div class="row">
+    <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">预警信息</h5>
@@ -227,6 +427,7 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <!-- 学生列表模态框 -->
@@ -309,6 +510,29 @@ function showStudentList(schoolName) {
         });
 }
 
+function switchScoreType(type) {
+    const rawScores = document.querySelectorAll('.raw-score');
+    const zScores = document.querySelectorAll('.z-score');
+    const rawBtn = document.querySelector('button[onclick="switchScoreType(\'raw\')"]');
+    const zBtn = document.querySelector('button[onclick="switchScoreType(\'zscore\')"]');
+
+    if (type === 'raw') {
+        rawScores.forEach(el => el.classList.remove('d-none'));
+        zScores.forEach(el => el.classList.add('d-none'));
+        rawBtn.classList.add('active');
+        zBtn.classList.remove('active');
+    } else {
+        rawScores.forEach(el => el.classList.add('d-none'));
+        zScores.forEach(el => el.classList.remove('d-none'));
+        rawBtn.classList.remove('active');
+        zBtn.classList.add('active');
+    }
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+    switchScoreType('raw');
+});
 // 导出Excel
 function exportToExcel() {
     const table = document.getElementById('schoolTable');

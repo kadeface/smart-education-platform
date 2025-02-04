@@ -1,5 +1,5 @@
 # views/trackingview.py
-
+import numpy as np
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views import View
@@ -1114,36 +1114,245 @@ class StudentGroupView(View):
         except Exception as e:
             raise Exception(f"学校分布数据获取失败: {str(e)}")
 
-    def get_subject_analysis(self, exam_id, select_type='理科', district_name='开平市'):
-        """获取学科分析数据。
-
-        Args:
-            exam_id (str): 考试ID
-            select_type (str): 分科类型，默认为'理科'
-            district_name (str): 区域名称，默认为'开平市'
-
-        Returns:
-            dict: 包含各学科统计数据的字典
-
-        Raises:
-            Exception: 当数据查询失败时抛出异常
-        """
+    def get_subject_analysis(self, exam_id, select_type='理科', district_name='开平市', compare_exam_id=None):
+        """获取学科分析数据。"""
         try:
-            return ScoreStudentBasic.objects.filter(
-                exam_id=exam_id,
-                district_name=district_name,
-                select_type=select_type
-            ).aggregate(
-                math_avg=Avg('math'),
-                physics_avg=Avg('physics'),
-                chemistry_avg=Avg('chemistry'),
-                math_std=StdDev('math'),
-                physics_std=StdDev('physics'),
-                chemistry_std=StdDev('chemistry')
+            thresholds = self.get_thresholds(exam_id, select_type)
+
+            # 如果没有指定比较考试，获取上一次考试ID
+            if not compare_exam_id:
+                previous_exam = ScoreStudentBasic.objects.filter(
+                    exam_id__lt=exam_id,
+                    select_type=select_type,
+                    district_name=district_name
+                ).values('exam_id').distinct().order_by('-exam_id').first()
+
+                if previous_exam:
+                    compare_exam_id = previous_exam['exam_id']
+
+            print(f"当前考试: {exam_id}")
+            print(f"比较考试: {compare_exam_id} ({'用户选择' if compare_exam_id else '默认上一次'})")
+
+            # 定义科目顺序
+            if select_type == '理科':
+                subjects = [
+                    'chinese',  # 语文
+                    'math',  # 数学
+                    'english',  # 英语
+                    'physics',  # 物理
+                    'chemistry',  # 化学
+                    'biology',  # 生物
+                    'geography',  # 地理
+                    'politics'  # 政治
+                ]
+            else:  # 文科
+                subjects = [
+                    'chinese',  # 语文
+                    'math',  # 数学
+                    'english',  # 英语
+                    'history',  # 历史
+                    'geography',  # 地理
+                    'politics',  # 政治
+                    'chemistry',  # 化学
+                    'biology'  # 生物
+                ]
+
+            subject_names = {
+                'chinese': '语文',
+                'math': '数学',
+                'english': '英语',
+                'physics': '物理',
+                'chemistry': '化学',
+                'biology': '生物',
+                'politics': '政治',
+                'history': '历史',
+                'geography': '地理'
+            }
+
+            # 获取当前考试数据
+            current_stats = self._get_exam_stats(
+                exam_id, subjects, thresholds, select_type, district_name
             )
+
+            # 获取比较考试数据
+            compare_stats = None
+            if compare_exam_id:
+                compare_thresholds = self.get_thresholds(compare_exam_id, select_type)
+                compare_stats = self._get_exam_stats(
+                    compare_exam_id, subjects, compare_thresholds, select_type, district_name
+                )
+
+                # 计算变化量
+                for school in current_stats:
+                    school_name = school['school_name']
+                    compare_school = next(
+                        (s for s in compare_stats if s['school_name'] == school_name),
+                        None
+                    )
+
+                    if compare_school:
+                        # 计算人数变化
+                        school['special_count_change'] = (
+                                school['special_count'] - compare_school['special_count']
+                        )
+                        school['regular_count_change'] = (
+                                school['regular_count'] - compare_school['regular_count']
+                        )
+
+                        # 计算各科目变化
+                        for subject in subjects:
+                            # 原始分变化
+                            school[f'special_{subject}_avg_change'] = (
+                                    (school[f'special_{subject}_avg'] or 0) -
+                                    (compare_school[f'special_{subject}_avg'] or 0)
+                            )
+                            school[f'regular_{subject}_avg_change'] = (
+                                    (school[f'regular_{subject}_avg'] or 0) -
+                                    (compare_school[f'regular_{subject}_avg'] or 0)
+                            )
+
+                            # 相对位置变化
+                            school[f'special_{subject}_relative_change'] = (
+                                    (school[f'special_{subject}_relative'] or 0) -
+                                    (compare_school[f'special_{subject}_relative'] or 0)
+                            )
+                            school[f'regular_{subject}_relative_change'] = (
+                                    (school[f'regular_{subject}_relative'] or 0) -
+                                    (compare_school[f'regular_{subject}_relative'] or 0)
+                            )
+
+            # 扩展调试信息
+            print("\n=== 返回数据检查 ===")
+            print(f"科目列表: {subjects}")
+            print(f"学校统计数据数量: {len(current_stats) if current_stats else 0}")
+            if current_stats:
+                print("\n第一所学校数据示例:")
+                school = current_stats[0]
+                print(f"学校名: {school.get('school_name')}")
+                print(f"特控群人数: {school.get('special_count')}")
+                print(f"本科群人数: {school.get('regular_count')}")
+                print("\n各科目成绩:")
+                for subject in subjects:
+                    print(f"{subject_names[subject]}:")
+                    print(f"  特控均分: {school.get(f'special_{subject}_avg')}")
+                    print(f"  本科均分: {school.get(f'regular_{subject}_avg')}")
+                    print(f"  特控相对位置: {school.get(f'special_{subject}_relative')}")
+                    print(f"  本科相对位置: {school.get(f'regular_{subject}_relative')}")
+
+            return {
+                'school_stats': current_stats,
+                'subjects': subjects,
+                'subject_names': subject_names,
+                'compare_exam_id': compare_exam_id
+            }
 
         except Exception as e:
             raise Exception(f"学科分析数据获取失败: {str(e)}")
+
+    def _get_exam_stats(self, exam_id, subjects, thresholds, select_type, district_name):
+        """获取单次考试的统计数据。"""
+        try:
+            # 基础统计数据
+            school_stats = list(ScoreStudentBasic.objects.filter(
+                exam_id=exam_id,
+                district_name=district_name,
+                select_type=select_type
+            ).values('school_name').annotate(
+                # 特控群统计
+                special_count=Count(
+                    'id',
+                    filter=Q(total_score__gte=thresholds['special_score'])
+                ),
+                **{f"special_{subject}_avg": Avg(
+                    subject,
+                    filter=Q(total_score__gte=thresholds['special_score'])
+                ) for subject in subjects},
+                **{f"special_{subject}_std": StdDev(
+                    subject,
+                    filter=Q(total_score__gte=thresholds['special_score'])
+                ) for subject in subjects},
+
+                # 本科群统计
+                regular_count=Count(
+                    'id',
+                    filter=Q(total_score__gte=thresholds['regular_score'])
+                ),
+                **{f"regular_{subject}_avg": Avg(
+                    subject,
+                    filter=Q(total_score__gte=thresholds['regular_score'])
+                ) for subject in subjects},
+                **{f"regular_{subject}_std": StdDev(
+                    subject,
+                    filter=Q(total_score__gte=thresholds['regular_score'])
+                ) for subject in subjects},
+
+                # 总人数
+                student_count=Count('id')
+            ).order_by('-regular_count', '-student_count'))
+
+            # 计算相对位置
+            queryset = ScoreStudentBasic.objects.filter(
+                exam_id=exam_id,
+                district_name=district_name,
+                select_type=select_type
+            )
+
+            for subject in subjects:
+                # 计算全体考生的均值和标准差
+                all_stats = queryset.aggregate(
+                    mean=Avg(subject),
+                    std=StdDev(subject)
+                )
+                mean = all_stats['mean'] or 0
+                std = all_stats['std'] or 1  # 避免除以0
+
+                # 为每个学校计算相对位置
+                for school in school_stats:
+                    # 特控群相对位置
+                    special_avg = school.get(f'special_{subject}_avg')
+                    if special_avg is not None:
+                        school[f'special_{subject}_relative'] = (special_avg - mean) / std
+                    else:
+                        school[f'special_{subject}_relative'] = None
+
+                    # 本科群相对位置
+                    regular_avg = school.get(f'regular_{subject}_avg')
+                    if regular_avg is not None:
+                        school[f'regular_{subject}_relative'] = (regular_avg - mean) / std
+                    else:
+                        school[f'regular_{subject}_relative'] = None
+
+            # 调试输出
+            print("\n=== 相对位置计算结果 ===")
+            if school_stats:
+                first_school = school_stats[0]
+                print(f"第一所学校: {first_school['school_name']}")
+                for subject in subjects:
+                    print(f"{subject}:")
+                    print(f"  特控相对位置: {first_school.get(f'special_{subject}_relative')}")
+                    print(f"  本科相对位置: {first_school.get(f'regular_{subject}_relative')}")
+
+            return school_stats
+
+        except Exception as e:
+            print(f"_get_exam_stats 错误: {str(e)}")
+            raise
+
+    def calculate_zscore(self, scores):
+        """计算Z分数。
+
+        Args:
+            scores (list): 原始分数列表
+
+        Returns:
+            list: Z分数列表
+        """
+        scores = np.array(scores)
+        mean = np.mean(scores)
+        std = np.std(scores)
+        if std == 0:
+            return np.zeros_like(scores)
+        return ((scores - mean) / std).tolist()
 
     def get_warnings(self, exam_id, select_type='理科', district_name='开平市'):
         """获取预警信息。
@@ -1246,7 +1455,13 @@ class StudentGroupView(View):
             if not compare_exam_id and available_exams:
                 compare_exam_id = available_exams[0]['exam_id']
                 print(f"使用默认比较考试: {compare_exam_id}")
-
+            # 获取学科分析数据
+            subject_analysis_data = self.get_subject_analysis(
+                exam_id,
+                select_type,
+                district_name,
+                compare_exam_id
+            )
             context = {
                 'module_type': module_type,
                 'exam_id': exam_id,
@@ -1266,12 +1481,12 @@ class StudentGroupView(View):
                     district_name,
                     compare_exam_id
                 ),
-                'subject_analysis': self.get_subject_analysis(
-                    exam_id,
-                    select_type,
-                    district_name
-                )
+                'subject_analysis': subject_analysis_data
+
             }
+            print("\n=== 最终 context 数据 ===")
+            print(f"subject_analysis 中的学校数: {len(context['subject_analysis']['school_stats'])}")
+            print(f"compare_exam_id: {context['compare_exam_id']}")
             return render(request, self.template_name, context)
 
         except Exception as e:
