@@ -10,11 +10,13 @@ from django.db.models import (
 from django.db.models.functions import JSONObject, Cast
 from score_processor.models import StudentMapping, BaseExamConfig
 from ..models.Tracking import TrackingRecord, TaggedStudent
-from django.db.models import F
+
 from django.core.paginator import Paginator
 from ..models.source import ScoreStudentBasic
 from ..models.statistics import ExamLevelAnalysisConfig
+from django.db.models import F, Subquery, OuterRef, Q
 
+from datetime import datetime
 
 class TrackingAnalysisView(View):
     """发展跟踪分析主页面视图"""
@@ -1505,53 +1507,360 @@ class StudentGroupView(View):
 
 
 class ElitePortraitView(View):
-    """尖子生群体画像视图"""
+    """尖子生群体画像视图类。
+
+    用于展示各学校尖子生的详细信息、统计数据和特征分析。
+    包含基础成绩、排名和T分数据的综合展示。
+    """
+
     template_name = 'score_analysis/tracking/elite_portrait.html'
 
-    def get(self, request, exam_id):
-        try:
-            # 获取各学校的尖子生数据
-            schools_elite = self._get_schools_elite_data(exam_id)
+    def get(self, request, module_type, exam_id):
+        """处理GET请求，显示尖子生群体画像页面。
 
+        Args:
+            request: HttpRequest对象
+            module_type: str, 模块类型标识
+            exam_id: str, 考试ID，格式如：202501-CITY-H-2025
+
+        Returns:
+            HttpResponse: 渲染后的页面响应，包含：
+                - 考试基本信息
+                - 各学校尖子生数据
+                - 总体统计数据
+                - 文理科分布
+
+        Raises:
+            JsonResponse: 当发生错误时返回错误信息，状态码500
+        """
+        try:
+            # 获取考试基本信息
+            exam_info = self._get_exam_info(exam_id)
+
+            # 获取锁定尖子生统计数据
+            locked_stats = self._get_locked_elite_stats(exam_id)
+            # 获取学校列表数据
+            schools_stats = self._get_schools_elite_data(exam_id)
+
+            # 详细打印学校统计数据
+            print("\n=== 学校统计数据 ===")
+            if schools_stats:
+                for school in schools_stats:
+                    print(f"\n学校名称: {school['school_name']}")
+                    print(f"总人数: {school['total']['count']}")
+
+                    print("\n理科学生:")
+                    print(f"人数: {school['science']['count']}")
+                    if school['science']['students']:
+                        for student in school['science']['students']:
+                            print(f"- {student['student_name']}: "
+                                  f"总分={student['total_score']}, "
+                                  f"市排名={student['city_rank']}, "
+                                  f"区排名={student['district_rank']}")
+
+                    print("\n文科学生:")
+                    print(f"人数: {school['liberal']['count']}")
+                    if school['liberal']['students']:
+                        for student in school['liberal']['students']:
+                            print(f"- {student['student_name']}: "
+                                  f"总分={student['total_score']}, "
+                                  f"市排名={student['city_rank']}, "
+                                  f"区排名={student['district_rank']}")
+            else:
+                print("没有找到学校数据")
             # 准备上下文数据
             context = {
+                'module_type': module_type,
                 'exam_id': exam_id,
-                'schools_elite': schools_elite,
-                'total_stats': self._get_total_stats(exam_id),
+                'exam_info': exam_info,
+                'locked_stats': locked_stats,  # 确保这个键名与模板中使用的一致
+                'schools_stats': schools_stats,
             }
+
+            # 渲染模板
             return render(request, self.template_name, context)
+
         except Exception as e:
+            print(f"视图处理失败: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
 
+    def _get_exam_info(self, exam_id):
+        """获取考试基本信息。
+
+        从base_exam_config表获取考试的基本信息，并统计考生人数。
+
+        Args:
+            exam_id (str): 考试ID，格式如：202501-CITY-H-2025
+
+        Returns:
+            dict: 考试信息，包含：
+                - exam_name: str, 考试名称
+                - exam_date: date, 考试日期
+                - exam_type: str, 考试类型
+                - grade_level: str, 年级
+                - semester: str, 学期
+                - total_students: int, 总考生数
+                - science_students: int, 理科考生数
+                - liberal_students: int, 文科考生数
+
+        Raises:
+            BaseExamConfig.DoesNotExist: 当考试ID不存在时抛出异常
+        """
+        # 获取考试基本信息
+        exam_config = BaseExamConfig.objects.get(exam_id=exam_id)
+
+        # 获取考生统计数据
+        basic_stats = ScoreStudentBasic.objects.filter(
+            exam_id=exam_id
+        ).aggregate(
+            total_students=Count('id'),
+            science_students=Count('id', filter=Q(select_type='理科')),
+            liberal_students=Count('id', filter=Q(select_type='文科'))
+        )
+
+        return {
+            'exam_name': exam_config.exam_name,
+            'exam_date': exam_config.exam_date,
+            'exam_type': exam_config.exam_type,
+            'grade_level': exam_config.grade_level,
+            'semester': exam_config.semester,
+            'is_divided': exam_config.is_divided_exam,
+            'exam_level': exam_config.exam_level,
+            **basic_stats
+        }
+
     def _get_schools_elite_data(self, exam_id):
-        """获取各学校尖子生数据"""
-        schools_data = {}
+        """获取各学校的锁定尖子生数据。"""
+        try:
+            # 1. 获取锁定尖子生
+            tagged_students = TaggedStudent.objects.filter(
+                is_active=True,
+                remarks='锁定尖子生'
+            ).values_list('student_id', flat=True)
 
-        # 获取所有相关学校
-        schools = TaggedStudent.objects.filter(
-            exam_id=exam_id,
-            is_active=True
-        ).values_list('school_name', flat=True).distinct()
+            print(f"找到的锁定尖子生ID: {list(tagged_students)}")
 
-        for school_name in schools:
-            school_data = {
-                'name': school_name,
-                'science': {  # 理科
-                    'elite': self._get_elite_students(exam_id, school_name, '理科', 'elite'),
-                    'potential': self._get_elite_students(exam_id, school_name, '理科', 'potential_elite'),
-                },
-                'liberal': {  # 文科
-                    'elite': self._get_elite_students(exam_id, school_name, '文科', 'elite'),
-                    'potential': self._get_elite_students(exam_id, school_name, '文科', 'potential_elite'),
-                },
-                'features': self._get_school_features(exam_id, school_name),
-            }
-            schools_data[school_name] = school_data
+            # 2. 获取基础信息和跟踪记录
+            students = ScoreStudentBasic.objects.filter(
+                exam_id=exam_id,
+                student_id__in=tagged_students
+            ).values(
+                'student_id',
+                'student_name',
+                'school_name',
+                'select_type'
+            )
 
-        return schools_data
+            # 获取当前考试的跟踪记录
+            tracking_records = TrackingRecord.objects.filter(
+                exam_id=exam_id,
+                student_id__in=tagged_students
+            ).values(
+                'student_id',
+                'total_score',
+                'total_t_score',
+                'city_rank',
+                'district_rank',
+                'school_rank',
+                'subject_scores',
+                'subject_t_scores',
+                'improvement',
+                'percentile'
+            )
+
+            # 创建查找字典
+            tracking_dict = {tr['student_id']: tr for tr in tracking_records}
+
+            # 3. 获取上一次考试ID和排名类型
+            prev_exam_id, rank_type = self._get_previous_exam_id(exam_id)
+            print(f"上一次考试ID: {prev_exam_id}")
+            print(f"排名类型: {rank_type}")
+
+            # 4. 获取上一次排名数据
+            prev_ranks = {}
+            if prev_exam_id and rank_type:
+                prev_ranks = dict(
+                    TrackingRecord.objects.filter(
+                        exam_id=prev_exam_id,
+                        student_id__in=tagged_students
+                    ).values_list('student_id', rank_type)
+                )
+
+            # 5. 处理学校数据
+            schools_data = {}
+            for student in students:
+                # 获取跟踪记录数据
+                tracking = tracking_dict.get(student['student_id'], {})
+                subject_scores = tracking.get('subject_scores', {})
+                subject_t_scores = tracking.get('subject_t_scores', {})
+                prev_rank = prev_ranks.get(student['student_id'])
+
+                # 5.1 初始化学校数据
+                if student['school_name'] not in schools_data:
+                    schools_data[student['school_name']] = {
+                        'school_name': student['school_name'],
+                        'science': {'count': 0, 'students': []},
+                        'liberal': {'count': 0, 'students': []},
+                        'total': {'count': 0}
+                    }
+
+                # 5.2 计算排名变化
+                current_rank = tracking.get(rank_type)
+                rank_change = None
+                if prev_rank and current_rank:
+                    rank_change = prev_rank - current_rank
+
+                # 5.3 构建学生数据
+                student_data = {
+                    'student_id': student['student_id'],
+                    'student_name': student['student_name'],
+                    'total_score': tracking.get('total_score'),
+                    'total_t_score': tracking.get('total_t_score'),
+                    'city_rank': tracking.get('city_rank'),
+                    'district_rank': tracking.get('district_rank'),
+                    'school_rank': tracking.get('school_rank'),
+                    'city_rank_change': rank_change if rank_type == 'city_rank' else None,
+                    'district_rank_change': rank_change if rank_type == 'district_rank' else None,
+                    # 科目成绩（从JSON中获取）
+                    'chinese_score': subject_scores.get('chinese'),
+                    'math_score': subject_scores.get('math'),
+                    'english_score': subject_scores.get('english'),
+                    'physics_score': subject_scores.get('physics'),
+                    'chemistry_score': subject_scores.get('chemistry'),
+                    'biology_score': subject_scores.get('biology'),
+                    'politics_score': subject_scores.get('politics'),
+                    'history_score': subject_scores.get('history'),
+                    'geography_score': subject_scores.get('geography'),
+                    # T分（从JSON中获取）
+                    'chinese_t_score': subject_t_scores.get('chinese'),
+                    'math_t_score': subject_t_scores.get('math'),
+                    'english_t_score': subject_t_scores.get('english'),
+                    'physics_t_score': subject_t_scores.get('physics'),
+                    'chemistry_t_score': subject_t_scores.get('chemistry'),
+                    'biology_t_score': subject_t_scores.get('biology'),
+                    'politics_t_score': subject_t_scores.get('politics'),
+                    'history_t_score': subject_t_scores.get('history'),
+                    'geography_t_score': subject_t_scores.get('geography'),
+                    # 其他
+                    'improvement': tracking.get('improvement'),
+                    'percentile': tracking.get('percentile')
+                }
+
+                # 5.4 根据文理科分类添加学生数据
+                if student['select_type'] == '理科':
+                    schools_data[student['school_name']]['science']['students'].append(student_data)
+                    schools_data[student['school_name']]['science']['count'] += 1
+                else:
+                    schools_data[student['school_name']]['liberal']['students'].append(student_data)
+                    schools_data[student['school_name']]['liberal']['count'] += 1
+
+                schools_data[student['school_name']]['total']['count'] += 1
+
+            # 6. 对每个学校的理科和文科学生按校排名排序
+            for school_data in schools_data.values():
+                # 理科学生排序
+                school_data['science']['students'].sort(key=lambda x: x['school_rank'] or float('inf'))
+                # 文科学生排序
+                school_data['liberal']['students'].sort(key=lambda x: x['school_rank'] or float('inf'))
+
+            # 7. 转换为列表并按总人数排序
+            return sorted(
+                schools_data.values(),
+                key=lambda x: x['total']['count'],
+                reverse=True
+            )
+
+        except Exception as e:
+            print(f"获取学校尖子生数据失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def _get_previous_rank_subquery(self, rank_field, current_exam_id):
+        """获取上一次考试的排名子查询。"""
+        prev_exam_id = self._get_previous_exam_id(current_exam_id)
+        if not prev_exam_id:
+            return None
+
+        return Subquery(
+            TrackingRecord.objects.filter(
+                student_id=OuterRef('student_id'),
+                exam_id=prev_exam_id
+            ).values(rank_field)[:1]
+        )
+
+    def _get_previous_exam_id(self, current_exam_id):
+        """获取上一次考试的ID。
+
+        Args:
+            current_exam_id (str): 当前考试ID，格式如：'202501-CITY-H-2025' 或 '202501-DIST-H-2025'
+
+        Returns:
+            tuple: (prev_exam_id, rank_type)
+                - prev_exam_id: 上一次考试的ID
+                - rank_type: 排名类型，'city_rank' 或 'district_rank'
+        """
+        try:
+            print(f"当前考试ID: {current_exam_id}")
+
+            # 判断当前考试类型
+            is_city_exam = 'CITY' in current_exam_id
+            print(f"是否市级考试: {is_city_exam}")
+
+            # 解析日期
+            date_part = current_exam_id.split('-')[0]
+            current_date = datetime.strptime(date_part, '%Y%m')
+            print(f"当前考试日期: {current_date}")
+
+            if is_city_exam:
+                # 市级考试：只查找上一次市级考试
+                prev_exams = BaseExamConfig.objects.filter(
+                    exam_id__contains='CITY',
+                    exam_id__lt=current_exam_id
+                ).order_by('-exam_id')
+                rank_type = 'city_rank'
+            else:
+                # 区级考试：查找所有之前的考试（用于区县排名比较）
+                prev_exams = BaseExamConfig.objects.filter(
+                    exam_id__lt=current_exam_id
+                ).order_by('-exam_id')
+                rank_type = 'district_rank'
+
+            if prev_exams.exists():
+                prev_exam_id = prev_exams[0].exam_id
+                print(f"找到上一次考试ID: {prev_exam_id}")
+                print(f"使用排名类型: {rank_type}")
+                return prev_exam_id, rank_type
+            else:
+                print("未找到上一次考试")
+                return None, None
+
+        except Exception as e:
+            print(f"获取上一次考试ID时出错: {str(e)}")
+            return None, None
 
     def _get_elite_students(self, exam_id, school_name, subject_type, tag_type):
-        """获取指定类型的尖子生列表"""
+        """获取指定类型的尖子生列表。
+
+        Args:
+            exam_id: str, 考试ID
+            school_name: str, 学校名称
+            subject_type: str, 文理科类型（'文科'/'理科'）
+            tag_type: str, 标签类型（'elite'/'potential_elite'）
+
+        Returns:
+            list: 包含学生详细信息的列表，每个学生信息包含：
+                - student_id: str, 学生ID
+                - student_name: str, 学生姓名
+                - total_score: float, 总分
+                - total_t_score: float, 总T分
+                - ranks: dict, 各级别排名
+                - subject_scores: dict, 各科成绩
+                - subject_t_scores: dict, 各科T分
+                - subject_ranks: dict, 各科排名
+                - features: dict, 特征数据
+                - remarks: str, 备注
+        """
         tagged_students = TaggedStudent.objects.filter(
             exam_id=exam_id,
             school_name=school_name,
@@ -1562,100 +1871,352 @@ class ElitePortraitView(View):
 
         student_details = []
         for tagged in tagged_students:
-            # 获取成绩信息
-            score = ScoreStudentBasic.objects.filter(
+            # 获取基础成绩
+            basic_score = ScoreStudentBasic.objects.filter(
                 student_id=tagged['student_id'],
                 exam_id=exam_id
             ).values(
-                'student_name', 'total_score', 'rank',
-                'chinese_score', 'math_score', 'english_score',
-                'chinese_t_score', 'math_t_score', 'english_t_score',
-                'physics_score', 'chemistry_score', 'biology_score',
-                'physics_t_score', 'chemistry_t_score', 'biology_t_score',
-                'politics_score', 'history_score', 'geography_score',
-                'politics_t_score', 'history_t_score', 'geography_t_score'
+                'student_name', 'total_score',
+                'chinese', 'math', 'english',
+                'physics', 'chemistry', 'biology',
+                'politics', 'history', 'geography'
             ).first()
 
-            if score:
-                student_detail = {
-                    'student_id': tagged['student_id'],
-                    'student_name': score['student_name'],
-                    'total_score': score['total_score'],
-                    'rank': score['rank'],
-                    'features': tagged['features'],
-                    'remarks': tagged['remarks'],
-                    'subject_scores': {},
-                    't_scores': {}
-                }
+            # 获取跟踪记录（排名和T分）
+            tracking = TrackingRecord.objects.filter(
+                student_id=tagged['student_id'],
+                exam_id=exam_id
+            ).values(
+                'total_t_score', 'city_rank', 'district_rank', 'school_rank',
+                'city_t_score', 'district_t_score', 'school_t_score',
+                'subject_scores', 'subject_t_scores', 'subject_ranks',
+                'weighted_t_score', 'improvement', 'percentile'
+            ).first()
 
-                # 添加科目成绩
-                base_subjects = ['chinese', 'math', 'english']
-                if subject_type == '理科':
-                    subjects = base_subjects + ['physics', 'chemistry', 'biology']
-                else:
-                    subjects = base_subjects + ['politics', 'history', 'geography']
-
-                for subject in subjects:
-                    score_key = f'{subject}_score'
-                    t_score_key = f'{subject}_t_score'
-                    if score[score_key] is not None:
-                        student_detail['subject_scores'][subject] = score[score_key]
-                        student_detail['t_scores'][subject] = score[t_score_key]
-
+            if basic_score and tracking:
+                student_detail = self._format_student_detail(
+                    tagged, basic_score, tracking, subject_type
+                )
                 student_details.append(student_detail)
 
         return student_details
 
+    def _format_student_detail(self, tagged, basic_score, tracking, subject_type):
+        """格式化学生详细信息。
+
+        Args:
+            tagged: dict, 标签学生信息
+            basic_score: dict, 基础成绩信息
+            tracking: dict, 跟踪记录信息
+            subject_type: str, 文理科类型
+
+        Returns:
+            dict: 格式化后的学生详细信息
+        """
+        detail = {
+            'student_id': tagged['student_id'],
+            'student_name': basic_score['student_name'],
+            'total_score': basic_score['total_score'],
+            'total_t_score': tracking['total_t_score'],
+            'ranks': {
+                'city': tracking['city_rank'],
+                'district': tracking['district_rank'],
+                'school': tracking['school_rank']
+            },
+            't_scores': {
+                'city': tracking['city_t_score'],
+                'district': tracking['district_t_score'],
+                'school': tracking['school_t_score']
+            },
+            'subject_scores': {
+                '语文': basic_score['chinese'],
+                '数学': basic_score['math'],
+                '英语': basic_score['english']
+            },
+            'subject_t_scores': tracking['subject_t_scores'],
+            'subject_ranks': tracking['subject_ranks'],
+            'weighted_t_score': tracking['weighted_t_score'],
+            'improvement': tracking['improvement'],
+            'percentile': tracking['percentile'],
+            'features': tagged['features'],
+            'remarks': tagged['remarks']
+        }
+
+        # 添加文理科特有科目成绩
+        if subject_type == '理科':
+            detail['subject_scores'].update({
+                '物理': basic_score['physics'],
+                '化学': basic_score['chemistry'],
+                '生物': basic_score['biology']
+            })
+        else:
+            detail['subject_scores'].update({
+                '政治': basic_score['politics'],
+                '历史': basic_score['history'],
+                '地理': basic_score['geography']
+            })
+
+        return detail
+
     def _get_school_features(self, exam_id, school_name):
-        """获取学校特色"""
-        stats = TaggedStudent.objects.filter(
+        """获取学校特色信息。
+
+        Args:
+            exam_id: str, 考试ID
+            school_name: str, 学校名称
+
+        Returns:
+            dict: 学校特色信息，包含：
+                - stats: dict, 统计数据（人数、平均分、平均T分）
+                - ranks: dict, 排名统计
+                - improvements: dict, 进步统计
+                - advantages: list, 优势学科
+                - description: str, 特色描述
+        """
+        # 基础统计
+        basic_stats = ScoreStudentBasic.objects.filter(
             exam_id=exam_id,
-            school_name=school_name,
-            is_active=True
+            school_name=school_name
         ).aggregate(
-            science_count=Count('id', filter=Q(subject_type='理科')),
-            liberal_count=Count('id', filter=Q(subject_type='文科')),
-            science_avg=Avg('total_score', filter=Q(subject_type='理科')),
-            liberal_avg=Avg('total_score', filter=Q(subject_type='文科'))
+            science_count=Count('id', filter=Q(select_type='理科')),
+            liberal_count=Count('id', filter=Q(select_type='文科')),
+            science_avg=Avg('total_score', filter=Q(select_type='理科')),
+            liberal_avg=Avg('total_score', filter=Q(select_type='文科'))
         )
 
-        # 分析优势学科
-        advantages = self._analyze_school_advantages(exam_id, school_name)
+        # T分和排名统计
+        tracking_stats = TrackingRecord.objects.filter(
+            exam_id=exam_id,
+            student_id__in=TaggedStudent.objects.filter(
+                exam_id=exam_id,
+                school_name=school_name,
+                is_active=True
+            ).values_list('student_id', flat=True)
+        ).aggregate(
+            avg_t_score=Avg('total_t_score'),
+            avg_weighted_t_score=Avg('weighted_t_score'),
+            avg_improvement=Avg('improvement'),
+            top_100_count=Count('id', filter=Q(city_rank__lte=100))
+        )
 
         return {
-            'stats': stats,
-            'advantages': advantages,
-            'description': self._get_school_description(school_name, stats, advantages)
+            'stats': {**basic_stats, **tracking_stats},
+            'advantages': self._analyze_school_advantages(exam_id, school_name),
+            'description': self._get_school_description(school_name, basic_stats, tracking_stats)
         }
 
     def _analyze_school_advantages(self, exam_id, school_name):
-        """分析学校优势学科"""
-        return TaggedStudent.objects.filter(
-            exam_id=exam_id,
-            school_name=school_name,
-            is_active=True
-        ).values_list('features__advantages', flat=True).distinct()
+        """分析学校优势学科。
 
-    def _get_school_description(self, school_name, stats, advantages):
-        """生成学校特色描述"""
-        description = f"{school_name}的特色分析：\n"
-        description += f"理科尖子生{stats['science_count']}人，平均分{stats['science_avg']:.1f}\n"
-        description += f"文科尖子生{stats['liberal_count']}人，平均分{stats['liberal_avg']:.1f}\n"
-        if advantages:
-            description += f"优势学科：{', '.join(advantages)}"
-        return description
+        Args:
+            exam_id: str, 考试ID
+            school_name: str, 学校名称
 
-    def _get_total_stats(self, exam_id):
-        """计算总体统计数据"""
-        return TaggedStudent.objects.filter(
+        Returns:
+            list: 优势学科列表，每个学科包含：
+                - subject: str, 学科名称
+                - avg_score: float, 平均分
+                - avg_t_score: float, 平均T分
+                - top_count: int, 优秀人数
+        """
+        # 从跟踪记录中获取学科T分数据
+        tracking_records = TrackingRecord.objects.filter(
             exam_id=exam_id,
-            is_active=True
-        ).aggregate(
-            science_elite=Count('id', filter=Q(subject_type='理科', tag_type='elite')),
-            science_potential=Count('id', filter=Q(subject_type='理科', tag_type='potential_elite')),
-            liberal_elite=Count('id', filter=Q(subject_type='文科', tag_type='elite')),
-            liberal_potential=Count('id', filter=Q(subject_type='文科', tag_type='potential_elite')),
-            science_avg=Avg('total_score', filter=Q(subject_type='理科')),
-            liberal_avg=Avg('total_score', filter=Q(subject_type='文科'))
+            student_id__in=TaggedStudent.objects.filter(
+                exam_id=exam_id,
+                school_name=school_name,
+                is_active=True
+            ).values_list('student_id', flat=True)
         )
 
+        advantages = []
+        for record in tracking_records:
+            subject_t_scores = record.subject_t_scores
+            if subject_t_scores:
+                for subject, t_score in subject_t_scores.items():
+                    if t_score >= 60:  # 设定优势学科的T分阈值
+                        advantages.append(subject)
+
+        # 统计出现频率最高的学科
+        from collections import Counter
+        subject_counter = Counter(advantages)
+        return [subject for subject, count in subject_counter.most_common(3)]
+
+    def _get_school_description(self, school_name, basic_stats, tracking_stats):
+        """生成学校特色描述。
+
+        Args:
+            school_name: str, 学校名称
+            basic_stats: dict, 基础统计数据
+            tracking_stats: dict, 跟踪统计数据
+
+        Returns:
+            str: 学校特色描述文本
+        """
+        description = f"{school_name}的特色分析：\n"
+
+        # 添加文理科人数和平均分
+        if basic_stats['science_count'] > 0:
+            description += (
+                f"理科：{basic_stats['science_count']}人，"
+                f"平均分{basic_stats['science_avg']:.1f}分\n"
+            )
+        if basic_stats['liberal_count'] > 0:
+            description += (
+                f"文科：{basic_stats['liberal_count']}人，"
+                f"平均分{basic_stats['liberal_avg']:.1f}分\n"
+            )
+
+        # 添加T分和进步情况
+        if tracking_stats['avg_t_score']:
+            description += f"平均T分：{tracking_stats['avg_t_score']:.1f}\n"
+        if tracking_stats['avg_improvement']:
+            description += f"平均进步：{tracking_stats['avg_improvement']:.1f}分\n"
+        if tracking_stats['top_100_count']:
+            description += f"市前100名：{tracking_stats['top_100_count']}人"
+
+        return description
+
+    def _get_locked_elite_stats(self, exam_id):
+        """获取锁定尖子生的统计数据。
+
+        统计remarks='锁定尖子生'的学生的总人数、总分平均分、总分平均T分和排名范围。
+
+        Args:
+            exam_id (str): 考试ID，格式如：202501-CITY-H-2025
+
+        Returns:
+            dict: 锁定尖子生的统计数据：
+                {
+                    'science': {
+                        'count': int, 理科锁定尖子生人数
+                        'avg_score': float, 理科锁定尖子生平均分
+                        'avg_t_score': float, 理科锁定尖子生平均T分
+                        'rank_range': str, 理科锁定尖子生排名范围(min-max)
+                    },
+                    'liberal': {
+                        同理科结构
+                    },
+                    'total': {
+                        'count': int, 总锁定尖子生人数
+                        'avg_score': float, 总锁定尖子生平均分
+                        'avg_t_score': float, 总锁定尖子生平均T分
+                        'rank_range': str, 总锁定尖子生排名范围(min-max)
+                    }
+                }
+
+        Raises:
+            Exception: 当数据库查询出错时抛出异常，返回包含默认值的统计数据
+        """
+        try:
+            # 获取锁定尖子生ID列表，不筛选exam_id
+            locked_student_ids = TaggedStudent.objects.filter(
+                is_active=True,
+                remarks='锁定尖子生'
+            ).values_list('student_id', flat=True)
+
+            print(f"找到的锁定尖子生ID: {locked_student_ids}")
+
+            # 如果没有找到锁定尖子生，直接返回空数据
+            if not locked_student_ids:
+                return {
+                    'science': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'},
+                    'liberal': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'},
+                    'total': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'}
+                }
+
+            # 基础成绩统计 - 使用exam_id和student_ids
+            basic_stats = ScoreStudentBasic.objects.filter(
+                exam_id=exam_id,
+                student_id__in=locked_student_ids
+            ).aggregate(
+                science_avg=Avg('total_score', filter=Q(select_type='理科')),
+                liberal_avg=Avg('total_score', filter=Q(select_type='文科')),
+                science_count=Count('id', filter=Q(select_type='理科')),
+                liberal_count=Count('id', filter=Q(select_type='文科'))
+            )
+
+            print(f"基础统计数据: {basic_stats}")
+
+            # 跟踪记录统计
+            tracking_stats = TrackingRecord.objects.filter(
+                exam_id=exam_id,
+                student_id__in=locked_student_ids
+            ).aggregate(
+                science_t_avg=Avg('total_t_score', filter=Q(select_type='理科')),
+                liberal_t_avg=Avg('total_t_score', filter=Q(select_type='文科')),
+                science_min_rank=Min('city_rank', filter=Q(select_type='理科')),
+                science_max_rank=Max('city_rank', filter=Q(select_type='理科')),
+                liberal_min_rank=Min('city_rank', filter=Q(select_type='文科')),
+                liberal_max_rank=Max('city_rank', filter=Q(select_type='文科'))
+            )
+
+            # 打印调试信息
+            print(f"跟踪统计数据: {tracking_stats}")
+
+            # 计算总体统计数据
+            total_count = (basic_stats['science_count'] or 0) + (basic_stats['liberal_count'] or 0)
+
+            # 确保除数不为零
+            if total_count > 0:
+                total_avg_score = (
+                                          (basic_stats['science_avg'] or 0) * (basic_stats['science_count'] or 0) +
+                                          (basic_stats['liberal_avg'] or 0) * (basic_stats['liberal_count'] or 0)
+                                  ) / total_count
+
+                total_avg_t_score = (
+                                            (tracking_stats['science_t_avg'] or 0) * (
+                                                basic_stats['science_count'] or 0) +
+                                            (tracking_stats['liberal_t_avg'] or 0) * (basic_stats['liberal_count'] or 0)
+                                    ) / total_count
+            else:
+                total_avg_score = None
+                total_avg_t_score = None
+
+            # 计算排名范围
+            min_rank = min(filter(None, [
+                tracking_stats['science_min_rank'],
+                tracking_stats['liberal_min_rank']
+            ]) or [0])
+            max_rank = max(filter(None, [
+                tracking_stats['science_max_rank'],
+                tracking_stats['liberal_max_rank']
+            ]) or [0])
+
+            result = {
+                'science': {
+                    'count': basic_stats['science_count'] or 0,
+                    'avg_score': basic_stats['science_avg'],
+                    'avg_t_score': tracking_stats['science_t_avg'],
+                    'rank_range': (f"{tracking_stats['science_min_rank']}-"
+                                   f"{tracking_stats['science_max_rank']}"
+                                   if tracking_stats['science_min_rank'] else '-')
+                },
+                'liberal': {
+                    'count': basic_stats['liberal_count'] or 0,
+                    'avg_score': basic_stats['liberal_avg'],
+                    'avg_t_score': tracking_stats['liberal_t_avg'],
+                    'rank_range': (f"{tracking_stats['liberal_min_rank']}-"
+                                   f"{tracking_stats['liberal_max_rank']}"
+                                   if tracking_stats['liberal_min_rank'] else '-')
+                },
+                'total': {
+                    'count': total_count,
+                    'avg_score': total_avg_score,
+                    'avg_t_score': total_avg_t_score,
+                    'rank_range': f"{min_rank}-{max_rank}" if min_rank and max_rank else '-'
+                }
+            }
+
+            # 打印最终结果
+            print(f"最终统计结果: {result}")
+
+            return result
+
+        except Exception as e:
+            print(f"获取锁定尖子生统计数据失败: {str(e)}")
+            return {
+                'science': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'},
+                'liberal': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'},
+                'total': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'}
+            }

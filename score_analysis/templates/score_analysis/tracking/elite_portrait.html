@@ -3,150 +3,261 @@
 {% load static %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">尖子生群体画像</h5>
-                </div>
-                <div class="card-body">
-                    <!-- 总体统计 -->
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title">理科尖子生</h6>
-                                    <p class="card-text">
-                                        尖子生：{{ total_stats.science_elite }}人<br>
-                                        潜力生：{{ total_stats.science_potential }}人<br>
-                                        平均分：{{ total_stats.science_avg|floatformat:1 }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="card">
-                                <div class="card-body">
-                                    <h6 class="card-title">文科尖子生</h6>
-                                    <p class="card-text">
-                                        尖子生：{{ total_stats.liberal_elite }}人<br>
-                                        潜力生：{{ total_stats.liberal_potential }}人<br>
-                                        平均分：{{ total_stats.liberal_avg|floatformat:1 }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+<!-- 标题和考试信息部分 -->
+<div class="card">
+    <div class="card-header">
+        <!-- 第一行：标题和考试名称，居中 -->
+        <div class="text-center mb-2">
+            <h5 class="card-title mb-0">尖子生群体画像 - {{ exam_info.exam_name }}</h5>
+        </div>
 
-                    <!-- 学校列表 -->
-                    {% for school_name, school in schools_elite.items %}
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            <h6 class="mb-0">{{ school.name }}</h6>
-                        </div>
-                        <div class="card-body">
-                            <!-- 理科尖子生 -->
-                            {% if school.science.elite %}
-                            <h6>理科尖子生</h6>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>姓名</th>
-                                            <th>总分</th>
-                                            <th>排名</th>
-                                            <th>语文</th>
-                                            <th>数学</th>
-                                            <th>英语</th>
-                                            <th>物理</th>
-                                            <th>化学</th>
-                                            <th>生物</th>
-                                            <th>特征</th>
-                                            <th>备注</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for student in school.science.elite %}
-                                        <tr>
-                                            <td>{{ student.student_name }}</td>
-                                            <td>{{ student.total_score }}</td>
-                                            <td>{{ student.rank }}</td>
-                                            <td>{{ student.subject_scores.语文 }}</td>
-                                            <td>{{ student.subject_scores.数学 }}</td>
-                                            <td>{{ student.subject_scores.英语 }}</td>
-                                            <td>{{ student.subject_scores.物理 }}</td>
-                                            <td>{{ student.subject_scores.化学 }}</td>
-                                            <td>{{ student.subject_scores.生物 }}</td>
-                                            <td>{{ student.features|safe }}</td>
-                                            <td>{{ student.remarks }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {% endif %}
+        <!-- 第二行：考试概况，居中 -->
+        <div class="text-center">
+            <div class="text-muted">
+                <span class="me-4">总考生：{{ exam_info.total_students|default:0 }}人</span>
+                <span class="me-4">理科生：{{ exam_info.science_students|default:0 }}人</span>
+                <span>文科生：{{ exam_info.liberal_students|default:0 }}人</span>
+            </div>
+        </div>
+    </div>
 
-                            <!-- 文科尖子生 -->
-                            {% if school.liberal.elite %}
-                            <h6 class="mt-4">文科尖子生</h6>
-                            <div class="table-responsive">
-                                <table class="table table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>姓名</th>
-                                            <th>总分</th>
-                                            <th>排名</th>
-                                            <th>语文</th>
-                                            <th>数学</th>
-                                            <th>英语</th>
-                                            <th>政治</th>
-                                            <th>历史</th>
-                                            <th>地理</th>
-                                            <th>特征</th>
-                                            <th>备注</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for student in school.liberal.elite %}
-                                        <tr>
-                                            <td>{{ student.student_name }}</td>
-                                            <td>{{ student.total_score }}</td>
-                                            <td>{{ student.rank }}</td>
-                                            <td>{{ student.subject_scores.语文 }}</td>
-                                            <td>{{ student.subject_scores.数学 }}</td>
-                                            <td>{{ student.subject_scores.英语 }}</td>
-                                            <td>{{ student.subject_scores.政治 }}</td>
-                                            <td>{{ student.subject_scores.历史 }}</td>
-                                            <td>{{ student.subject_scores.地理 }}</td>
-                                            <td>{{ student.features|safe }}</td>
-                                            <td>{{ student.remarks }}</td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {% endif %}
+    <!-- 锁定尖子生统计 -->
+    <div class="card-body">
+        <h6 class="card-title">锁定尖子生统计</h6>
+        <div class="row">
+            <div class="col-md-4">
+                <h6>理科</h6>
+                <p>
+                    人数：{{ locked_stats.science.count|default_if_none:0 }}人<br>
+                    平均分：{{ locked_stats.science.avg_score|default_if_none:'-'|floatformat:1 }}<br>
+                    平均T分：{{ locked_stats.science.avg_t_score|default_if_none:'-'|floatformat:1 }}<br>
+                    排名范围：{{ locked_stats.science.rank_range|default_if_none:'-' }}
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h6>文科</h6>
+                <p>
+                    人数：{{ locked_stats.liberal.count|default_if_none:0 }}人<br>
+                    平均分：{{ locked_stats.liberal.avg_score|default_if_none:'-'|floatformat:1 }}<br>
+                    平均T分：{{ locked_stats.liberal.avg_t_score|default_if_none:'-'|floatformat:1 }}<br>
+                    排名范围：{{ locked_stats.liberal.rank_range|default_if_none:'-' }}
+                </p>
+            </div>
+            <div class="col-md-4">
+                <h6>总计</h6>
+                <p>
+                    总人数：{{ locked_stats.total.count|default_if_none:0 }}人<br>
+                    总平均分：{{ locked_stats.total.avg_score|default_if_none:'-'|floatformat:1 }}<br>
+                    总平均T分：{{ locked_stats.total.avg_t_score|default_if_none:'-'|floatformat:1 }}<br>
+                    总排名范围：{{ locked_stats.total.rank_range|default_if_none:'-' }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
 
-                            <!-- 学校特色 -->
-                            {% if school.features %}
-                            <div class="mt-4">
-                                <h6>学校特色</h6>
-                                <p>{{ school.features.description }}</p>
-                                {% if school.features.advantages %}
-                                <h6>优势学科</h6>
-                                <ul>
-                                    {% for advantage in school.features.advantages %}
-                                    <li>{{ advantage }}</li>
-                                    {% endfor %}
-                                </ul>
+<!-- 学校列表 -->
+{% for school in schools_stats %}
+<div class="card mt-4">
+    <!-- 学校标题 -->
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">{{ school.school_name }}</h6>
+        <div class="small text-muted">
+            锁定尖子生：{{ school.total.count }}人
+            (理科{{ school.science.count }}人，文科{{ school.liberal.count }}人)
+        </div>
+    </div>
+
+    <!-- 表格内容 -->
+    <div class="card-body p-0">
+        <!-- 理科学生列表 -->
+        {% if school.science.students %}
+        <div class="px-3 pt-3">
+            <h6 class="mb-2">理科</h6>
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-nowrap">姓名</th>
+                            <th class="text-nowrap text-center">总分</th>
+                            <th class="text-nowrap text-center">总T分</th>
+                            <th class="text-nowrap text-center">市排名<br>(进步)</th>
+                            <th class="text-nowrap text-center">区排名<br>(进步)</th>
+                            <th class="text-nowrap text-center">校排名</th>
+                            <th class="text-nowrap text-center">语文<br>(T分)</th>
+                            <th class="text-nowrap text-center">数学<br>(T分)</th>
+                            <th class="text-nowrap text-center">英语<br>(T分)</th>
+                            <th class="text-nowrap text-center">物理<br>(T分)</th>
+                            <th class="text-nowrap text-center">化学<br>(T分)</th>
+                            <th class="text-nowrap text-center">生物<br>(T分)</th>
+                            <th class="text-nowrap text-center">地理<br>(T分)</th>
+                            <th class="text-nowrap text-center">政治<br>(T分)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in school.science.students %}
+                        <tr class="student-row" data-student-id="{{ student.student_id }}" style="cursor: pointer;">
+                            <td class="text-nowrap">{{ student.student_name }}</td>
+                            <td class="text-center">{{ student.total_score }}</td>
+                            <td class="text-center">{{ student.total_t_score|floatformat:1 }}</td>
+                            <td class="text-center">
+                                {{ student.city_rank }}
+                                {% if student.city_rank_change %}
+                                <br><small class="text-{% if student.city_rank_change > 0 %}success{% else %}danger{% endif %}">
+                                    ({{ student.city_rank_change|stringformat:"+d" }})
+                                </small>
                                 {% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
+                            </td>
+                            <td class="text-center">
+                                {{ student.district_rank }}
+                                {% if student.district_rank_change %}
+                                <br><small class="text-{% if student.district_rank_change > 0 %}success{% else %}danger{% endif %}">
+                                    ({{ student.district_rank_change|stringformat:"+d" }})
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ student.school_rank }}</td>
+                            <td class="text-center">
+                                {{ student.chinese_score }}<br>
+                                <small class="text-muted">{{ student.chinese_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.math_score }}<br>
+                                <small class="text-muted">{{ student.math_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.english_score }}<br>
+                                <small class="text-muted">{{ student.english_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.physics_score }}<br>
+                                <small class="text-muted">{{ student.physics_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.chemistry_score }}<br>
+                                <small class="text-muted">{{ student.chemistry_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.biology_score }}<br>
+                                <small class="text-muted">{{ student.biology_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.geography_score }}<br>
+                                <small class="text-muted">{{ student.geography_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.politics_score }}<br>
+                                <small class="text-muted">{{ student.politics_t_score|floatformat:1 }}</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 文科学生列表 -->
+        {% if school.liberal.students %}
+        <div class="px-3 pt-3 pb-3">
+            <h6 class="mb-2">文科</h6>
+            <div class="table-responsive">
+                <table class="table table-hover table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="text-nowrap">姓名</th>
+                            <th class="text-nowrap text-center">总分</th>
+                            <th class="text-nowrap text-center">总T分</th>
+                            <th class="text-nowrap text-center">市排名<br>(进步)</th>
+                            <th class="text-nowrap text-center">区排名<br>(进步)</th>
+                            <th class="text-nowrap text-center">校排名</th>
+                            <th class="text-nowrap text-center">语文<br>(T分)</th>
+                            <th class="text-nowrap text-center">数学<br>(T分)</th>
+                            <th class="text-nowrap text-center">英语<br>(T分)</th>
+                            <th class="text-nowrap text-center">历史<br>(T分)</th>
+                            <th class="text-nowrap text-center">政治<br>(T分)</th>
+                            <th class="text-nowrap text-center">地理<br>(T分)</th>
+                            <th class="text-nowrap text-center">生物<br>(T分)</th>
+                            <th class="text-nowrap text-center">化学<br>(T分)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in school.liberal.students %}
+                        <tr class="student-row" data-student-id="{{ student.student_id }}" style="cursor: pointer;">
+                            <td class="text-nowrap">{{ student.student_name }}</td>
+                            <td class="text-center">{{ student.total_score }}</td>
+                            <td class="text-center">{{ student.total_t_score|floatformat:1 }}</td>
+                            <td class="text-center">
+                                {{ student.city_rank }}
+                                {% if student.city_rank_change %}
+                                <br><small class="text-{% if student.city_rank_change > 0 %}success{% else %}danger{% endif %}">
+                                    ({{ student.city_rank_change|stringformat:"+d" }})
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {{ student.district_rank }}
+                                {% if student.district_rank_change %}
+                                <br><small class="text-{% if student.district_rank_change > 0 %}success{% else %}danger{% endif %}">
+                                    ({{ student.district_rank_change|stringformat:"+d" }})
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ student.school_rank }}</td>
+                            <td class="text-center">
+                                {{ student.chinese_score }}<br>
+                                <small class="text-muted">{{ student.chinese_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.math_score }}<br>
+                                <small class="text-muted">{{ student.math_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.english_score }}<br>
+                                <small class="text-muted">{{ student.english_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.history_score }}<br>
+                                <small class="text-muted">{{ student.history_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.politics_score }}<br>
+                                <small class="text-muted">{{ student.politics_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.geography_score }}<br>
+                                <small class="text-muted">{{ student.geography_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.biology_score }}<br>
+                                <small class="text-muted">{{ student.biology_t_score|floatformat:1 }}</small>
+                            </td>
+                            <td class="text-center">
+                                {{ student.chemistry_score }}<br>
+                                <small class="text-muted">{{ student.chemistry_t_score|floatformat:1 }}</small>
+                            </td>
+
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+<!-- 学生历史成绩对比模态框 -->
+<div class="modal fade" id="studentHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">历次考试成绩对比</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- 这里将通过AJAX加载学生的历史成绩数据 -->
             </div>
         </div>
     </div>
@@ -162,8 +273,23 @@ $(document).ready(function() {
         "language": {
             "url": "{% static 'vendor/datatables/Chinese.json' %}"
         },
-        "order": [[1, "desc"]],
-        "pageLength": 25
+        "order": [[1, "desc"]],  // 按总分降序排序
+        "pageLength": 25,
+        "scrollX": true,
+        "dom": '<"top"f>rt<"bottom"lip><"clear">',
+        "buttons": ['copy', 'excel', 'pdf']
+    });
+
+    // 点击学生行时显示历史成绩对比
+    $('.student-row').click(function() {
+        var studentId = $(this).data('student-id');
+        var modal = $('#studentHistoryModal');
+
+        // 通过AJAX加载学生历史成绩
+        $.get(`/api/student/${studentId}/history/`, function(data) {
+            modal.find('.modal-body').html(data);
+            modal.modal('show');
+        });
     });
 });
 </script>
