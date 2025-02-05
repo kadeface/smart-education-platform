@@ -1,21 +1,19 @@
 # views/trackingview.py
 import numpy as np
-from django.shortcuts import render
-from django.http import JsonResponse, HttpResponse
+
+from django.http import  HttpResponse
 from django.views import View
 from django.db.models import (
-    Count, F, Q, Case, When, Value, CharField,
-    Avg, StdDev, FloatField,Max, Min,ExpressionWrapper
+    Count, Q, Subquery, OuterRef,
+    Avg, StdDev, FloatField,Max, Min
 )
 from django.db.models.functions import JSONObject, Cast
-from score_processor.models import StudentMapping, BaseExamConfig
+from score_processor.models import  BaseExamConfig
 from ..models.Tracking import TrackingRecord, TaggedStudent
-
 from django.core.paginator import Paginator
 from ..models.source import ScoreStudentBasic
 from ..models.statistics import ExamLevelAnalysisConfig
-from django.db.models import F, Subquery, OuterRef, Q
-
+from django.template.loader import render_to_string
 from datetime import datetime
 
 class TrackingAnalysisView(View):
@@ -1534,6 +1532,10 @@ class ElitePortraitView(View):
             JsonResponse: 当发生错误时返回错误信息，状态码500
         """
         try:
+            # 检查是否是AJAX请求获取学生历史数据
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                student_id = request.GET.get('student_id')
+                return self._get_student_history(student_id, exam_id)
             # 获取考试基本信息
             exam_info = self._get_exam_info(exam_id)
 
@@ -1542,32 +1544,7 @@ class ElitePortraitView(View):
             # 获取学校列表数据
             schools_stats = self._get_schools_elite_data(exam_id)
 
-            # 详细打印学校统计数据
-            print("\n=== 学校统计数据 ===")
-            if schools_stats:
-                for school in schools_stats:
-                    print(f"\n学校名称: {school['school_name']}")
-                    print(f"总人数: {school['total']['count']}")
 
-                    print("\n理科学生:")
-                    print(f"人数: {school['science']['count']}")
-                    if school['science']['students']:
-                        for student in school['science']['students']:
-                            print(f"- {student['student_name']}: "
-                                  f"总分={student['total_score']}, "
-                                  f"市排名={student['city_rank']}, "
-                                  f"区排名={student['district_rank']}")
-
-                    print("\n文科学生:")
-                    print(f"人数: {school['liberal']['count']}")
-                    if school['liberal']['students']:
-                        for student in school['liberal']['students']:
-                            print(f"- {student['student_name']}: "
-                                  f"总分={student['total_score']}, "
-                                  f"市排名={student['city_rank']}, "
-                                  f"区排名={student['district_rank']}")
-            else:
-                print("没有找到学校数据")
             # 准备上下文数据
             context = {
                 'module_type': module_type,
@@ -2220,3 +2197,44 @@ class ElitePortraitView(View):
                 'liberal': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'},
                 'total': {'count': 0, 'avg_score': None, 'avg_t_score': None, 'rank_range': '-'}
             }
+
+    def _get_student_history(self, student_id, current_exam_id):
+        """获取学生历史成绩数据。"""
+        try:
+            # 获取最近5次考试的记录
+            history_records = TrackingRecord.objects.filter(
+                student_id=student_id
+            ).order_by('-exam_id')[:5]
+
+            # 判断是否为理科生
+            latest_record = history_records.first()
+            is_science = latest_record.select_type == 'science' if latest_record else True
+
+            # 准备数据
+            history_data = []
+            for record in history_records:
+                exam_info = BaseExamConfig.objects.get(exam_id=record.exam_id)
+                history_data.append({
+                    'exam_name': exam_info.exam_name,
+                    'total_score': record.total_score,
+                    'total_t_score': record.total_t_score,
+                    'city_rank': record.city_rank,
+                    'district_rank': record.district_rank,
+                    'school_rank': record.school_rank,
+                    'subject_scores': record.subject_scores,
+                    'subject_t_scores': record.subject_t_scores
+                })
+
+            # 渲染历史数据模板
+            html = render_to_string(
+                'score_analysis/tracking/_student_history.html',
+                {
+                    'history_data': history_data,
+                    'is_science': is_science
+                }
+            )
+
+            return JsonResponse({'html': html})
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)

@@ -1,0 +1,104 @@
+<!-- templates/score_analysis/tracking/_student_history.html -->
+<div class="table-responsive">
+    <table class="table table-sm table-hover">
+        <thead class="table-light">
+            <tr>
+                <th class="text-nowrap">考试名称</th>
+                <th class="text-center">总分</th>
+                <th class="text-center">总T分</th>
+                <th class="text-center">市排名</th>
+                <th class="text-center">区排名</th>
+                <th class="text-center">校排名</th>
+                <!-- 基础科目 -->
+                <th class="text-center">语文<br>(T分)</th>
+                <th class="text-center">数学<br>(T分)</th>
+                <th class="text-center">英语<br>(T分)</th>
+                {% if is_science %}
+                <!-- 理科科目 -->
+                <th class="text-center">物理<br>(T分)</th>
+                <th class="text-center">化学<br>(T分)</th>
+                <th class="text-center">生物<br>(T分)</th>
+                <th class="text-center">地理<br>(T分)</th>
+                <th class="text-center">政治<br>(T分)</th>
+                {% else %}
+                <!-- 文科科目 -->
+                <th class="text-center">历史<br>(T分)</th>
+                <th class="text-center">政治<br>(T分)</th>
+                <th class="text-center">地理<br>(T分)</th>
+                <th class="text-center">生物<br>(T分)</th>
+                <th class="text-center">化学<br>(T分)</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in history_data %}
+            <tr>
+                <td class="text-nowrap">{{ record.exam_name }}</td>
+                <td class="text-center">{{ record.total_score }}</td>
+                <td class="text-center">{{ record.total_t_score|floatformat:1 }}</td>
+                <td class="text-center">{{ record.city_rank }}</td>
+                <td class="text-center">{{ record.district_rank }}</td>
+                <td class="text-center">{{ record.school_rank }}</td>
+                <!-- 基础科目 -->
+                <td class="text-center">
+                    {{ record.subject_scores.chinese }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.chinese|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.math }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.math|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.english }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.english|floatformat:1 }})</small>
+                </td>
+                {% if is_science %}
+                <!-- 理科科目 -->
+                <td class="text-center">
+                    {{ record.subject_scores.physics }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.physics|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.chemistry }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.chemistry|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.biology }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.biology|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.geography }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.geography|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.politics }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.politics|floatformat:1 }})</small>
+                </td>
+                {% else %}
+                <!-- 文科科目 -->
+                <td class="text-center">
+                    {{ record.subject_scores.history }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.history|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.politics }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.politics|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.geography }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.geography|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.biology }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.biology|floatformat:1 }})</small>
+                </td>
+                <td class="text-center">
+                    {{ record.subject_scores.chemistry }}<br>
+                    <small class="text-muted">({{ record.subject_t_scores.chemistry|floatformat:1 }})</small>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

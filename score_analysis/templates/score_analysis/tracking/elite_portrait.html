@@ -249,48 +249,111 @@
 {% endfor %}
 
 <!-- 学生历史成绩对比模态框 -->
-<div class="modal fade" id="studentHistoryModal" tabindex="-1">
+<div class="modal fade" id="studentHistoryModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">历次考试成绩对比</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="historyModalLabel">历次考试成绩对比</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <!-- 这里将通过AJAX加载学生的历史成绩数据 -->
+                <!-- 加载提示 -->
+                <div class="loading-spinner d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                </div>
+                <!-- 历史成绩表格将通过AJAX加载到这里 -->
+                <div class="history-content"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-{% block scripts %}
+{% block extra_js %}
+<!-- 添加 jQuery -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<!-- DataTables -->
 <script src="{% static 'vendor/datatables/jquery.dataTables.min.js' %}"></script>
 <script src="{% static 'vendor/datatables/dataTables.bootstrap4.min.js' %}"></script>
+
 <script>
-$(document).ready(function() {
-    $('.table').DataTable({
-        "language": {
-            "url": "{% static 'vendor/datatables/Chinese.json' %}"
-        },
-        "order": [[1, "desc"]],  // 按总分降序排序
-        "pageLength": 25,
-        "scrollX": true,
-        "dom": '<"top"f>rt<"bottom"lip><"clear">',
-        "buttons": ['copy', 'excel', 'pdf']
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM已加载');
 
-    // 点击学生行时显示历史成绩对比
-    $('.student-row').click(function() {
-        var studentId = $(this).data('student-id');
-        var modal = $('#studentHistoryModal');
+    // 绑定点击事件
+    document.querySelectorAll('.student-row').forEach(function(row) {
+        row.addEventListener('click', function() {
+            console.log('学生行被点击');
+            var studentId = this.getAttribute('data-student-id');
+            console.log('学生ID:', studentId);
 
-        // 通过AJAX加载学生历史成绩
-        $.get(`/api/student/${studentId}/history/`, function(data) {
-            modal.find('.modal-body').html(data);
-            modal.modal('show');
+            // 使用Bootstrap 5的方式创建模态框
+            var modalEl = document.getElementById('studentHistoryModal');
+            var modal = new bootstrap.Modal(modalEl);
+
+            // 显示加载动画
+            var loadingSpinner = modalEl.querySelector('.loading-spinner');
+            var historyContent = modalEl.querySelector('.history-content');
+            loadingSpinner.classList.remove('d-none');
+            historyContent.innerHTML = '';
+
+            // 显示模态框
+            modal.show();
+
+            // 发送请求
+            fetch(window.location.href + '?student_id=' + studentId, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('收到数据:', data);
+                loadingSpinner.classList.add('d-none');
+                if (data.html) {
+                    historyContent.innerHTML = data.html;
+                } else if (data.error) {
+                    historyContent.innerHTML =
+                        '<div class="alert alert-danger">' + data.error + '</div>';
+                }
+            })
+            .catch(error => {
+                console.error('请求失败:', error);
+                loadingSpinner.classList.add('d-none');
+                historyContent.innerHTML =
+                    '<div class="alert alert-danger">加载数据失败：' + error.message + '</div>';
+            });
         });
     });
+
+    // 初始化DataTables
+    if (typeof $.fn.DataTable !== 'undefined') {
+        console.log('初始化DataTables...');
+        $('.table').DataTable({
+            "language": {
+                "url": "{% static 'vendor/datatables/Chinese.json' %}"
+            },
+            "order": [[5, "asc"]],
+            "pageLength": 25,
+            "scrollX": true,
+            "dom": '<"top"f>rt<"bottom"lip><"clear">'
+        });
+    } else {
+        console.error('DataTables未加载');
+    }
 });
+
+// 添加错误处理
+window.onerror = function(msg, url, line) {
+    console.error('JavaScript错误:', msg);
+    console.error('文件:', url);
+    console.error('行号:', line);
+    return false;
+};
 </script>
 {% endblock %}
