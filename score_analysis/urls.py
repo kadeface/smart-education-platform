@@ -18,6 +18,7 @@ from .views.tracking_view import (ScoreRankingView,
                                   ScoreTrendView,
                                   StudentGroupView,
                                   ElitePortraitView)
+from .views.value_added_view import ValueAddedHomeView, ValueAddedDetailView
 
 app_name = 'score_analysis'
 urlpatterns = [
@@ -40,9 +41,17 @@ urlpatterns = [
     path('indicators/basic/<str:module_type>/<str:exam_id>/',
          ExamOverviewView.as_view(),
          name='exam_overview'), #概述基础指标分析模块
+
     path('exam/<str:exam_id>/statistics-preview/<str:module_type>/',
              ExamOverviewView.as_view(),
              name='statistics_preview'), #概述基础指标分析模块预览模块
+
+    path('value-added/',
+         ValueAddedHomeView.as_view(),
+         name='value_added_home'),  #增值评价模块
+    path('value-added/<str:school_level>/',
+         ValueAddedDetailView.as_view(),
+         name='value_added_detail'), #增值评价模块详情页
 
     path('tracking/analysis/<str:module_type>/<str:exam_id>/',
          TrackingAnalysisView.as_view(),

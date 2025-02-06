@@ -1,0 +1,191 @@
+<!-- templates/score_analysis/value_add/value_added_result.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>增值分析结果</title>
+    <meta charset="utf-8">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+
+    <style>
+        [v-cloak] { display: none; }
+        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { margin-bottom: 20px; background: #fff; border-radius: 4px; box-shadow: 0 2px 12px 0 rgba(0,0,0,.1); }
+        .chart-container { height: 400px; margin: 20px 0; }
+        .text-success { color: #67C23A; }
+        .text-danger { color: #F56C6C; }
+        .statistic-card { text-align: center; padding: 20px; }
+        .statistic-value { font-size: 24px; color: #409EFF; }
+        .debug-info { padding: 10px; background: #f5f7fa; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <!-- 添加调试信息区域 -->
+    <div class="debug-info">
+        <pre>初始数据: {{ initial_data }}</pre>
+    </div>
+
+    <div id="app" class="container">
+        <!-- 加载状态 -->
+        <el-card v-if="loading" class="card">
+            <el-skeleton :rows="3" animated></el-skeleton>
+        </el-card>
+
+        <!-- 错误提示 -->
+        <el-alert
+            v-if="error"
+            :title="error"
+            type="error"
+            :closable="false"
+            show-icon>
+        </el-alert>
+
+        <!-- 数据展示 -->
+        <template v-if="!loading && !error">
+            <!-- 基础信息卡片 -->
+            <el-row :gutter="20" class="card">
+                <el-col :span="8">
+                    <div class="statistic-card">
+                        <div>总学生数</div>
+                        <div class="statistic-value">{{ summary.student_count }}</div>
+                    </div>
+                </el-col>
+                <el-col :span="8">
+                    <div class="statistic-card">
+                        <div>考试次数</div>
+                        <div class="statistic-value">{{ summary.exam_count }}</div>
+                    </div>
+                </el-col>
+                <el-col :span="8">
+                    <div class="statistic-card">
+                        <div>整体改进率</div>
+                        <div class="statistic-value">{{ formattedImprovementRate }}%</div>
+                    </div>
+                </el-col>
+            </el-row>
+
+            <!-- 增长模式分布图 -->
+            <div class="card">
+                <div style="padding: 20px;">
+                    <h3>增长模式分布</h3>
+                    <div id="patternChart" class="chart-container"></div>
+                </div>
+            </div>
+
+            <!-- 科目分析表格 -->
+            <div class="card">
+                <div style="padding: 20px;">
+                    <h3>科目分析</h3>
+                    <el-table :data="subjectData" border stripe>
+                        <el-table-column prop="subject" label="科目"></el-table-column>
+                        <el-table-column prop="formattedImprovement" label="平均提升">
+                            <template slot-scope="scope">
+                                <span :class="{'text-success': scope.row.avg_improvement > 0, 'text-danger': scope.row.avg_improvement < 0}">
+                                    {{ scope.row.formattedImprovement }}
+                                </span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="main_pattern" label="主要模式"></el-table-column>
+                    </el-table>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <script>
+        // 打印原始数据到控制台
+        console.log('Raw initial_data:', '{{ initial_data|escapejs }}');
+
+        let initialData;
+        try {
+            initialData = JSON.parse('{{ initial_data|escapejs }}');
+            console.log('Parsed initial data:', initialData);
+        } catch (e) {
+            console.error('Failed to parse initial data:', e);
+            initialData = { error: '数据解析失败' };
+        }
+
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    summary: initialData.summary || {},
+                    charts: initialData.charts || {},
+                    tables: initialData.tables || {},
+                    loading: false,
+                    error: initialData.error || null
+                }
+            },
+            computed: {
+                formattedImprovementRate() {
+                    return this.summary.improvement_rate
+                        ? (this.summary.improvement_rate * 100).toFixed(2)
+                        : '0.00';
+                },
+                subjectData() {
+                    const data = [];
+                    if (this.summary.subject_analysis) {
+                        for (const [subject, analysis] of Object.entries(this.summary.subject_analysis)) {
+                            data.push({
+                                subject,
+                                avg_improvement: analysis.avg_improvement,
+                                formattedImprovement: analysis.avg_improvement.toFixed(2),
+                                main_pattern: analysis.main_pattern
+                            });
+                        }
+                    }
+                    return data;
+                }
+            },
+            mounted() {
+                console.log('Vue mounted with data:', this.$data);
+                this.$nextTick(() => {
+                    if (!this.error && this.charts.pattern_distribution) {
+                        this.initChart();
+                    }
+                });
+            },
+            methods: {
+                initChart() {
+                    try {
+                        const chart = echarts.init(document.getElementById('patternChart'));
+                        const option = {
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: '{b}: {c} ({d}%)'
+                            },
+                            legend: {
+                                orient: 'vertical',
+                                left: 'left'
+                            },
+                            series: [{
+                                type: 'pie',
+                                radius: '60%',
+                                center: ['60%', '50%'],
+                                data: this.charts.pattern_distribution.labels.map((label, index) => ({
+                                    name: label,
+                                    value: this.charts.pattern_distribution.values[index]
+                                })),
+                                emphasis: {
+                                    itemStyle: {
+                                        shadowBlur: 10,
+                                        shadowOffsetX: 0,
+                                        shadowColor: 'rgba(0, 0, 0, 0.5)'
+                                    }
+                                }
+                            }]
+                        };
+                        chart.setOption(option);
+                        console.log('Chart initialized');
+                    } catch (error) {
+                        console.error('Chart initialization failed:', error);
+                        this.error = '图表初始化失败';
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

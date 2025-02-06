@@ -1,0 +1,430 @@
+<!-- templates/score_analysis/value_add/value_added_detail.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>增值分析</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/theme-chalk/index.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+
+    <style>
+        [v-cloak] { display: none; }
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .exam-select {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f5f7fa;
+            border-radius: 4px;
+        }
+        .analysis-result {
+            margin-top: 30px;
+        }
+        .metrics-card {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            color: #409EFF;
+            margin: 10px 0;
+        }
+        .metric-title {
+            color: #666;
+        }
+        .chart-container {
+            height: 400px;
+            margin: 20px 0;
+        }
+        .positive { color: #67C23A; }
+        .negative { color: #F56C6C; }
+    </style>
+</head>
+<body>
+    <!-- 添加CSRF Token -->
+    {% csrf_token %}
+
+    {% verbatim %}
+    <div id="app" class="container" v-cloak
+         data-core-metrics="{{ core_metrics|escapejs }}"
+         data-trend-data="{{ trend_data|escapejs }}"
+         data-subject-analysis="{{ subject_analysis|escapejs }}">
+
+        <!-- 考试选择区域 -->
+        <el-card class="exam-select">
+            <div slot="header">
+                <span>选择要分析的{{ school_level_display }}考试</span>
+            </div>
+            <el-form :inline="true" @submit.native.prevent>
+                <el-form-item label="考试列表">
+                    <el-select
+                        v-model="selectedExams"
+                        multiple
+                        placeholder="请选择考试（按时间顺序）"
+                        style="width: 500px;">
+                        <el-option
+                            v-for="exam in examList"
+                            :key="exam.id"
+                            :label="exam.name"
+                            :value="exam.id">
+                            <span style="float: left">{{ exam.name }}</span>
+                            <span style="float: right; color: #8492a6; font-size: 13px">
+                                <el-tag size="mini" :type="exam.level === 'CITY' ? 'primary' : 'info'">
+                                    {{ exam.level === 'CITY' ? '市级' : exam.level === 'DIST' ? '区级' : '校级' }}
+                                </el-tag>
+                                <el-tag size="mini" type="warning" v-if="exam.is_divided">分科</el-tag>
+                            </span>
+                        </el-option>
+                    </el-select>
+                </el-form-item>
+                <el-form-item>
+                    <el-button
+                        type="primary"
+                        @click="submitAnalysis"
+                        :loading="loading"
+                        :disabled="selectedExams.length < 2">
+                        生成分析
+                    </el-button>
+                </el-form-item>
+            </el-form>
+            <div class="tips" style="color: #909399; font-size: 12px; margin-top: 10px;">
+                提示：请至少选择两次考试进行对比分析
+            </div>
+        </el-card>
+
+        <!-- 分析结果区域 -->
+        <div v-if="showResult" class="analysis-result">
+            <!-- 核心指标卡片 -->
+            <el-row :gutter="20">
+                <el-col :span="8">
+                    <el-card class="metrics-card">
+                        <div class="metric-title">整体增值率</div>
+                        <div class="metric-value" :class="valueAddedClass">
+                            {{ formatPercent(coreMetrics.value_added_rate) }}
+                        </div>
+                    </el-card>
+                </el-col>
+                <el-col :span="8">
+                    <el-card class="metrics-card">
+                        <div class="metric-title">教学质量评分</div>
+                        <div class="metric-value">
+                            {{ formatScore(coreMetrics.quality_score) }}
+                        </div>
+                    </el-card>
+                </el-col>
+                <el-col :span="8">
+                    <el-card class="metrics-card">
+                        <div class="metric-title">进步学生比例</div>
+                        <div class="metric-value positive">
+                            {{ formatPercent(coreMetrics.improvement_ratio) }}
+                        </div>
+                    </el-card>
+                </el-col>
+            </el-row>
+
+            <!-- 增值趋势图 -->
+            <el-card style="margin-top: 20px;">
+                <div slot="header">
+                    <span>增值趋势分析</span>
+                </div>
+                <div id="trendChart" class="chart-container"></div>
+            </el-card>
+
+            <!-- 学科分析 -->
+            <el-card style="margin-top: 20px;">
+                <div slot="header">
+                    <span>学科教学质量分析</span>
+                </div>
+                <el-row :gutter="20">
+                    <el-col :span="12">
+                        <div id="radarChart" class="chart-container"></div>
+                    </el-col>
+                    <el-col :span="12">
+                        <div id="patternChart" class="chart-container"></div>
+                    </el-col>
+                </el-row>
+
+                <!-- 详细数据表格 -->
+                <el-table :data="subjectAnalysis.detailed_table" border stripe>
+                    <el-table-column label="学科">
+                        <template slot-scope="scope">
+                            {{ getSubjectName(scope.row.subject) }}
+                        </template>
+                    </el-table-column>
+                    <el-table-column label="增值率">
+                        <template slot-scope="scope">
+                            <span :class="getValueClass(scope.row.improvement)">
+                                {{ formatPercent(scope.row.improvement) }}
+                            </span>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="pattern" label="主要模式"></el-table-column>
+                    <el-table-column label="进步率">
+                        <template slot-scope="scope">
+                            <span class="positive">
+                                {{ formatPercent(scope.row.progress_rate) }}
+                            </span>
+                        </template>
+                    </el-table-column>
+                </el-table>
+            </el-card>
+        </div>
+    </div>
+    {% endverbatim %}
+
+<script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                examList: JSON.parse('{{ exam_list|escapejs }}'),
+                selectedExams: [],
+                loading: false,
+                showResult: false,  // 初始设置为false
+                coreMetrics: {},
+                trendData: { labels: [], values: [] },
+                subjectAnalysis: {
+                    radar_data: { indicators: [], values: [] },
+                    pattern_distribution: { labels: [], values: [] },
+                    detailed_table: []
+                    },
+                subjectNameMap: {
+                    'chinese': '语文',
+                    'math': '数学',
+                    'english': '英语',
+                    'physics': '物理',
+                    'chemistry': '化学',
+                    'biology': '生物',
+                    'history': '历史',
+                    'politics': '政治',
+                    'geography': '地理'
+
+                }
+            }
+        },
+        computed: {
+            valueAddedClass() {
+                return {
+                    'positive': this.coreMetrics.value_added_rate > 0,
+                    'negative': this.coreMetrics.value_added_rate < 0
+                }
+            }
+        },
+        methods: {
+            async submitAnalysis() {
+                if (this.selectedExams.length < 2) {
+                    this.$message.warning('请至少选择两次考试');
+                    return;
+                }
+
+                this.loading = true;
+                try {
+                    const formData = new FormData();
+                    this.selectedExams.forEach(examId => {
+                        formData.append('selected_exams[]', examId);
+                    });
+
+                    const response = await fetch(window.location.href, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                            'X-Requested-With': 'XMLHttpRequest'  // 添加AJAX标识
+                        }
+                    });
+
+                    const result = await response.json();  // 直接解析JSON响应
+                    console.log('服务器返回数据:', result);  // 调试日志
+
+                    if (result.status === 'success' && result.data) {
+                        // 更新数据
+                        this.showResult = true;
+                        this.coreMetrics = result.data.core_metrics;
+                        this.trendData = result.data.trend_data;
+                        this.subjectAnalysis = result.data.subject_analysis;
+
+                        // 确保DOM更新后再初始化图表
+                        this.$nextTick(() => {
+                            this.initCharts();
+                        });
+
+                        this.$message.success('分析完成');
+                    } else {
+                        throw new Error(result.message || '分析失败');
+                    }
+
+                } catch (error) {
+                    console.error('分析失败:', error);
+                    this.$message.error(error.message || '分析请求失败');
+                } finally {
+                    this.loading = false;
+                }
+            },
+            formatPercent(value) {
+                if (value === undefined || value === null) return '0.0%';
+                return `${Number(value).toFixed(1)}%`;
+            },
+            formatScore(value) {
+                if (value === undefined || value === null) return '0.0';
+                return Number(value).toFixed(1);
+            },
+            getValueClass(value) {
+                if (!value) return '';
+                return Number(value) > 0 ? 'positive' : 'negative';
+            },
+            getSubjectName(subject) {
+                return this.subjectNameMap[subject] || subject;
+            },
+            initCharts() {
+                console.log('初始化图表，数据:', {
+                    trendData: this.trendData,
+                    subjectAnalysis: this.subjectAnalysis
+                });
+
+                this.$nextTick(() => {
+                    // 趋势图
+                    if (document.getElementById('trendChart')) {
+                        const trendChart = echarts.init(document.getElementById('trendChart'));
+                        trendChart.setOption({
+                            title: { text: '整体增值趋势' },
+                            tooltip: { trigger: 'axis' },
+                            xAxis: {
+                                type: 'category',
+                                data: this.trendData.labels || []
+                            },
+                            yAxis: { type: 'value' },
+                            series: [{
+                                data: this.trendData.values || [],
+                                type: 'line',
+                                smooth: true
+                            }]
+                        });
+                    }
+
+                    // 雷达图
+                    if (document.getElementById('radarChart')) {
+                        const radarChart = echarts.init(document.getElementById('radarChart'));
+                        const indicators = this.subjectAnalysis.radar_data.indicators || [];
+                        const values = this.subjectAnalysis.radar_data.values || [];
+                        const maxValue = values.length ? Math.max(...values, Math.abs(Math.min(...values))) * 1.2 : 100;
+
+                        // 科目名称映射
+                        const subjectNameMap = {
+                            'chinese': '语文',
+                            'math': '数学',
+                            'english': '英语',
+                            'physics': '物理',
+                            'chemistry': '化学',
+                            'biology': '生物',
+                            'history': '历史',
+                            'politics': '政治',
+                            'geography': '地理'
+                        };
+
+                        radarChart.setOption({
+                            title: {
+                                text: '学科表现对比',
+                                left: 'center'
+                            },
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: function(params) {
+                                    return params.name + '<br/>' +
+                                           params.marker + ' 增值分: ' +
+                                           params.value.toFixed(2);
+                                }
+                            },
+                            radar: {
+                                shape: 'circle',
+                                indicator: indicators.map(name => ({
+                                    name: subjectNameMap[name] || name,
+                                    max: maxValue,
+                                    min: -maxValue
+                                })),
+                                splitNumber: 4,
+                                axisName: {
+                                    color: '#333',
+                                    fontSize: 12
+                                },
+                                splitLine: {
+                                    lineStyle: {
+                                        color: ['#ddd']
+                                    }
+                                },
+                                splitArea: {
+                                    show: true,
+                                    areaStyle: {
+                                        color: ['rgba(250,250,250,0.3)', 'rgba(200,200,200,0.1)']
+                                    }
+                                },
+                                axisLine: {
+                                    lineStyle: {
+                                        color: '#ddd'
+                                    }
+                                }
+                            },
+                            series: [{
+                                type: 'radar',
+                                data: [{
+                                    value: values,
+                                    name: '增值分',
+                                    symbol: 'circle',
+                                    symbolSize: 6,
+                                    lineStyle: {
+                                        width: 2,
+                                        color: '#409EFF'
+                                    },
+                                    areaStyle: {
+                                        color: 'rgba(64,158,255,0.2)'
+                                    },
+                                    itemStyle: {
+                                        color: '#409EFF'
+                                    }
+                                }]
+                            }]
+                        });
+
+                        // 监听窗口大小变化，自动调整图表大小
+                        window.addEventListener('resize', () => {
+                            radarChart.resize();
+                        });
+                    }
+
+                    // 模式分布图
+                    if (document.getElementById('patternChart')) {
+                        const patternChart = echarts.init(document.getElementById('patternChart'));
+                        const distribution = this.subjectAnalysis.pattern_distribution || {};
+
+                        patternChart.setOption({
+                            title: { text: '增长模式分布' },
+                            tooltip: {
+                                trigger: 'item',
+                                formatter: '{b}: {c} ({d}%)'
+                            },
+                            series: [{
+                                type: 'pie',
+                                data: (distribution.labels || []).map((label, index) => ({
+                                    name: label,
+                                    value: (distribution.values || [])[index] || 0
+                                }))
+                            }]
+                        });
+                    }
+                });
+            }
+        },
+        mounted() {
+            // 如果初始有数据，显示图表
+            if (this.showResult) {
+                this.initCharts();
+            }
+        }
+    })
+</script>
+</body>
+</html>

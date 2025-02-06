@@ -1,0 +1,97 @@
+{# templates/score_analysis/value_add/value_added_home.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">增值评价分析</h2>
+
+    <div class="row">
+        <!-- 高中卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">高中</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h4>{{ school_levels.H.stats.school_count }}</h4>
+                        <p class="text-muted">参评学校数</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <h5>学校分层</h5>
+                        <ul class="list-unstyled">
+                            <li>A类学校：{{ school_levels.H.stats.school_ranks.A }}</li>
+                            <li>B类学校：{{ school_levels.H.stats.school_ranks.B }}</li>
+                            <li>C类学校：{{ school_levels.H.stats.school_ranks.C }}</li>
+                        </ul>
+                    </div>
+
+                    <a href="{% url 'score_analysis:value_added_detail' 'H' %}"
+                       class="btn btn-primary btn-block">
+                        查看详细分析
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 初中卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h3 class="card-title mb-0">初中</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h4>{{ school_levels.M.stats.school_count }}</h4>
+                        <p class="text-muted">参评学校数</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <h5>学校分层</h5>
+                        <ul class="list-unstyled">
+                            <li>A类学校：{{ school_levels.M.stats.school_ranks.A }}</li>
+                            <li>B类学校：{{ school_levels.M.stats.school_ranks.B }}</li>
+                            <li>C类学校：{{ school_levels.M.stats.school_ranks.C }}</li>
+                        </ul>
+                    </div>
+
+                    <a href="{% url 'score_analysis:value_added_detail' 'M' %}"
+                       class="btn btn-success btn-block">
+                        查看详细分析
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 小学卡片 -->
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h3 class="card-title mb-0">小学</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h4>{{ school_levels.P.stats.school_count }}</h4>
+                        <p class="text-muted">参评学校数</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <h5>学校分层</h5>
+                        <ul class="list-unstyled">
+                            <li>A类学校：{{ school_levels.P.stats.school_ranks.A }}</li>
+                            <li>B类学校：{{ school_levels.P.stats.school_ranks.B }}</li>
+                            <li>C类学校：{{ school_levels.P.stats.school_ranks.C }}</li>
+                        </ul>
+                    </div>
+
+                    <a href="{% url 'score_analysis:value_added_detail' 'P' %}"
+                       class="btn btn-info btn-block">
+                        查看详细分析
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

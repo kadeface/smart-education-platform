@@ -1,0 +1,25 @@
+{# templates/client/school_level_select.html #}
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>{{ module_name }}</h2>
+    
+    <div class="row mt-4">
+        {% for level_name, level_code in school_levels.items %}
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3>{{ level_name }}</h3>
+                    <p>{{ level_name }}增值评价分析</p>
+                    <a href="{% url 'client:exam_select' module_type level_code %}" 
+                       class="btn btn-primary">
+                        查看分析
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
