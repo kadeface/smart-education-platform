@@ -542,16 +542,15 @@ class ValueAddedDetailView(TemplateView):
             logger.error(f"计算学科进步率失败: {str(e)}")
             return 0
 
-
     def _get_schools_subject_analysis(self, df):
         """
-        获取各学校学科增值对比分析。
+        获取各学校学科增值对比分析，按学校人数降序排列。
 
         Args:
             df: T分数据DataFrame
 
         Returns:
-            list: 包含各学校学科增值数据的列表
+            list: 包含各学校学科增值数据的列表，按学校人数降序排列
         """
         try:
             # 获取首次和最后一次考试
@@ -559,13 +558,22 @@ class ValueAddedDetailView(TemplateView):
             first_exam = exam_ids[0]
             last_exam = exam_ids[-1]
 
-            # 获取所有学校列表
-            schools = df['school_name'].unique()
+            # 获取所有学校列表及其学生人数
+            # 使用最后一次考试的数据统计学校人数
+            school_counts = df[
+                (df['exam_id'] == last_exam)
+            ]['student_id'].groupby(df['school_name']).nunique()
+
+            # 按人数降序排列学校
+            schools = school_counts.sort_values(ascending=False).index
 
             schools_data = []
 
             for school in schools:
-                school_data = {'school_name': school}
+                school_data = {
+                    'school_name': school,
+                    'student_count': int(school_counts[school])  # 添加学校总人数
+                }
 
                 # 获取该校的考试数据
                 school_df = df[df['school_name'] == school]
@@ -584,7 +592,8 @@ class ValueAddedDetailView(TemplateView):
                             last_t_score) else 0
 
                         # 计算进步率
-                        first_scores = subject_df[subject_df['exam_id'] == first_exam].set_index('student_id')['t_score']
+                        first_scores = subject_df[subject_df['exam_id'] == first_exam].set_index('student_id')[
+                            't_score']
                         last_scores = subject_df[subject_df['exam_id'] == last_exam].set_index('student_id')['t_score']
                         improved = sum((last_scores - first_scores) > 0)
                         total = len(first_scores)

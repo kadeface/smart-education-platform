@@ -162,17 +162,15 @@ class ScoreAnalysisForValueAddService:
 
     def _calculate_t_scores(self) -> pd.DataFrame:
         """
-        计算T分数。
+        计算T分数。使用全市数据计算均值和标准差，但只输出指定区域学生的T分。
 
-        使用全市数据计算均值和标准差，但只输出指定区域学生的T分。
-        T分计算公式：T = 10Z + 50，其中Z为标准分。
-        排除未选科目（分数为-3）的情况。
+        为保证不同满分科目的公平性：
+        1. 先将所有分数转换为百分制(100分制)
+        2. 使用转换后的分数计算Z分数
+        3. 再计算T分数：T = 10Z + 50
 
         Returns:
             pd.DataFrame: 包含T分数据的DataFrame
-
-        Raises:
-            ValueError: 如果无法生成有效的T分数据
         """
         t_scores_list = []
 
@@ -199,9 +197,12 @@ class ScoreAnalysisForValueAddService:
                             logger.warning(f"警告: {exam_id} {select_type} {subject} 没有有效成绩")
                             continue
 
-                        # 计算全市统计数据
-                        city_mean = valid_scores[subject].mean()
-                        city_std = valid_scores[subject].std()
+                        # 将分数转换为百分制
+                        normalized_scores = valid_scores[subject] * (100 / max_scores[subject])
+
+                        # 计算全市统计数据（使用百分制分数）
+                        city_mean = normalized_scores.mean()
+                        city_std = normalized_scores.std()
 
                         # 存储统计数据
                         stats_key = (exam_id, select_type, subject)
@@ -212,7 +213,7 @@ class ScoreAnalysisForValueAddService:
                             'max_score': valid_scores[subject].max(),
                             'min_score': valid_scores[subject].min(),
                             'full_score': max_scores[subject],
-                            'avg_rate': (city_mean / max_scores[subject]) * 100,
+                            'avg_rate': city_mean,  # 已经是百分比了
                             'valid_count': len(valid_scores),
                             'total_count': len(exam_type_data),
                             'selection_rate': (len(valid_scores) / len(exam_type_data)) * 100
@@ -222,10 +223,17 @@ class ScoreAnalysisForValueAddService:
                         district_scores = valid_scores[valid_scores['district_name'] == self.district_name]
 
                         if not district_scores.empty and city_std != 0:
-                            z_scores = (district_scores[subject] - city_mean) / city_std
+                            # 将区域学生分数也转换为百分制
+                            district_normalized_scores = district_scores[subject] * (100 / max_scores[subject])
+
+                            # 计算Z分数（使用百分制分数）
+                            z_scores = (district_normalized_scores - city_mean) / city_std
                             t_scores = z_scores * 10 + 50
 
                             for index, row in district_scores.iterrows():
+                                # 原始分数的百分比
+                                score_rate = (row[subject] / max_scores[subject]) * 100
+
                                 t_scores_list.append({
                                     'exam_id': exam_id,
                                     'student_id': row['student_id'],
@@ -237,13 +245,13 @@ class ScoreAnalysisForValueAddService:
                                     'subject_name': self.SUBJECT_NAMES[subject],
                                     'raw_score': row[subject],
                                     't_score': t_scores[index],
-                                    'city_mean': city_mean,
-                                    'city_std': city_std,
+                                    'city_mean': city_mean,  # 存储百分制的均值
+                                    'city_std': city_std,  # 存储百分制的标准差
                                     'max_score': max_scores[subject],
-                                    'score_rate': (row[subject] / max_scores[subject]) * 100,
+                                    'score_rate': score_rate,
                                     'percentile': stats.percentileofscore(
-                                        valid_scores[subject],
-                                        row[subject]
+                                        normalized_scores,  # 使用百分制分数计算百分位数
+                                        district_normalized_scores[index]
                                     )
                                 })
 
