@@ -95,12 +95,16 @@ class ValueAddedDetailView(TemplateView):
             service.prepare_data()
             t_scores_df = service.t_scores_df  # 获取T分数据DataFrame
 
-            # 生成分析结果
+            # 1. 生成区域整体分析结果
             analysis_results = {
                 'core_metrics': self._get_core_metrics(t_scores_df),
                 'trend_data': self._get_trend_data(t_scores_df),
                 'subject_analysis': self._get_subject_analysis(t_scores_df)
             }
+
+            # 2. 添加学校各学科增值对比分析
+            schools_comparison = self._get_schools_subject_analysis(t_scores_df)
+            analysis_results['schools_comparison'] = schools_comparison
 
             return JsonResponse({
                 'status': 'success',
@@ -276,99 +280,6 @@ class ValueAddedDetailView(TemplateView):
             print(f"获取考试列表错误: {str(e)}")  # 打印错误信息
             return []
 
-    def _analyze_exams(self, exam_ids):
-        """
-        分析选中的考试数据
-
-        Args:
-            exam_ids: 考试ID列表
-
-        Returns:
-            dict: 包含分析结果的字典
-        """
-        # 获取成绩数据
-        scores_data = self._get_scores_data(exam_ids)
-
-        # 计算核心指标
-        core_metrics = self._calculate_core_metrics(scores_data)
-
-        # 分析趋势
-        trend_data = self._analyze_trend(scores_data)
-
-        # 分析学科表现
-        subject_analysis = self._analyze_subjects(scores_data)
-
-        return {
-            'core_metrics': core_metrics,
-            'trend_data': trend_data,
-            'subject_analysis': subject_analysis
-        }
-
-    def _get_scores_data(self, exam_ids):
-        """
-        获取成绩数据
-
-        Args:
-            exam_ids: 考试ID列表
-
-        Returns:
-            pd.DataFrame: 包含成绩数据的DataFrame
-        """
-        # TODO: 从数据库获取实际的成绩数据
-        # 示例数据结构
-        data = {
-            'student_id': ['001', '001', '002', '002'],
-            'exam_id': ['1', '2', '1', '2'],
-            'subject': ['语文', '语文', '语文', '语文'],
-            'score': [80, 85, 75, 80]
-        }
-        return pd.DataFrame(data)
-
-    def _calculate_core_metrics(self, df):
-        """计算核心指标"""
-        # TODO: 实现实际的计算逻辑
-        return {
-            'value_added_rate': 12.5,
-            'quality_score': 4.2,
-            'improvement_ratio': 78.3
-        }
-
-    def _analyze_trend(self, df):
-        """分析趋势"""
-        # TODO: 实现实际的趋势分析
-        return {
-            'labels': ['2023-12', '2024-01', '2024-02'],
-            'values': [67.8, 72.3, 76.5]
-        }
-
-    def _analyze_subjects(self, df):
-        """分析学科表现"""
-        # TODO: 实现实际的学科分析
-        return {
-            'radar_data': {
-                'indicators': ['语文', '数学', '英语', '物理', '化学'],
-                'values': [8.2, 7.5, 6.8, 9.1, 7.7]
-            },
-            'pattern_distribution': {
-                'labels': ['稳定上升', '波动上升', '稳定波动', '波动下降', '持续下降'],
-                'values': [30, 25, 20, 15, 10]
-            },
-            'detailed_table': [
-                {
-                    'subject': '语文',
-                    'improvement': 8.2,
-                    'pattern': '稳定上升',
-                    'progress_rate': 76.2
-                },
-                {
-                    'subject': '数学',
-                    'improvement': 7.5,
-                    'pattern': '波动上升',
-                    'progress_rate': 72.1
-                }
-                # ... 其他学科数据
-            ]
-        }
 
     def get_analysis_results(self, t_scores_df):
         """
@@ -630,3 +541,67 @@ class ValueAddedDetailView(TemplateView):
         except Exception as e:
             logger.error(f"计算学科进步率失败: {str(e)}")
             return 0
+
+
+    def _get_schools_subject_analysis(self, df):
+        """
+        获取各学校学科增值对比分析。
+
+        Args:
+            df: T分数据DataFrame
+
+        Returns:
+            list: 包含各学校学科增值数据的列表
+        """
+        try:
+            # 获取首次和最后一次考试
+            exam_ids = sorted(df['exam_id'].unique())
+            first_exam = exam_ids[0]
+            last_exam = exam_ids[-1]
+
+            # 获取所有学校列表
+            schools = df['school_name'].unique()
+
+            schools_data = []
+
+            for school in schools:
+                school_data = {'school_name': school}
+
+                # 获取该校的考试数据
+                school_df = df[df['school_name'] == school]
+
+                # 计算各学科的增值情况
+                for subject in df['subject'].unique():
+                    subject_df = school_df[school_df['subject'] == subject]
+
+                    if not subject_df.empty:
+                        # 获取首次和最后一次考试的T分均值
+                        first_t_score = subject_df[subject_df['exam_id'] == first_exam]['t_score'].mean()
+                        last_t_score = subject_df[subject_df['exam_id'] == last_exam]['t_score'].mean()
+
+                        # 计算增值率
+                        value_added = last_t_score - first_t_score if not pd.isna(first_t_score) and not pd.isna(
+                            last_t_score) else 0
+
+                        # 计算进步率
+                        first_scores = subject_df[subject_df['exam_id'] == first_exam].set_index('student_id')['t_score']
+                        last_scores = subject_df[subject_df['exam_id'] == last_exam].set_index('student_id')['t_score']
+                        improved = sum((last_scores - first_scores) > 0)
+                        total = len(first_scores)
+                        progress_rate = (improved / total * 100) if total > 0 else 0
+
+                        # 存储学科数据
+                        school_data[subject] = value_added
+                        school_data[f'{subject}_details'] = {
+                            'avg_score': float(last_t_score) if not pd.isna(last_t_score) else 0,
+                            'progress_rate': float(progress_rate),
+                            'student_count': int(total)
+                        }
+
+                schools_data.append(school_data)
+
+            return schools_data
+
+        except Exception as e:
+            logger.error(f"获取学校学科增值对比分析失败: {str(e)}")
+            return []

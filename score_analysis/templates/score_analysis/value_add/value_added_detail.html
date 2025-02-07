@@ -173,6 +173,88 @@
                     </el-table-column>
                 </el-table>
             </el-card>
+            <!-- 添加学校各学科增值对比卡片 -->
+            <el-card style="margin-top: 20px;">
+                <div slot="header">
+                    <span>学校各学科增值对比</span>
+                </div>
+
+                <!-- 表格视图 -->
+                <el-table
+                    :data="schoolsComparison"
+                    border
+                    stripe
+                    style="width: 100%"
+                    :default-sort="{prop: 'value_added', order: 'descending'}">
+
+                    <el-table-column
+                        prop="school_name"
+                        label="学校名称"
+                        fixed="left"
+                        width="180">
+                    </el-table-column>
+
+                    <!-- 各学科增值列 -->
+                    <template v-for="subject in subjectList">
+                        <el-table-column :key="subject.code">
+                            <template slot="header">
+                                <div>{{ subject.name }}</div>
+                                <div style="font-size: 12px; color: #909399;">增值率</div>
+                            </template>
+                            <template slot-scope="scope">
+                                <div v-if="scope.row[subject.code] !== undefined">
+                                    <div :class="getValueClass(scope.row[subject.code])">
+                                        {{ formatPercent(scope.row[subject.code]) }}
+                                    </div>
+                                    <el-popover
+                                        placement="top"
+                                        width="200"
+                                        trigger="hover">
+                                        <div>
+                                            <p>平均T分: {{ formatScore(scope.row[`${subject.code}_details`].avg_score) }}</p>
+                                            <p>进步率: {{ formatPercent(scope.row[`${subject.code}_details`].progress_rate) }}</p>
+                                            <p>参与人数: {{ scope.row[`${subject.code}_details`].student_count }}人</p>
+                                        </div>
+                                        <i class="el-icon-info" slot="reference"
+                                           style="color: #909399; margin-left: 5px; cursor: pointer;">
+                                        </i>
+                                    </el-popover>
+                                </div>
+                                <span v-else>-</span>
+                            </template>
+                        </el-table-column>
+                    </template>
+
+                    <!-- 操作列 -->
+                    <el-table-column
+                        fixed="right"
+                        label="操作"
+                        width="120">
+                        <template slot-scope="scope">
+                            <el-button
+                                @click="showSchoolDetail(scope.row)"
+                                type="text"
+                                size="small">
+                                详细分析
+                            </el-button>
+                        </template>
+                    </el-table-column>
+                </el-table>
+
+                <!-- 图表展示 -->
+                <div style="margin-top: 20px;">
+                    <el-tabs v-model="activeSubjectTab">
+                        <el-tab-pane
+                            v-for="subject in subjectList"
+                            :key="subject.code"
+                            :label="subject.name"
+                            :name="subject.code">
+                            <div :id="'chart-' + subject.code" class="chart-container"></div>
+                        </el-tab-pane>
+                    </el-tabs>
+                </div>
+            </el-card>
+        </div>
         </div>
     </div>
     {% endverbatim %}
@@ -204,7 +286,21 @@
                     'politics': '政治',
                     'geography': '地理'
 
-                }
+                },
+                schoolsComparison: [], // 学校对比数据
+                subjectList: [
+                    { code: 'chinese', name: '语文' },
+                    { code: 'math', name: '数学' },
+                    { code: 'english', name: '英语' },
+                    { code: 'physics', name: '物理' },
+                    { code: 'chemistry', name: '化学' },
+                    { code: 'biology', name: '生物' },
+                    { code: 'history', name: '历史' },
+                    { code: 'politics', name: '政治' },
+                    { code: 'geography', name: '地理' }
+                ],
+                activeSubjectTab: 'chinese', // 当前选中的学科标签
+                subjectCharts: {} // 存储各学科的图表实例
             }
         },
         computed: {
@@ -247,10 +343,12 @@
                         this.coreMetrics = result.data.core_metrics;
                         this.trendData = result.data.trend_data;
                         this.subjectAnalysis = result.data.subject_analysis;
+                        this.schoolsComparison = result.data.schools_comparison;
 
                         // 确保DOM更新后再初始化图表
                         this.$nextTick(() => {
                             this.initCharts();
+                            this.initSubjectCharts();
                         });
 
                         this.$message.success('分析完成');
@@ -265,6 +363,7 @@
                     this.loading = false;
                 }
             },
+
             formatPercent(value) {
                 if (value === undefined || value === null) return '0.0%';
                 return `${Number(value).toFixed(1)}%`;
@@ -416,6 +515,74 @@
                         });
                     }
                 });
+            },
+            initSubjectCharts() {
+                // 为每个学科创建柱状图
+                this.subjectList.forEach(subject => {
+                    const chartContainer = document.getElementById(`chart-${subject.code}`);
+                    if (!chartContainer) return;
+
+                    const chart = echarts.init(chartContainer);
+
+                    // 准备图表数据
+                    const schoolNames = this.schoolsComparison.map(item => item.school_name);
+                    const valueAdded = this.schoolsComparison.map(item => item[subject.code] || 0);
+
+                    chart.setOption({
+                        title: {
+                            text: `${subject.name}学科增值对比`,
+                            left: 'center'
+                        },
+                        tooltip: {
+                            trigger: 'axis',
+                            formatter: (params) => {
+                                const schoolData = this.schoolsComparison.find(
+                                    item => item.school_name === params[0].name
+                                );
+                                const details = schoolData[`${subject.code}_details`];
+
+                                return `
+                                    <div>
+                                        <p>${params[0].name}</p>
+                                        <p>增值率：${this.formatPercent(params[0].value)}</p>
+                                        <p>平均T分：${this.formatScore(details.avg_score)}</p>
+                                        <p>进步率：${this.formatPercent(details.progress_rate)}</p>
+                                        <p>参与人数：${details.student_count}人</p>
+                                    </div>
+                                `;
+                            }
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: schoolNames,
+                            axisLabel: {
+                                interval: 0,
+                                rotate: 30
+                            }
+                        },
+                        yAxis: {
+                            type: 'value',
+                            name: '增值率(%)'
+                        },
+                        series: [{
+                            data: valueAdded,
+                            type: 'bar',
+                            itemStyle: {
+                                color: (params) => {
+                                    return params.value >= 0 ? '#67C23A' : '#F56C6C';
+                                }
+                            }
+                        }]
+                    });
+
+                    this.subjectCharts[subject.code] = chart;
+                });
+            },
+
+            showSchoolDetail(school) {
+                // 实现查看学校详细分析的功能
+                this.$message.info(`查看 ${school.school_name} 的详细分析`);
+                // 可以跳转到学校详细分析页面或打开对话框显示详细信息
             }
         },
         mounted() {
@@ -423,8 +590,25 @@
             if (this.showResult) {
                 this.initCharts();
             }
-        }
-    })
+        },
+         watch: {
+                activeSubjectTab(newTab) {
+                    // 切换标签时重新调整图表大小
+                    this.$nextTick(() => {
+                        if (this.subjectCharts[newTab]) {
+                            this.subjectCharts[newTab].resize();
+                        }
+                    });
+                }
+            },
+            beforeDestroy() {
+                // 销毁图表实例
+                Object.values(this.subjectCharts).forEach(chart => {
+                    chart.dispose();
+                });
+            }
+        })
+
 </script>
 </body>
 </html>
