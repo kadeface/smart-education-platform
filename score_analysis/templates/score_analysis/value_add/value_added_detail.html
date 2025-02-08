@@ -338,6 +338,8 @@
             <el-table
                 :data="levelAnalysisTableData"
                 border
+                show-summary
+                :summary-method="getSummary"
                 style="width: 100%">
                 <el-table-column
                     prop="name"
@@ -516,6 +518,35 @@
             name: levelNames[key],
             data: this.currentLevelAnalysis[key]
         }));
+    },
+        coreMetrics() {
+        if (!this.analysisResult) return {};
+
+        // 获取所有有效的进步率数据
+        const validProgressRates = Object.values(this.currentLevelAnalysis || {})
+            .filter(level => level && typeof level.progress_rate === 'number' && level.student_count > 0)
+            .map(level => ({
+                progress_rate: level.progress_rate,
+                student_count: level.student_count
+            }));
+
+        // 计算加权平均进步率
+        let totalStudents = 0;
+        let weightedProgressRate = 0;
+
+        validProgressRates.forEach(({ progress_rate, student_count }) => {
+            totalStudents += student_count;
+            weightedProgressRate += progress_rate * student_count;
+        });
+
+        const averageProgressRate = totalStudents > 0
+            ? weightedProgressRate / totalStudents
+            : 0;
+
+        return {
+            ...this.analysisResult.core_metrics,
+            improvement_ratio: averageProgressRate // 使用计算出的平均进步率
+        };
     }
 
             },
@@ -571,6 +602,47 @@
                     this.loading = false;
                 }
             },
+                getSummary(param) {
+        const { columns, data } = param;
+        const sums = [];
+
+        columns.forEach((column, index) => {
+            if (index === 0) {
+                sums[index] = '总计';
+                return;
+            }
+
+            if (column.property === 'data.progress_rate') {
+                // 计算加权平均进步率
+                let totalStudents = 0;
+                let weightedProgressRate = 0;
+
+                data.forEach(row => {
+                    const studentCount = row.data.student_count;
+                    const progressRate = row.data.progress_rate;
+
+                    if (studentCount > 0 && typeof progressRate === 'number') {
+                        totalStudents += studentCount;
+                        weightedProgressRate += progressRate * studentCount;
+                    }
+                });
+
+                const averageProgressRate = totalStudents > 0
+                    ? weightedProgressRate / totalStudents
+                    : 0;
+
+                sums[index] = this.formatPercent(averageProgressRate);
+            } else if (column.property === 'data.student_count') {
+                // 计算总人数
+                const total = data.reduce((sum, row) => sum + row.data.student_count, 0);
+                sums[index] = `${total}`;
+            } else {
+                sums[index] = '--';
+            }
+        });
+
+        return sums;
+    },
     showLevelAnalysis(school, subject) {
         console.log('显示分层分析数据:', {
             school: school,
