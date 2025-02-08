@@ -59,7 +59,14 @@ class ScoreAnalysisForValueAddService:
         'politics': '政治',
         'geography': '地理'
     }
-
+    # 添加分层定义
+    SCORE_LEVELS = {
+        'low': {'name': '低分组', 'range': (0, 40)},
+        'middle': {'name': '中分组', 'range': (40, 60)},
+        'high': {'name': '高分组', 'range': (60, 70)},
+        'excellent': {'name': '优秀组', 'range': (70, 80)},
+        'outstanding': {'name': '卓越组', 'range': (80, 100)}
+    }
     def __init__(self, exam_ids: List[str], district_name: str = '开平市'):
         """
         初始化成绩分析服务。
@@ -83,6 +90,9 @@ class ScoreAnalysisForValueAddService:
 
         logger.info(f"初始化成绩分析服务 - 考试IDs: {exam_ids}, 区域: {district_name}")
 
+    def get_subjects(self):
+        """获取学科列表"""
+        return self.SUBJECTS
     def prepare_data(self) -> None:
         """
         准备分析数据，从数据库获取成绩并进行预处理。
@@ -356,13 +366,41 @@ class ScoreAnalysisForValueAddService:
                 'selection_rate': round(stats['selection_rate'], 2)
             }
         return summary
-
-    def analyze_school_progress(self) -> Dict:
+    def _get_score_level(self, t_score: float) -> str:
         """
-        分析学校进步情况。
+        根据T分确定学生所属层次。
+
+        Args:
+            t_score: T分数
 
         Returns:
-            Dict: 包含学校进步分析结果的字典
+            str: 层次代码 (low/middle/high/excellent/outstanding)
+        """
+        for level, config in self.SCORE_LEVELS.items():
+            if config['range'][0] <= t_score < config['range'][1]:
+                return level
+        return 'outstanding' if t_score >= 80 else 'low'
+    def analyze_school_progress(self) -> Dict:
+        """
+        分析学校进步情况，包括整体分析和分层分析。
+
+        Returns:
+            Dict: 包含学校进步分析结果的字典，结构如下：
+                {
+                    'school_name_select_type': {
+                        'overall': {...},  # 整体分析结果
+                        'subjects': {...},  # 学科分析结果
+                        'level_analysis': {  # 分层分析结果
+                            'subject_name': {
+                                'low': {...},  # 低分组分析
+                                'middle': {...},  # 中分组分析
+                                'high': {...},  # 高分组分析
+                                'excellent': {...},  # 优秀组分析
+                                'outstanding': {...}  # 卓越组分析
+                            }
+                        }
+                    }
+                }
 
         Raises:
             ValueError: 如果T分数据未准备好
@@ -380,17 +418,121 @@ class ScoreAnalysisForValueAddService:
                     continue
 
                 school_key = f"{school_name}_{select_type}"
-                progress_results[school_key] = self._analyze_single_school(
+
+                # 1. 获取常规分析结果
+                school_analysis = self._analyze_single_school(
                     school_name,
                     select_type,
                     school_data
                 )
+
+                # 2. 添加分层分析结果
+                level_analysis = {}
+
+                # 对每个学科进行分层分析
+                for subject in school_data['subject'].unique():
+                    subject_data = school_data[school_data['subject'] == subject]
+                    if not subject_data.empty:
+                        level_analysis[subject] = self._analyze_subject_by_levels(subject_data)
+
+                # 合并结果
+                progress_results[school_key] = {
+                    **school_analysis,  # 保持原有的分析结果
+                    'level_analysis': level_analysis  # 添加分层分析结果
+                }
 
             except Exception as e:
                 logger.error(f"分析学校 {school_name} ({select_type}) 进步情况时出错: {str(e)}")
                 continue
 
         return progress_results
+
+    def _analyze_subject_by_levels(self, subject_df: pd.DataFrame) -> Dict:
+        """
+        对单个学科按成绩层次进行分析。
+
+        Args:
+            subject_df: 单个学科的成绩DataFrame
+
+        Returns:
+            Dict: 各层次的分析结果
+        """
+        try:
+            exam_ids = sorted(subject_df['exam_id'].unique())
+            first_exam = exam_ids[0]
+            last_exam = exam_ids[-1]
+
+            # 获取首次考试数据
+            first_exam_data = subject_df[subject_df['exam_id'] == first_exam]
+
+            # 初始化各层次的结果
+            level_results = {
+                level: {
+                    'name': config['name'],
+                    'range': config['range'],
+                    'student_count': 0,
+                    'first_mean': 0,
+                    'last_mean': 0,
+                    'value_added': 0,
+                    'progress_count': 0,
+                    'progress_rate': 0,
+                    'students': []
+                } for level, config in self.SCORE_LEVELS.items()
+            }
+
+            # 根据首次考试T分对学生进行分层
+            for _, row in first_exam_data.iterrows():
+                level = self._get_score_level(row['t_score'])
+                level_results[level]['students'].append(row['student_id'])
+
+            # 计算各层次的统计数据
+            for level, result in level_results.items():
+                student_ids = result['students']
+                if not student_ids:
+                    continue
+
+                # 获取该层次学生的首次和最后一次考试数据
+                level_first = first_exam_data[first_exam_data['student_id'].isin(student_ids)]
+                level_last = subject_df[
+                    (subject_df['exam_id'] == last_exam) &
+                    (subject_df['student_id'].isin(student_ids))
+                    ]
+
+                if level_first.empty or level_last.empty:
+                    continue
+
+                # 计算统计数据
+                first_mean = level_first['t_score'].mean()
+                last_mean = level_last['t_score'].mean()
+                value_added = last_mean - first_mean
+
+                # 计算进步人数和进步率
+                first_scores = level_first.set_index('student_id')['t_score']
+                last_scores = level_last.set_index('student_id')['t_score']
+                common_students = set(first_scores.index) & set(last_scores.index)
+
+                if common_students:
+                    progress_count = sum(
+                        last_scores[student] > first_scores[student]
+                        for student in common_students
+                    )
+
+                    result.update({
+                        'student_count': len(common_students),
+                        'first_mean': float(first_mean),
+                        'last_mean': float(last_mean),
+                        'value_added': float(value_added),
+                        'progress_count': progress_count,
+                        'progress_rate': (progress_count / len(common_students)) * 100,
+                        'raw_score_mean': float(level_last['raw_score'].mean()),  # 添加原始分均值
+                        'score_rate': float(level_last['score_rate'].mean())  # 添加得分率
+                    })
+
+            return level_results
+
+        except Exception as e:
+            logger.error(f"分层分析失败: {str(e)}")
+            return {}
 
     def _analyze_single_school(self, school_name: str, select_type: str, school_data: pd.DataFrame) -> Dict:
         """
@@ -589,3 +731,78 @@ class ScoreAnalysisForValueAddService:
             't_scores': self.t_scores_df.to_dict('records'),
             'progress_analysis': self.analyze_school_progress()
         }
+
+    def _calculate_level_statistics(self, df: pd.DataFrame, subject: str) -> dict:
+        """
+        计算各层次学生的统计数据。
+
+        Args:
+            df: 包含首次和最后一次考试数据的DataFrame
+            subject: 学科名称
+
+        Returns:
+            dict: 各层次的统计数据
+        """
+        exam_ids = sorted(df['exam_id'].unique())
+        first_exam = exam_ids[0]
+        last_exam = exam_ids[-1]
+
+        # 获取首次考试的数据
+        first_exam_data = df[df['exam_id'] == first_exam]
+
+        # 初始化结果字典
+        level_stats = {level: {
+            'name': config['name'],
+            'student_count': 0,
+            'first_mean': 0,
+            'last_mean': 0,
+            'value_added': 0,
+            'progress_count': 0,
+            'progress_rate': 0,
+            'students': []  # 记录该层次的学生ID列表
+        } for level, config in self.SCORE_LEVELS.items()}
+
+        # 根据首次考试T分对学生进行分层
+        for _, row in first_exam_data.iterrows():
+            level = self._get_score_level(row['t_score'])
+            level_stats[level]['students'].append(row['student_id'])
+
+        # 计算各层次的统计数据
+        for level, stats in level_stats.items():
+            student_ids = stats['students']
+            if not student_ids:
+                continue
+
+            # 获取该层次学生的首次和最后一次考试数据
+            level_first = first_exam_data[first_exam_data['student_id'].isin(student_ids)]
+            level_last = df[
+                (df['exam_id'] == last_exam) &
+                (df['student_id'].isin(student_ids))
+                ]
+
+            if level_first.empty or level_last.empty:
+                continue
+
+            # 计算T分均值
+            first_mean = level_first['t_score'].mean()
+            last_mean = level_last['t_score'].mean()
+
+            # 计算进步人数
+            first_scores = level_first.set_index('student_id')['t_score']
+            last_scores = level_last.set_index('student_id')['t_score']
+            common_students = set(first_scores.index) & set(last_scores.index)
+
+            if common_students:
+                progress_count = sum((last_scores[student] > first_scores[student])
+                                     for student in common_students)
+
+                stats.update({
+                    'student_count': len(common_students),
+                    'first_mean': float(first_mean),
+                    'last_mean': float(last_mean),
+                    'value_added': float(last_mean - first_mean),
+                    'progress_count': progress_count,
+                    'progress_rate': (progress_count / len(common_students)) * 100
+                })
+
+        return level_stats

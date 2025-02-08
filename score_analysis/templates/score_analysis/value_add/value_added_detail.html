@@ -9,56 +9,125 @@
     <script src="https://cdn.jsdelivr.net/npm/element-ui@2.15.14/lib/index.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 
-    <style>
-        [v-cloak] { display: none; }
-        .container {
-            padding: 20px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .exam-select {
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #f5f7fa;
-            border-radius: 4px;
-        }
-        .analysis-result {
-            margin-top: 30px;
-        }
-        .metrics-card {
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .metric-value {
-            font-size: 24px;
-            color: #409EFF;
-            margin: 10px 0;
-        }
-        .metric-title {
-            color: #666;
-        }
-        .chart-container {
-            height: 400px;
-            margin: 20px 0;
-        }
-        .positive { color: #67C23A; }
-        .negative { color: #F56C6C; }
-    </style>
+<style>
+    /* 基础样式 */
+    [v-cloak] {
+        display: none;
+    }
+
+    .container {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* 考试选择区域 */
+    .exam-select {
+        margin-bottom: 30px;
+        padding: 20px;
+        background: #f5f7fa;
+        border-radius: 4px;
+    }
+
+    /* 分析结果区域 */
+    .analysis-result {
+        margin-top: 30px;
+    }
+
+    /* 指标卡片 */
+    .metrics-card {
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .metric-value {
+        font-size: 24px;
+        color: #409EFF;
+        margin: 10px 0;
+    }
+
+    .metric-title {
+        color: #666;
+    }
+
+    /* 图表样式 */
+    .chart-container {
+        height: 400px;
+        width: 100%;
+        min-height: 300px;
+        margin: 20px 0;
+    }
+
+    /* 数值颜色 */
+    .positive {
+        color: #67C23A;
+    }
+
+    .negative {
+        color: #F56C6C;
+    }
+
+    /* 分层分析对话框 */
+    .el-dialog {
+        margin-top: 5vh !important;
+    }
+
+    .el-dialog__body {
+        padding: 20px !important;
+    }
+
+    /* 分层说明样式 */
+    .level-description {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        color: #606266;
+        font-size: 14px;
+    }
+
+    .level-description h4 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        color: #303133;
+    }
+
+    .level-description p {
+        margin: 8px 0;
+        line-height: 1.5;
+    }
+
+    /* 表格样式 */
+    .el-table {
+        margin-bottom: 20px;
+    }
+
+    .el-table.cell {
+        text-align: center;
+    }
+
+</style>
+
 </head>
 <body>
     <!-- 添加CSRF Token -->
     {% csrf_token %}
 
-    {% verbatim %}
-    <div id="app" class="container" v-cloak
-         data-core-metrics="{{ core_metrics|escapejs }}"
-         data-trend-data="{{ trend_data|escapejs }}"
-         data-subject-analysis="{{ subject_analysis|escapejs }}">
 
+<div id="app" class="container" v-cloak>
+    <script type="text/javascript">
+        // 将Django模板变量转换为JavaScript变量
+        window.INIT_DATA = {
+            examList: {{ exam_list|safe }},
+            schoolLevel: "{{ school_level }}",
+            schoolLevelDisplay: "{{ school_level_display }}"
+        };
+    </script>
+    {% verbatim %}
         <!-- 考试选择区域 -->
         <el-card class="exam-select">
             <div slot="header">
-                <span>选择要分析的{{ school_level_display }}考试</span>
+                   <span>选择要分析的考试</span>
             </div>
             <el-form :inline="true" @submit.native.prevent>
                 <el-form-item label="考试列表">
@@ -173,144 +242,283 @@
                     </el-table-column>
                 </el-table>
             </el-card>
-            <!-- 添加学校各学科增值对比卡片 -->
-            <el-card style="margin-top: 20px;">
-                <div slot="header">
-                    <span>学校各学科增值对比</span>
-                </div>
+    <!-- 学校各学科增值对比卡片 -->
+    <el-card style="margin-top: 20px;">
+        <div slot="header">
+            <span>学校各学科增值对比</span>
+        </div>
 
-                <!-- 表格视图 -->
-                <el-table
-                    :data="schoolsComparison"
-                    border
-                    stripe
-                    style="width: 100%"
-                    :default-sort="{prop: 'value_added', order: 'descending'}">
+        <!-- 表格视图 -->
+        <el-table
+            :data="schoolsComparison"
+            border
+            stripe
+            style="width: 100%"
+            :default-sort="{prop: 'value_added', order: 'descending'}">
 
-                    <el-table-column
-                        prop="school_name"
-                        label="学校名称"
-                        fixed="left"
-                        width="180">
-                    </el-table-column>
+            <!-- 学校名称列 -->
+            <el-table-column
+                prop="school_name"
+                label="学校名称"
+                fixed="left"
+                width="180">
+            </el-table-column>
 
-                    <!-- 各学科增值列 -->
-                    <template v-for="subject in subjectList">
-                        <el-table-column :key="subject.code">
-                            <template slot="header">
-                                <div>{{ subject.name }}</div>
-                                <div style="font-size: 12px; color: #909399;">增值率</div>
-                            </template>
-                            <template slot-scope="scope">
-                                <div v-if="scope.row[subject.code] !== undefined">
-                                    <div :class="getValueClass(scope.row[subject.code])">
-                                        {{ formatPercent(scope.row[subject.code]) }}
-                                    </div>
-                                    <el-popover
-                                        placement="top"
-                                        width="200"
-                                        trigger="hover">
-                                        <div>
-                                            <p>平均T分: {{ formatScore(scope.row[`${subject.code}_details`].avg_score) }}</p>
-                                            <p>进步率: {{ formatPercent(scope.row[`${subject.code}_details`].progress_rate) }}</p>
-                                            <p>参与人数: {{ scope.row[`${subject.code}_details`].student_count }}人</p>
-                                        </div>
-                                        <i class="el-icon-info" slot="reference"
-                                           style="color: #909399; margin-left: 5px; cursor: pointer;">
-                                        </i>
-                                    </el-popover>
+            <!-- 学科列 -->
+            <el-table-column
+                v-for="subject in subjectList"
+                :key="subject.code"
+                :min-width="150">
+                <template slot="header">
+                    <div>{{ subject.name }}</div>
+                    <div style="font-size: 12px; color: #909399;">增值率</div>
+                </template>
+                <template slot-scope="scope">
+                    <div v-if="scope.row[subject.code] !== undefined">
+                        <div style="display: flex; align-items: center;">
+                            <span :class="getValueClass(scope.row[subject.code])">
+                                {{ formatPercent(scope.row[subject.code]) }}
+                            </span>
+
+                            <el-popover
+                                placement="top"
+                                width="200"
+                                trigger="hover">
+                                <div>
+                                    <p>平均T分: {{ formatScore(scope.row[`${subject.code}_details`].avg_score) }}</p>
+                                    <p>进步率: {{ formatPercent(scope.row[`${subject.code}_details`].progress_rate) }}</p>
+                                    <p>参与人数: {{ scope.row[`${subject.code}_details`].student_count }}人</p>
                                 </div>
-                                <span v-else>-</span>
-                            </template>
-                        </el-table-column>
-                    </template>
+                                <i class="el-icon-info" slot="reference"
+                                   style="color: #909399; margin-left: 5px; cursor: pointer;">
+                                </i>
+                            </el-popover>
 
-                    <!-- 操作列 -->
-                    <el-table-column
-                        fixed="right"
-                        label="操作"
-                        width="120">
-                        <template slot-scope="scope">
                             <el-button
-                                @click="showSchoolDetail(scope.row)"
                                 type="text"
-                                size="small">
-                                详细分析
+                                size="mini"
+                                @click="showLevelAnalysis(scope.row, subject.code)"
+                                style="margin-left: 5px">
+                                <i class="el-icon-s-data"></i>
+                                分层
                             </el-button>
-                        </template>
-                    </el-table-column>
-                </el-table>
+                        </div>
+                    </div>
+                    <span v-else>-</span>
+                </template>
+            </el-table-column>
+        </el-table>
 
-                <!-- 图表展示 -->
-                <div style="margin-top: 20px;">
-                    <el-tabs v-model="activeSubjectTab">
-                        <el-tab-pane
-                            v-for="subject in subjectList"
-                            :key="subject.code"
-                            :label="subject.name"
-                            :name="subject.code">
-                            <div :id="'chart-' + subject.code" class="chart-container"></div>
-                        </el-tab-pane>
-                    </el-tabs>
-                </div>
-            </el-card>
+        <!-- 图表展示 -->
+        <div style="margin-top: 20px;">
+            <el-tabs v-model="activeSubjectTab">
+                <el-tab-pane
+                    v-for="subject in subjectList"
+                    :key="subject.code"
+                    :label="subject.name"
+                    :name="subject.code">
+                    <div :id="'chart-' + subject.code" class="chart-container"></div>
+                </el-tab-pane>
+            </el-tabs>
         </div>
+    </el-card>
+</div>
+<!-- 分层分析对话框 -->
+<el-dialog
+    :visible.sync="showLevelAnalysisDialog"
+    :title="`${currentSchool?.school_name || ''} - ${currentSubject?.name || ''} 分层分析`"
+    width="80%"
+    :destroy-on-close="false"
+    :close-on-click-modal="false"
+    @open="handleDialogOpen">
+
+    <el-card v-loading="!currentLevelAnalysis">
+        <template v-if="currentLevelAnalysis">
+            <!-- 分层数据表格 -->
+            <el-table
+                :data="levelAnalysisTableData"
+                border
+                style="width: 100%">
+                <el-table-column
+                    prop="name"
+                    label="层次"
+                    width="120">
+                </el-table-column>
+
+                <el-table-column
+                    label="人数(占比)"
+                    width="150">
+                    <template slot-scope="{row}">
+                        {{ row.data.student_count }}
+                        ({{ formatPercent(row.data.percentage) }})
+                    </template>
+                </el-table-column>
+
+                <el-table-column
+                    label="T分均值变化"
+                    width="200">
+                    <template slot-scope="{row}">
+                        {{ formatScore(row.data.first_mean) }} →
+                        {{ formatScore(row.data.last_mean) }}
+                        <span :class="getValueClass(row.data.value_added)">
+                            ({{ formatWithSign(row.data.value_added) }})
+                        </span>
+                    </template>
+                </el-table-column>
+
+                <el-table-column
+                    label="进步率"
+                    width="120">
+                    <template slot-scope="{row}">
+                        <span class="positive">
+                            {{ formatPercent(row.data.progress_rate) }}
+                        </span>
+                    </template>
+                </el-table-column>
+
+                <el-table-column
+                    label="得分率"
+                    width="120">
+                    <template slot-scope="{row}">
+                        {{ formatPercent(row.data.score_rate) }}
+                    </template>
+                </el-table-column>
+            </el-table>
+
+            <!-- 分层说明 -->
+            <div class="level-description" style="margin-top: 20px; color: #606266; font-size: 14px;">
+                <h4>分层说明：</h4>
+                <p>⭐ 卓越组：T分>80 优等生群体</p>
+                <p>⭐ 优秀组：70≤T分≤80 成绩优秀学生</p>
+                <p>⭐ 良好组：60≤T分<70 中等偏上学生</p>
+                <p>⭐ 合格组：40≤T分<60 中等偏下学生</p>
+                <p>⭐ 提高组：T分<40 需要重点帮扶学生</p>
+            </div>
+        </template>
+
+        <div v-else class="no-data" style="text-align: center; padding: 20px;">
+            暂无分层分析数据
         </div>
+    </el-card>
+
+    <span slot="footer" class="dialog-footer">
+        <el-button @click="showLevelAnalysisDialog = false">关闭</el-button>
+    </span>
+</el-dialog>
 
     {% endverbatim %}
-
+       </div>
 <script>
     new Vue({
         el: '#app',
         data() {
-            return {
-                examList: JSON.parse('{{ exam_list|escapejs }}'),
-                selectedExams: [],
-                loading: false,
-                showResult: false,  // 初始设置为false
-                coreMetrics: {},
-                trendData: { labels: [], values: [] },
-                subjectAnalysis: {
-                    radar_data: { indicators: [], values: [] },
-                    pattern_distribution: { labels: [], values: [] },
-                    detailed_table: []
-                    },
-                subjectNameMap: {
-                    'chinese': '语文',
-                    'math': '数学',
-                    'english': '英语',
-                    'physics': '物理',
-                    'chemistry': '化学',
-                    'biology': '生物',
-                    'history': '历史',
-                    'politics': '政治',
-                    'geography': '地理'
+    const initData = window.INIT_DATA || {};
+    return {
+        // 基础配置数据
+        examList: initData.examList || [],
+        schoolLevel: initData.schoolLevel || '',
+        schoolLevelDisplay: initData.schoolLevelDisplay || '',
+        selectedExams: [],
+        loading: false,
 
-                },
-                schoolsComparison: [], // 学校对比数据
-                subjectList: [
-                    { code: 'chinese', name: '语文' },
-                    { code: 'math', name: '数学' },
-                    { code: 'english', name: '英语' },
-                    { code: 'physics', name: '物理' },
-                    { code: 'chemistry', name: '化学' },
-                    { code: 'biology', name: '生物' },
-                    { code: 'history', name: '历史' },
-                    { code: 'politics', name: '政治' },
-                    { code: 'geography', name: '地理' }
-                ],
-                activeSubjectTab: 'chinese', // 当前选中的学科标签
-                subjectCharts: {} // 存储各学科的图表实例
-            }
+        // 分析结果展示控制
+        showResult: false,
+        showLevelAnalysisDialog: false,
+
+        // 分层分析相关数据
+        currentSchool: null,
+        currentSubject: null,
+        currentLevelAnalysis: null,
+
+        // 核心指标数据
+        coreMetrics: {},
+        trendData: {
+            labels: [],
+            values: []
         },
+
+        // 学科分析数据
+        subjectAnalysis: {
+            radar_data: {
+                indicators: [],
+                values: []
+            },
+            pattern_distribution: {
+                labels: [],
+                values: []
+            },
+            detailed_table: []
+        },
+
+        // 学科配置
+        subjectNameMap: {
+            'chinese': '语文',
+            'math': '数学',
+            'english': '英语',
+            'physics': '物理',
+            'chemistry': '化学',
+            'biology': '生物',
+            'history': '历史',
+            'politics': '政治',
+            'geography': '地理'
+        },
+
+        // 学科列表
+        subjectList: [
+            { code: 'chinese', name: '语文' },
+            { code: 'math', name: '数学' },
+            { code: 'english', name: '英语' },
+            { code: 'physics', name: '物理' },
+            { code: 'chemistry', name: '化学' },
+            { code: 'biology', name: '生物' },
+            { code: 'history', name: '历史' },
+            { code: 'politics', name: '政治' },
+            { code: 'geography', name: '地理' }
+        ],
+
+        // 学校对比数据
+        schoolsComparison: [],
+
+        // 图表相关
+        activeSubjectTab: 'chinese',
+        subjectCharts: {}
+    }
+},
         computed: {
             valueAddedClass() {
                 return {
                     'positive': this.coreMetrics.value_added_rate > 0,
                     'negative': this.coreMetrics.value_added_rate < 0
                 }
-            }
-        },
+            },
+            dialogTitle() {
+                if (!this.currentSchool || !this.currentSubject) return '分层分析';
+                return `${this.currentSchool.school_name} - ${this.currentSubject.name} 分层分析`;
+            },
+
+    levelAnalysisTableData() {
+        if (!this.currentLevelAnalysis) {
+            console.warn('当前没有分层分析数据');
+            return [];
+        }
+
+        const levelOrder = ['excellent', 'good', 'medium', 'pass', 'improve'];
+        const levelNames = {
+            excellent: '卓越组',
+            good: '优秀组',
+            medium: '良好组',
+            pass: '合格组',
+            improve: '提高组'
+        };
+
+        return levelOrder.map(key => ({
+            key,
+            name: levelNames[key],
+            data: this.currentLevelAnalysis[key]
+        }));
+    }
+
+            },
         methods: {
             async submitAnalysis() {
                 if (this.selectedExams.length < 2) {
@@ -363,17 +571,116 @@
                     this.loading = false;
                 }
             },
+    showLevelAnalysis(school, subject) {
+        console.log('显示分层分析数据:', {
+            school: school,
+            subject: subject
+        });
+
+        // 获取分层数据
+        const levelAnalysisKey = `${subject}_level_analysis`;
+        const levelData = school[levelAnalysisKey];
+
+        if (!levelData || typeof levelData !== 'object') {
+            console.warn('未找到分层数据');
+            return;
+        }
+
+        // 处理分层数据
+        this.currentSchool = school;
+        this.currentSubject = this.subjectList.find(s => s.code === subject);
+
+        // 处理每个层级的数据
+        this.currentLevelAnalysis = {
+            excellent: this.processLevelData(levelData.excellent?.data || levelData.excellent),
+            good: this.processLevelData(levelData.good?.data || levelData.good),
+            medium: this.processLevelData(levelData.medium?.data || levelData.medium),
+            pass: this.processLevelData(levelData.pass?.data || levelData.pass),
+            improve: this.processLevelData(levelData.improve?.data || levelData.improve)
+        };
+
+        console.log('处理后的分层数据:', this.currentLevelAnalysis);
+        this.showLevelAnalysisDialog = true;
+    },
+
+    // 处理单个层级的数据
+    processLevelData(data) {
+        if (!data) {
+            return {
+                student_count: 0,
+                percentage: 0,
+                first_mean: 0,
+                last_mean: 0,
+                value_added: 0,
+                progress_rate: 0,
+                score_rate: 0
+            };
+        }
+
+        // 确保返回数字类型
+        return {
+            student_count: Number(data.student_count || 0),
+            percentage: Number(data.percentage || 0),
+            first_mean: Number(data.first_mean || 0),
+            last_mean: Number(data.last_mean || 0),
+            value_added: Number(data.value_added || 0),
+            progress_rate: Number(data.progress_rate || 0),
+            score_rate: Number(data.score_rate || 0)
+        };
+    },
+
+
+
+    // 确保数据有效性的方法
+
+    ensureLevelData(data) {
+        const defaultData = {
+            student_count: 0,
+            percentage: 0,
+            first_mean: 0,
+            last_mean: 0,
+            value_added: 0,
+            progress_rate: 0,
+            score_rate: 0
+        };
+
+        if (!data) return defaultData;
+
+        // 确保所有数值都是有效的数字
+        return {
+            student_count: Number(data.student_count || 0),
+            percentage: Number(data.percentage || 0),
+            first_mean: Number(data.first_mean || 0),
+            last_mean: Number(data.last_mean || 0),
+            value_added: Number(data.value_added || 0),
+            progress_rate: Number(data.progress_rate || 0),
+            score_rate: Number(data.score_rate || 0)
+        };
+    },
+
+            formatWithSign(value) {
+                if (value === undefined || value === null) return '0.0';
+                const num = Number(value);
+                if (isNaN(num)) return '0.0';
+                return num > 0 ? `+${num.toFixed(1)}` : num.toFixed(1);
+            },
 
             formatPercent(value) {
                 if (value === undefined || value === null) return '0.0%';
-                return `${Number(value).toFixed(1)}%`;
+                const num = Number(value);
+                if (isNaN(num)) return '0.0%';
+                return `${num.toFixed(1)}%`;
             },
+
             formatScore(value) {
                 if (value === undefined || value === null) return '0.0';
-                return Number(value).toFixed(1);
+                const num = Number(value);
+                if (isNaN(num)) return '0.0';
+                return num.toFixed(1);
             },
+
             getValueClass(value) {
-                if (!value) return '';
+                if (!value || isNaN(Number(value))) return '';
                 return Number(value) > 0 ? 'positive' : 'negative';
             },
             getSubjectName(subject) {
@@ -390,13 +697,13 @@
                     if (document.getElementById('trendChart')) {
                         const trendChart = echarts.init(document.getElementById('trendChart'));
                         trendChart.setOption({
-                            title: { text: '整体增值趋势' },
-                            tooltip: { trigger: 'axis' },
+                            title: {text: '整体增值趋势'},
+                            tooltip: {trigger: 'axis'},
                             xAxis: {
                                 type: 'category',
                                 data: this.trendData.labels || []
                             },
-                            yAxis: { type: 'value' },
+                            yAxis: {type: 'value'},
                             series: [{
                                 data: this.trendData.values || [],
                                 type: 'line',
@@ -432,10 +739,10 @@
                             },
                             tooltip: {
                                 trigger: 'item',
-                                formatter: function(params) {
+                                formatter: function (params) {
                                     return params.name + '<br/>' +
-                                           params.marker + ' 增值分: ' +
-                                           params.value.toFixed(2);
+                                        params.marker + ' 增值分: ' +
+                                        params.value.toFixed(2);
                                 }
                             },
                             radar: {
@@ -500,7 +807,7 @@
                         const distribution = this.subjectAnalysis.pattern_distribution || {};
 
                         patternChart.setOption({
-                            title: { text: '增长模式分布' },
+                            title: {text: '增长模式分布'},
                             tooltip: {
                                 trigger: 'item',
                                 formatter: '{b}: {c} ({d}%)'
@@ -583,7 +890,17 @@
                 // 实现查看学校详细分析的功能
                 this.$message.info(`查看 ${school.school_name} 的详细分析`);
                 // 可以跳转到学校详细分析页面或打开对话框显示详细信息
-            }
+            },
+            handleDialogOpen() {
+                console.log('对话框打开，当前数据:', {
+                    school: this.currentSchool,
+                    subject: this.currentSubject,
+                    levelData: this.levelAnalysisTableData
+                });
+            },
+
+
+
         },
         mounted() {
             // 如果初始有数据，显示图表
@@ -591,6 +908,7 @@
                 this.initCharts();
             }
         },
+
          watch: {
                 activeSubjectTab(newTab) {
                     // 切换标签时重新调整图表大小

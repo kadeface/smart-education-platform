@@ -95,16 +95,51 @@ class ValueAddedDetailView(TemplateView):
             service.prepare_data()
             t_scores_df = service.t_scores_df  # 获取T分数据DataFrame
 
+            # 获取所有唯一的学科及其名称
+            subjects_info = t_scores_df[['subject', 'subject_name']].drop_duplicates().to_dict('records')
+            logger.info(f"分析的学科: {subjects_info}")
+
             # 1. 生成区域整体分析结果
             analysis_results = {
                 'core_metrics': self._get_core_metrics(t_scores_df),
                 'trend_data': self._get_trend_data(t_scores_df),
-                'subject_analysis': self._get_subject_analysis(t_scores_df)
+                'subject_analysis': self._get_subject_analysis(t_scores_df),
             }
 
             # 2. 添加学校各学科增值对比分析
             schools_comparison = self._get_schools_subject_analysis(t_scores_df)
+            # 3. 为每个学校添加分层分析数据
+            for school in schools_comparison:
+                school_name = school['school_name']
+                logger.info(f"处理学校数据: {school_name}")
+
+                # 获取该学校的数据
+                school_df = t_scores_df[t_scores_df['school_name'] == school_name]
+
+                if school_df.empty:
+                    logger.warning(f"学校 {school_name} 没有找到相关数据")
+                    continue
+
+                # 对每个学科进行分层分析
+                for subject_info in subjects_info:
+                    subject_code = subject_info['subject']
+                    subject_name = subject_info['subject_name']
+
+                    subject_df = school_df[school_df['subject'] == subject_code]
+
+                    if not subject_df.empty:
+                        logger.info(f"分析学校 {school_name} 的 {subject_name} 学科数据")
+                        # 计算分层统计数据
+                        level_analysis = self._calculate_level_statistics(subject_df, subject_code)
+                        # 将分层分析结果添加到学校数据中
+                        school[f'{subject_code}_level_analysis'] = level_analysis
+                    else:
+                        logger.warning(f"学校 {school_name} 的 {subject_name} 学科没有数据")
+
             analysis_results['schools_comparison'] = schools_comparison
+
+            # 添加学科信息到返回结果中，方便前端使用
+            analysis_results['subjects'] = subjects_info
 
             return JsonResponse({
                 'status': 'success',
@@ -113,6 +148,7 @@ class ValueAddedDetailView(TemplateView):
 
         except Exception as e:
             logger.error(f"分析处理失败: {str(e)}")
+            logger.exception(e)
             return JsonResponse({
                 'status': 'error',
                 'message': str(e)
@@ -606,7 +642,9 @@ class ValueAddedDetailView(TemplateView):
                             'progress_rate': float(progress_rate),
                             'student_count': int(total)
                         }
-
+                    # 添加分层统计数据
+               #         level_stats = self._calculate_level_statistics(subject_df, subject)
+               #         school_data[f'{subject}_level_analysis'] = level_stats
                 schools_data.append(school_data)
 
             return schools_data
@@ -614,3 +652,120 @@ class ValueAddedDetailView(TemplateView):
         except Exception as e:
             logger.error(f"获取学校学科增值对比分析失败: {str(e)}")
             return []
+
+    def _calculate_level_statistics(self, subject_df, subject):
+        """
+        计算学科分层统计数据
+
+        Args:
+            subject_df: 学科数据DataFrame
+            subject: 学科代码
+
+        Returns:
+            dict: 包含各层次统计数据的字典
+        """
+        try:
+            # 获取首次和最后一次考试
+            exam_ids = sorted(subject_df['exam_id'].unique())
+            first_exam = exam_ids[0]
+            last_exam = exam_ids[-1]
+
+            # 获取参加了两次考试的学生ID
+            first_exam_students = set(subject_df[subject_df['exam_id'] == first_exam]['student_id'])
+            last_exam_students = set(subject_df[subject_df['exam_id'] == last_exam]['student_id'])
+            common_students = list(first_exam_students.intersection(last_exam_students))
+
+            # 只选择参加了两次考试的学生数据
+            valid_df = subject_df[subject_df['student_id'].isin(common_students)]
+
+            # 获取最后一次考试的T分，用于分层
+            last_scores = valid_df[valid_df['exam_id'] == last_exam]
+            total_students = len(common_students)
+
+            logger.info(f"首次考试学生数: {len(first_exam_students)}")
+            logger.info(f"最后考试学生数: {len(last_exam_students)}")
+            logger.info(f"共同参考学生数: {total_students}")
+
+            # 定义分层
+            levels = {
+                'excellent': {'name': '卓越组', 'range': [80, 100], 'data': {}},  # 修改这里
+                'good': {'name': '优秀组', 'range': [70, 80], 'data': {}},
+                'medium': {'name': '良好组', 'range': [60, 70], 'data': {}},
+                'pass': {'name': '合格组', 'range': [40, 60], 'data': {}},
+                'improve': {'name': '提高组', 'range': [0, 40], 'data': {}}  # 修改这里
+            }
+
+            # 分层统计
+            for level_key, level_info in levels.items():
+                # 筛选该层次的学生
+                if level_key == 'excellent':
+                    level_students = last_scores[last_scores['t_score'] > level_info['range'][0]]
+                elif level_key == 'improve':
+                    level_students = last_scores[last_scores['t_score'] <= level_info['range'][1]]
+                else:
+                    level_students = last_scores[
+                        (last_scores['t_score'] > level_info['range'][0]) &
+                        (last_scores['t_score'] <= level_info['range'][1])
+                        ]
+                student_ids = level_students['student_id'].unique()
+                student_count = len(student_ids)
+
+                if student_count > 0:
+                    # 获取该层次学生的首次和最后一次考试成绩
+                    first_t_scores = valid_df[
+                        (valid_df['exam_id'] == first_exam) &
+                        (valid_df['student_id'].isin(student_ids))
+                        ]['t_score']
+
+                    last_t_scores = valid_df[
+                        (valid_df['exam_id'] == last_exam) &
+                        (valid_df['student_id'].isin(student_ids))
+                        ]['t_score']
+
+                    # 确保数据对齐
+                    first_scores_dict = dict(zip(
+                        valid_df[valid_df['exam_id'] == first_exam]['student_id'],
+                        valid_df[valid_df['exam_id'] == first_exam]['t_score']
+                    ))
+                    last_scores_dict = dict(zip(
+                        valid_df[valid_df['exam_id'] == last_exam]['student_id'],
+                        valid_df[valid_df['exam_id'] == last_exam]['t_score']
+                    ))
+
+                    # 计算配对的分数差
+                    paired_scores = [
+                        (last_scores_dict[student_id] - first_scores_dict[student_id])
+                        for student_id in student_ids
+                        if student_id in first_scores_dict and student_id in last_scores_dict
+                    ]
+
+                    # 计算统计数据
+                    first_mean = first_t_scores.mean()
+                    last_mean = last_t_scores.mean()
+                    value_added = last_mean - first_mean
+
+                    # 计算进步率
+                    improved = sum(diff > 0 for diff in paired_scores)
+                    progress_rate = (improved / len(paired_scores) * 100) if paired_scores else 0
+
+                    # 计算得分率
+                    score_rate = (last_mean / 100 * 100)
+
+                    levels[level_key]['data'] = {
+                        'student_count': student_count,
+                        'percentage': round(student_count / total_students * 100, 1),
+                        'first_mean': round(first_mean, 1),
+                        'last_mean': round(last_mean, 1),
+                        'value_added': round(value_added, 1),
+                        'progress_rate': round(progress_rate, 1),
+                        'score_rate': round(score_rate, 1)
+                    }
+
+                    logger.debug(f"层次 {level_key} 统计数据: {levels[level_key]['data']}")
+
+            return levels
+
+        except Exception as e:
+            logger.error(f"计算分层统计数据失败: {str(e)}")
+            logger.exception(e)  # 输出完整的错误堆栈
+            return {}
