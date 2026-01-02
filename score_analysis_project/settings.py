@@ -147,6 +147,9 @@ STATICFILES_FINDERS = [
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# 设置自定义端口
+PORT = 8010  # 设置你想要的端口号
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
