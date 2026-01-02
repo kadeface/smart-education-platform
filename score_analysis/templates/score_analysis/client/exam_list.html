@@ -4,7 +4,9 @@
 {% block title %}考试列表 - 开平市中小学教学质量增值评价系统{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <style>
     .exam-grid {
         display: grid;
@@ -117,45 +119,54 @@
 {% endblock %}
 
 {% block content %}
-<div class="exam-list">
-    <div class="page-header">
-        <h1>考试列表</h1>
+<div class="exam-list py-8 px-2 md:px-0 bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
+    <div class="page-header mb-8 p-6 bg-white bg-opacity-80 rounded-xl shadow flex items-center">
+        <h1 class="text-2xl font-bold text-blue-700 m-0">
+            <i class="fas fa-list-alt mr-3"></i> 考试列表
+        </h1>
     </div>
-    <div class="exam-grid">
+    <div class="exam-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
         {% for exam in exams %}
-            <div class="exam-card">
-                <div class="exam-info">
-                    <h2>{{ exam.exam_name }}</h2>
-                    <p class="exam-date">{{ exam.exam_date|date:"Y-m-d" }}</p>
-                    <p class="exam-type">{{ exam.exam_type }}</p>
+            <div class="exam-card bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="exam-info mb-6">
+                    <h2 class="text-lg font-semibold text-blue-600 mb-3 bg-blue-50 rounded px-3 py-2">{{ exam.exam_name }}</h2>
+                    <p class="exam-date flex items-center text-gray-500 mb-2">
+                        <i class="far fa-calendar-alt mr-2 text-blue-400"></i>
+                        {{ exam.exam_date|date:"Y-m-d" }}
+                    </p>
+                    <p class="exam-type flex items-center text-gray-500">
+                        <i class="fas fa-tasks mr-2 text-green-400"></i>
+                        {{ exam.exam_type }}
+                    </p>
                 </div>
-                <div class="exam-actions">
+                <div class="exam-actions text-right">
                     {% if module_type == 'area' %}
                         <a href="{% url 'score_analysis:area_analysis' exam_id=exam.exam_id %}"
-                           class="view-stats-btn">
-                            查看区域评价
+                           class="view-stats-btn inline-block bg-green-500 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-green-600 transition text-sm">
+                            <i class="fas fa-map-marked-alt mr-2"></i> 查看区域评价
                         </a>
                     {% elif module_type == 'value_added' %}
                         <a href="{% url 'score_analysis:value_added_analysis' exam_id=exam.exam_id %}"
-                           class="view-stats-btn">
-                            查看增值评价
+                           class="view-stats-btn inline-block bg-blue-400 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-blue-500 transition text-sm">
+                            <i class="fas fa-chart-line mr-2"></i> 查看增值评价
                         </a>
                     {% elif module_type == 'tracking' %}
                         <a href="{% url 'score_analysis:tracking_analysis' exam_id=exam.exam_id %}"
-                           class="view-stats-btn">
-                            查看跟踪监测
+                           class="view-stats-btn inline-block bg-indigo-500 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-indigo-600 transition text-sm">
+                            <i class="fas fa-user-graduate mr-2"></i> 查看跟踪监测
                         </a>
                     {% else %}
                         <a href="{% url 'score_analysis:overview_analysis' exam_id=exam.exam_id %}"
-                           class="view-stats-btn">
-                            查看统计结果
+                           class="view-stats-btn inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-blue-700 transition text-sm">
+                            <i class="fas fa-chart-bar mr-2"></i> 查看统计结果
                         </a>
                     {% endif %}
                 </div>
             </div>
         {% empty %}
-            <div class="no-data">
-                <p>暂无考试数据</p>
+            <div class="no-data col-span-full text-center py-16 bg-white rounded-2xl shadow text-gray-400">
+                <i class="fas fa-info-circle text-3xl mb-2"></i>
+                <p class="text-lg">暂无考试数据</p>
             </div>
         {% endfor %}
     </div>

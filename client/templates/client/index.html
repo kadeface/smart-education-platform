@@ -4,71 +4,83 @@
 {% block title %}广东省开平市中小学教学质量增值评价系统{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- Font Awesome 6（建议升级） -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<!-- Tailwind CSS CDN（如base.html未引入） -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<!-- Animate.css（可选） -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<!-- 保留原有自定义样式，便于逐步迁移 -->
 <link rel="stylesheet" href="{% static 'client/css/client_index.css' %}">
 {% endblock %}
 
 {% block content %}
-<div class="client-home">
-<!-- 功能卡片区域 -->
-<div class="feature-cards">
-    <!-- 质量监测 -->
-    <div class="feature-card">
-        <div class="card-icon">
-            <i class="fas fa-chart-pie"></i>
+<div class="client-home py-8 px-2 md:px-0 bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
+    <!-- 功能卡片区域 -->
+    <div class="feature-cards grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+        <!-- 质量监测 -->
+        <div class="feature-card bg-white rounded-2xl shadow-lg p-8 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+            <div class="card-icon mb-4 text-blue-500 text-4xl">
+                <i class="fas fa-chart-pie"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">质量监测</h3>
+            <ul class="text-gray-600 mb-6 space-y-1 text-center">
+                <li>考试成绩总体分析</li>
+                <li>各科成绩分布统计</li>
+                <li>及格率/优秀率分析</li>
+            </ul>
+            <a href="{% url 'client:grade_select' module_type='overview' %}" class="feature-btn bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition">
+                进入 <i class="fas fa-arrow-right ml-2"></i>
+            </a>
         </div>
-        <h3>质量监测</h3>
-        <ul>
-            <li>考试成绩总体分析</li>
-            <li>各科成绩分布统计</li>
-            <li>及格率/优秀率分析</li>
-        </ul>
-        <a href="{% url 'client:grade_select' module_type='overview' %}" class="feature-btn">进入</a>
-    </div>
 
-    <!-- 区域分析 -->
-    <div class="feature-card">
-        <div class="card-icon">
-            <i class="fas fa-map-marked-alt"></i>
+        <!-- 区域分析 -->
+        <div class="feature-card bg-white rounded-2xl shadow-lg p-8 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+            <div class="card-icon mb-4 text-green-500 text-4xl">
+                <i class="fas fa-map-marked-alt"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">区域分析</h3>
+            <ul class="text-gray-600 mb-6 space-y-1 text-center">
+                <li>学校间成绩对比</li>
+                <li>区域间学校对比</li>
+                <li>整体水平评估</li>
+            </ul>
+            <a href="{% url 'client:grade_select' module_type='area' %}" class="feature-btn bg-green-500 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-green-600 transition">
+                进入 <i class="fas fa-arrow-right ml-2"></i>
+            </a>
         </div>
-        <h3>区域分析</h3>
-        <ul>
-            <li>学校间成绩对比</li>
-            <li>区域间学校对比</li>
-            <li>整体水平评估</li>
-        </ul>
-        <a href="{% url 'client:grade_select' module_type='area' %}" class="feature-btn">进入</a>
-    </div>
 
-    <!-- 增值评估 -->
-    <div class="feature-card">
-        <div class="card-icon">
-            <i class="fas fa-chart-line"></i>
+        <!-- 增值评估 -->
+        <div class="feature-card bg-white rounded-2xl shadow-lg p-8 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+            <div class="card-icon mb-4 text-blue-400 text-4xl">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">增值评估</h3>
+            <ul class="text-gray-600 mb-6 space-y-1 text-center">
+                <li>区县增值分析</li>
+                <li>学校增值分析</li>
+                <li>多次考试对比</li>
+            </ul>
+            <a href="{% url 'client:grade_select' module_type='value_added' %}" class="feature-btn bg-blue-400 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-500 transition">
+                进入 <i class="fas fa-arrow-right ml-2"></i>
+            </a>
         </div>
-        <h3>增值评估</h3>
-        <ul>
-            <li>区县增值分析</li>
-            <li>学校增值分析</li>
-            <li>多次考试对比</li>
-        </ul>
-        <a href="{% url 'client:grade_select' module_type='value_added' %}" class="feature-btn">进入</a>
-    </div>
 
-    <!-- 发展跟踪 -->
-    <div class="feature-card">
-        <div class="card-icon">
-            <i class="fas fa-user-graduate"></i>
+        <!-- 发展跟踪 -->
+        <div class="feature-card bg-white rounded-2xl shadow-lg p-8 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+            <div class="card-icon mb-4 text-indigo-500 text-4xl">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">发展跟踪</h3>
+            <ul class="text-gray-600 mb-6 space-y-1 text-center">
+                <li>个人成绩发展轨迹</li>
+                <li>学生进步情况分析</li>
+                <li>长期成长趋势图</li>
+            </ul>
+            <a href="{% url 'client:grade_select' module_type='tracking' %}" class="feature-btn bg-indigo-500 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-indigo-600 transition">
+                进入 <i class="fas fa-arrow-right ml-2"></i>
+            </a>
         </div>
-        <h3>发展跟踪</h3>
-        <ul>
-            <li>个人成绩发展轨迹</li>
-            <li>学生进步情况分析</li>
-            <li>长期成长趋势图</li>
-        </ul>
-        <a href="{% url 'client:grade_select' module_type='tracking' %}" class="feature-btn">进入</a>
     </div>
-</div>
-
-
 </div>
 {% endblock %}

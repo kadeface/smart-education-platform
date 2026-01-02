@@ -1792,7 +1792,7 @@ class ElitePortraitView(View):
             if is_city_exam:
                 # 市级考试：只查找上一次市级考试
                 prev_exams = BaseExamConfig.objects.filter(
-                    exam_id__contains='CITY',
+                    exam_id__contains=current_exam_id[-11:],
                     exam_id__lt=current_exam_id
                 ).order_by('-exam_id')
                 rank_type = 'city_rank'
@@ -2202,13 +2202,15 @@ class ElitePortraitView(View):
         """获取学生历史成绩数据。"""
         try:
             # 获取最近5次考试的记录
+            suffix = current_exam_id[-11:]  # 获取后10位作为筛选条件
             history_records = TrackingRecord.objects.filter(
-                student_id=student_id
+                student_id=student_id,
+                exam_id__endswith=suffix  # 筛选以指定后缀结尾的考试记录
             ).order_by('-exam_id')[:5]
 
             # 判断是否为理科生
             latest_record = history_records.first()
-            is_science = latest_record.select_type == 'science' if latest_record else True
+            is_science = latest_record.select_type == '理科' if latest_record else True
 
             # 准备数据
             history_data = []

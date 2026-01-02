@@ -1,6 +1,29 @@
 <!-- templates/score_analysis/tracking/elite_portrait.html -->
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_filters %}
+
+{% block styles %}
+<style>
+.analysis-table th,
+.analysis-table td {
+    padding: 0.4rem;
+    text-align: center;
+    vertical-align: middle;
+}
+.analysis-table thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+.card-title { font-size: 0.9rem; color: #6c757d; }
+.progress { background-color: #e9ecef; }
+.progress-bar { background-color: #28a745; }
+@media (max-width: 768px) {
+    .analysis-table { font-size: 0.75rem; }
+    .card-title { font-size: 0.8rem; }
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <!-- 标题和考试信息部分 -->

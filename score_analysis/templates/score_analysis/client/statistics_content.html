@@ -4,51 +4,53 @@
 {% block title %}统计结果 - {{ exam.exam_name }}{% endblock %}
 
 {% block content %}
-<div class="statistics-container">
-    <div class="exam-header">
-        <h1>{{ exam.exam_name }} - 统计结果</h1>
-        <div class="exam-info">
-            <span>考试日期：{{ exam.exam_date|date:"Y-m-d" }}</span>
-            <span>考试类型：{{ exam.exam_type }}</span>
+<div class="statistics-container py-8 px-2 md:px-0 bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
+    <div class="exam-header mb-8 bg-white rounded-xl shadow p-6 flex flex-col md:flex-row md:items-center md:justify-between">
+        <h1 class="text-2xl font-bold text-blue-700 mb-4 md:mb-0">
+            <i class="fas fa-chart-bar mr-2"></i>{{ exam.exam_name }} - 统计结果
+        </h1>
+        <div class="exam-info flex flex-col md:flex-row md:space-x-6 text-gray-600">
+            <span><i class="far fa-calendar-alt mr-1 text-blue-400"></i>考试日期：{{ exam.exam_date|date:"Y-m-d" }}</span>
+            <span><i class="fas fa-tasks mr-1 text-green-400"></i>考试类型：{{ exam.exam_type }}</span>
         </div>
     </div>
 
-    <div class="statistics-content">
+    <div class="statistics-content space-y-10">
         {% for indicator in indicators %}
-            <div class="stat-section">
+            <div class="stat-section bg-white rounded-2xl shadow-lg p-6 animate__animated animate__fadeInUp">
                 {% if indicator.subject %}
-                    <h3>{{ indicator.subject }} 统计数据</h3>
+                    <h3 class="text-lg font-semibold text-blue-600 mb-4">{{ indicator.subject }} 统计数据</h3>
                 {% else %}
-                    <h3>总体统计数据</h3>
+                    <h3 class="text-lg font-semibold text-blue-600 mb-4">总体统计数据</h3>
                 {% endif %}
 
-                <div class="stat-cards">
-                    <div class="stat-card">
-                        <div class="stat-card-title">参考人数</div>
-                        <div class="stat-card-value">{{ indicator.student_count }}</div>
+                <div class="stat-cards grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 mb-4">
+                    <div class="stat-card bg-blue-50 rounded-lg p-4 flex flex-col items-center">
+                        <div class="stat-card-title text-gray-500 mb-1">参考人数</div>
+                        <div class="stat-card-value text-xl font-bold text-blue-700">{{ indicator.student_count }}</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-card-title">平均分</div>
-                        <div class="stat-card-value">{{ indicator.mean_score|floatformat:1 }}</div>
+                    <div class="stat-card bg-blue-50 rounded-lg p-4 flex flex-col items-center">
+                        <div class="stat-card-title text-gray-500 mb-1">平均分</div>
+                        <div class="stat-card-value text-xl font-bold text-blue-700">{{ indicator.mean_score|floatformat:1 }}</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-card-title">最高分</div>
-                        <div class="stat-card-value">{{ indicator.max_score }}</div>
+                    <div class="stat-card bg-blue-50 rounded-lg p-4 flex flex-col items-center">
+                        <div class="stat-card-title text-gray-500 mb-1">最高分</div>
+                        <div class="stat-card-value text-xl font-bold text-blue-700">{{ indicator.max_score }}</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-card-title">最低分</div>
-                        <div class="stat-card-value">{{ indicator.min_score }}</div>
+                    <div class="stat-card bg-blue-50 rounded-lg p-4 flex flex-col items-center">
+                        <div class="stat-card-title text-gray-500 mb-1">最低分</div>
+                        <div class="stat-card-value text-xl font-bold text-blue-700">{{ indicator.min_score }}</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-card-title">及格率</div>
-                        <div class="stat-card-value">{{ indicator.pass_rate|floatformat:1 }}%</div>
+                    <div class="stat-card bg-blue-50 rounded-lg p-4 flex flex-col items-center">
+                        <div class="stat-card-title text-gray-500 mb-1">及格率</div>
+                        <div class="stat-card-value text-xl font-bold text-blue-700">{{ indicator.pass_rate|floatformat:1 }}%</div>
                     </div>
                 </div>
 
                 {% if indicator.rank_distribution %}
-                <div class="chart-section">
-                    <h4>分数分布</h4>
-                    <div class="chart-container">
+                <div class="chart-section mt-6">
+                    <h4 class="text-base font-semibold text-green-600 mb-2">分数分布</h4>
+                    <div class="chart-container bg-white rounded-lg shadow p-4">
                         {{ indicator.rank_distribution|safe }}
                     </div>
                 </div>
@@ -57,9 +59,9 @@
         {% endfor %}
     </div>
 
-    <div class="actions">
-        <a href="{% url 'score_analysis:client_exam_list' %}" class="back-btn">
-            返回列表
+    <div class="actions mt-10 text-center">
+        <a href="{% url 'score_analysis:client_exam_list' %}" class="back-btn inline-block bg-gray-200 text-gray-700 font-semibold px-6 py-2 rounded-lg shadow hover:bg-gray-300 transition">
+            <i class="fas fa-arrow-left mr-2"></i> 返回列表
         </a>
     </div>
 </div>

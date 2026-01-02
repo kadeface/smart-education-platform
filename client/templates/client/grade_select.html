@@ -4,7 +4,13 @@
 {% block title %}{{ module_name }} - 学段选择{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<!-- Font Awesome 6（建议升级） -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+<!-- Tailwind CSS CDN（如base.html未引入） -->
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<!-- Animate.css（可选） -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<!-- 保留原有自定义样式，便于逐步迁移 -->
 <link rel="stylesheet" href="{% static 'score_analysis/css/client_default.css' %}">
 <style>
     /* 修改卡片布局为三列 */
@@ -56,179 +62,269 @@
 {% endblock %}
 
 {% block content %}
-<div class="education-sections">
+<div class="education-sections space-y-16 py-8 px-2 md:px-0 bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
     <!-- 高中部分 -->
     <div class="education-section">
-        <h2 class="section-header">高中</h2>
-        <div class="feature-cards">
-            <div class="feature-card">
-                <div class="card-icon">
+        <h2 class="section-header text-2xl font-bold text-teal-600 border-b-2 border-teal-400 mb-6 pb-2">高中</h2>
+        <div class="feature-cards grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-indigo-500 text-3xl mb-3">
                     <i class="fas fa-graduation-cap"></i>
                 </div>
-                <h3>高三</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">高三</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>高三年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.高三 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高三 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高三 %}" class="feature-btn bg-indigo-500 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-indigo-600 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-indigo-400 text-3xl mb-3">
                     <i class="fas fa-graduation-cap"></i>
                 </div>
-                <h3>高二</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">高二</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>高二年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.高二 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高二 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高二 %}" class="feature-btn bg-indigo-400 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-indigo-500 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-indigo-300 text-3xl mb-3">
                     <i class="fas fa-graduation-cap"></i>
                 </div>
-                <h3>高一</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">高一</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>高一年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.高一 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高一 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.高一 %}" class="feature-btn bg-indigo-300 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-indigo-400 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
         </div>
+        
+        <!-- 高中历史毕业班部分 -->
+        {% if history_grades %}
+        <div class="mt-8">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <i class="fas fa-history text-gray-500 mr-2"></i>
+                历史毕业班
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {% for grade_name, grade_id in history_grades.items %}
+                    {% if '-H' in grade_id and '届高中' in grade_name %}
+                    <div class="feature-card bg-gray-50 rounded-lg shadow p-4 flex flex-col items-center hover:shadow-md transition">
+                        <div class="card-icon text-gray-400 text-2xl mb-2">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <h4 class="text-sm font-semibold mb-2">{{ grade_name }}</h4>
+                        <a href="{% url 'client:exam_select' module_type=module_type grade=grade_id %}" class="feature-btn bg-green-500 text-white font-semibold px-4 py-2 rounded-lg shadow hover:bg-green-600 transition text-xs">
+                            查看 <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- 初中部分 -->
     <div class="education-section">
-        <h2 class="section-header">初中</h2>
-        <div class="feature-cards">
-            <div class="feature-card">
-                <div class="card-icon">
+        <h2 class="section-header text-2xl font-bold text-green-600 border-b-2 border-green-400 mb-6 pb-2">初中</h2>
+        <div class="feature-cards grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-green-500 text-3xl mb-3">
                     <i class="fas fa-school"></i>
                 </div>
-                <h3>初三</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">初三</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>初三年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.初三 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初三 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初三 %}" class="feature-btn bg-green-500 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-green-600 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-green-400 text-3xl mb-3">
                     <i class="fas fa-school"></i>
                 </div>
-                <h3>初二</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">初二</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>初二年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.初二 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初二 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初二 %}" class="feature-btn bg-green-400 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-green-500 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-green-300 text-3xl mb-3">
                     <i class="fas fa-school"></i>
                 </div>
-                <h3>初一</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">初一</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>初一年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.初一 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初一 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.初一 %}" class="feature-btn bg-green-300 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-green-400 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
         </div>
+        
+        <!-- 初中历史毕业班部分 -->
+        {% if history_grades %}
+        <div class="mt-8">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <i class="fas fa-history text-gray-500 mr-2"></i>
+                历史毕业班
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {% for grade_name, grade_id in history_grades.items %}
+                    {% if '-M' in grade_id and '届初中' in grade_name %}
+                    <div class="feature-card bg-gray-50 rounded-lg shadow p-4 flex flex-col items-center hover:shadow-md transition">
+                        <div class="card-icon text-gray-400 text-2xl mb-2">
+                            <i class="fas fa-school"></i>
+                        </div>
+                        <h4 class="text-sm font-semibold mb-2">{{ grade_name }}</h4>
+                        <a href="{% url 'client:exam_select' module_type=module_type grade=grade_id %}" class="feature-btn bg-green-500 text-white font-semibold px-4 py-2 rounded-lg shadow hover:bg-green-600 transition text-xs">
+                            查看 <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- 小学部分 -->
     <div class="education-section">
-        <h2 class="section-header">小学</h2>
-        <div class="feature-cards">
-            <div class="feature-card">
-                <div class="card-icon">
+        <h2 class="section-header text-2xl font-bold text-yellow-600 border-b-2 border-yellow-400 mb-6 pb-2">小学</h2>
+        <div class="feature-cards grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-yellow-500 text-3xl mb-3">
                     <i class="fas fa-child"></i>
                 </div>
-                <h3>六年级</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">六年级</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>六年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.六年级 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.六年级 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.六年级 %}" class="feature-btn bg-yellow-500 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-yellow-600 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-yellow-400 text-3xl mb-3">
                     <i class="fas fa-child"></i>
                 </div>
-                <h3>五年级</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">五年级</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>五年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.五年级 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.五年级 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.五年级 %}" class="feature-btn bg-yellow-400 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-yellow-500 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-yellow-300 text-3xl mb-3">
                     <i class="fas fa-child"></i>
                 </div>
-                <h3>四年级</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">四年级</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>四年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.四年级 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.四年级 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.四年级 %}" class="feature-btn bg-yellow-300 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-yellow-400 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-yellow-200 text-3xl mb-3">
                     <i class="fas fa-child"></i>
                 </div>
-                <h3>三年级</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">三年级</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>三年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.三年级 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.三年级 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.三年级 %}" class="feature-btn bg-yellow-200 text-white font-semibold px-5 py-2 rounded-lg shadow hover:bg-yellow-300 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-yellow-100 text-3xl mb-3">
                     <i class="fas fa-child"></i>
                 </div>
-                <h3>二年级</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">二年级</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>二年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.二年级 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.二年级 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.二年级 %}" class="feature-btn bg-yellow-100 text-gray-800 font-semibold px-5 py-2 rounded-lg shadow hover:bg-yellow-200 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
-
-            <div class="feature-card">
-                <div class="card-icon">
+            <div class="feature-card bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center hover:shadow-2xl transition animate__animated animate__fadeInUp">
+                <div class="card-icon text-yellow-50 text-3xl mb-3">
                     <i class="fas fa-child"></i>
                 </div>
-                <h3>一年级</h3>
-                <ul>
+                <h3 class="text-lg font-semibold mb-2">一年级</h3>
+                <ul class="text-gray-600 mb-4 text-center text-sm space-y-1">
                     <li>一年级数据分析</li>
                     <li>学科成绩统计</li>
                     <li>{{ grade_years.一年级 }}届</li>
                 </ul>
-                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.一年级 %}" class="feature-btn">进入</a>
+                <a href="{% url 'client:exam_select' module_type=module_type grade=grade_years.一年级 %}" class="feature-btn bg-yellow-50 text-gray-800 font-semibold px-5 py-2 rounded-lg shadow hover:bg-yellow-100 transition text-sm">
+                    进入 <i class="fas fa-arrow-right ml-2"></i>
+                </a>
             </div>
         </div>
+        
+        <!-- 小学历史毕业班部分 -->
+        {% if history_grades %}
+        <div class="mt-8">
+            <h3 class="text-lg font-semibold text-gray-700 mb-4 flex items-center">
+                <i class="fas fa-history text-gray-500 mr-2"></i>
+                历史毕业班
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {% for grade_name, grade_id in history_grades.items %}
+                    {% if '-P' in grade_id and '届小学' in grade_name %}
+                    <div class="feature-card bg-gray-50 rounded-lg shadow p-4 flex flex-col items-center hover:shadow-md transition">
+                        <div class="card-icon text-gray-400 text-2xl mb-2">
+                            <i class="fas fa-child"></i>
+                        </div>
+                        <h4 class="text-sm font-semibold mb-2">{{ grade_name }}</h4>
+                        <a href="{% url 'client:exam_select' module_type=module_type grade=grade_id %}" class="feature-btn bg-green-500 text-white font-semibold px-4 py-2 rounded-lg shadow hover:bg-green-600 transition text-xs">
+                            查看 <i class="fas fa-arrow-right ml-1"></i>
+                        </a>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

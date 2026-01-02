@@ -3,104 +3,102 @@
 {# 在头部添加样式引用 #}
 {% block extrastyle %}
     {{ block.super }}
-    <!-- DEBUG: CSS URL = {% static 'score_analysis/css/statistics.css' %} -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link rel="stylesheet" type="text/css" href="{% static 'score_analysis/css/statistics.css' %}">
 {% endblock %}
 
 {% block content %}
 
-<div class="statistics-container">
+<div class="statistics-container py-8 px-2 md:px-0 bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
     <!-- 考试概况标题 -->
-    <div class="section-title">
-        <h2>考试概况</h2>
+    <div class="section-title mb-8">
+        <h2 class="text-2xl font-bold text-blue-700"><i class="fas fa-info-circle mr-2"></i>考试概况</h2>
     </div>
 
     <!-- 市级数据 -->
-    <div class="summary-container">
+    <div class="summary-container grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <!-- 理科综述 -->
-        <div class="summary-section">
-            <h3>理科综述</h3>
-            <div class="summary-text">
-                本次考试，总计有<span class="number-highlight">{{ science_summary.school_count }}</span>所学校，
-                参考总人数<span class="number-highlight">{{ science_summary.student_count }}</span>人。
-                平均分为<span class="score-highlight">{{ science_summary.mean_score }}</span>分，
-                最高分为<span class="score-highlight">{{ science_summary.max_score }}</span>分，
-                归属于<span class="school-highlight">{{ science_summary.top_school }}</span>。
+        <div class="summary-section bg-white rounded-2xl shadow-lg p-6 animate__animated animate__fadeInUp">
+            <h3 class="text-lg font-semibold text-blue-600 mb-2">理科综述</h3>
+            <div class="summary-text text-gray-700">
+                本次考试，总计有<span class="number-highlight font-bold text-green-600">{{ science_summary.school_count }}</span>所学校，
+                参考总人数<span class="number-highlight font-bold text-green-600">{{ science_summary.student_count }}</span>人。
+                平均分为<span class="score-highlight font-bold text-blue-600">{{ science_summary.mean_score }}</span>分，
+                最高分为<span class="score-highlight font-bold text-blue-600">{{ science_summary.max_score }}</span>分，
+                归属于<span class="school-highlight font-bold text-indigo-600">{{ science_summary.top_school }}</span>。
 
                 {% for key, line in science_summary.score_lines.items %}
-                    {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
-                    人数<span class="number-highlight">{{ line.count }}</span>人
-                    （<span class="rate-highlight">{{ line.rate }}%</span>）
+                    {{ line.name }}模拟上线（<span class="score-highlight font-bold text-blue-600">{{ line.score }}</span>分）
+                    人数<span class="number-highlight font-bold text-green-600">{{ line.count }}</span>人
+                    （<span class="rate-highlight font-bold text-yellow-600">{{ line.rate }}%</span>）
                 {% endfor %}
             </div>
         </div>
 
         <!-- 文科综述 -->
-        <div class="summary-section">
-            <h3>文科综述</h3>
-            <div class="summary-text">
-                本次考试，总计有<span class="number-highlight">{{ arts_summary.school_count }}</span>所学校，
-                参考总人数<span class="number-highlight">{{ arts_summary.student_count }}</span>人。
-                平均分为<span class="score-highlight">{{ arts_summary.mean_score }}</span>分，
-                最高分为<span class="score-highlight">{{ arts_summary.max_score }}</span>分，
-                归属于<span class="school-highlight">{{ arts_summary.top_school }}</span>。
+        <div class="summary-section bg-white rounded-2xl shadow-lg p-6 animate__animated animate__fadeInUp">
+            <h3 class="text-lg font-semibold text-green-600 mb-2">文科综述</h3>
+            <div class="summary-text text-gray-700">
+                本次考试，总计有<span class="number-highlight font-bold text-green-600">{{ arts_summary.school_count }}</span>所学校，
+                参考总人数<span class="number-highlight font-bold text-green-600">{{ arts_summary.student_count }}</span>人。
+                平均分为<span class="score-highlight font-bold text-blue-600">{{ arts_summary.mean_score }}</span>分，
+                最高分为<span class="score-highlight font-bold text-blue-600">{{ arts_summary.max_score }}</span>分，
+                归属于<span class="school-highlight font-bold text-indigo-600">{{ arts_summary.top_school }}</span>。
 
                 {% for key, line in arts_summary.score_lines.items %}
-                    {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
-                    人数<span class="number-highlight">{{ line.count }}</span>人
-                    （<span class="rate-highlight">{{ line.rate }}%</span>）
+                    {{ line.name }}模拟上线（<span class="score-highlight font-bold text-blue-600">{{ line.score }}</span>分）
+                    人数<span class="number-highlight font-bold text-green-600">{{ line.count }}</span>人
+                    （<span class="rate-highlight font-bold text-yellow-600">{{ line.rate }}%</span>）
                 {% endfor %}
             </div>
         </div>
 
         <!-- 区县数据（仅地市级考试显示） -->
         {% if level_type == '地市级' and district_data %}
-            <div class="district-summaries">
-                <h3>区县数据</h3>
+            <div class="district-summaries col-span-full">
+                <h3 class="text-lg font-semibold text-indigo-600 mb-4">区县数据</h3>
                 {% for district, data in district_data.items %}
-                    <div class="district-panel">
-                        <!-- 添加隐藏的checkbox -->
-                        <input type="checkbox" id="district-{{ forloop.counter }}" class="district-toggle">
-
-                        <!-- 修改header为label -->
-                        <label class="district-header" for="district-{{ forloop.counter }}">
-                            <h4>{{ district }}</h4>
-                            <span class="toggle-btn"></span>
+                    <div class="district-panel bg-gray-50 rounded-xl shadow p-4 mb-4">
+                        <input type="checkbox" id="district-{{ forloop.counter }}" class="district-toggle hidden">
+                        <label class="district-header flex items-center justify-between cursor-pointer p-2 rounded hover:bg-gray-100 transition" for="district-{{ forloop.counter }}">
+                            <h4 class="text-base font-bold text-blue-700">{{ district }}</h4>
+                            <span class="toggle-btn text-sm text-blue-500">展开</span>
                         </label>
-
-                        <div class="district-content">
+                        <div class="district-content pl-4">
                             <!-- 区县理科综述 -->
-                            <div class="summary-section">
-                                <h5>理科综述</h5>
-                                <div class="summary-text">
-                                    本次考试，总计有<span class="number-highlight">{{ data.science.school_count }}</span>所学校，
-                                    参考总人数<span class="number-highlight">{{ data.science.student_count }}</span>人。
-                                    平均分为<span class="score-highlight">{{ data.science.mean_score }}</span>分，
-                                    最高分为<span class="score-highlight">{{ data.science.max_score }}</span>分，
-                                    归属于<span class="school-highlight">{{ data.science.top_school }}</span>。
+                            <div class="summary-section mb-2">
+                                <h5 class="font-semibold text-blue-600">理科综述</h5>
+                                <div class="summary-text text-gray-700">
+                                    本次考试，总计有<span class="number-highlight font-bold text-green-600">{{ data.science.school_count }}</span>所学校，
+                                    参考总人数<span class="number-highlight font-bold text-green-600">{{ data.science.student_count }}</span>人。
+                                    平均分为<span class="score-highlight font-bold text-blue-600">{{ data.science.mean_score }}</span>分，
+                                    最高分为<span class="score-highlight font-bold text-blue-600">{{ data.science.max_score }}</span>分，
+                                    归属于<span class="school-highlight font-bold text-indigo-600">{{ data.science.top_school }}</span>。
 
                                     {% for key, line in data.science.score_lines.items %}
-                                        {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
-                                        人数<span class="number-highlight">{{ line.count }}</span>人
-                                        （<span class="rate-highlight">{{ line.rate }}%</span>）
+                                        {{ line.name }}模拟上线（<span class="score-highlight font-bold text-blue-600">{{ line.score }}</span>分）
+                                        人数<span class="number-highlight font-bold text-green-600">{{ line.count }}</span>人
+                                        （<span class="rate-highlight font-bold text-yellow-600">{{ line.rate }}%</span>）
                                     {% endfor %}
                                 </div>
                             </div>
 
                             <!-- 区县文科综述 -->
                             <div class="summary-section">
-                                <h5>文科综述</h5>
-                                <div class="summary-text">
-                                    本次考试，总计有<span class="number-highlight">{{ data.arts.school_count }}</span>所学校，
-                                    参考总人数<span class="number-highlight">{{ data.arts.student_count }}</span>人。
-                                    平均分为<span class="score-highlight">{{ data.arts.mean_score }}</span>分，
-                                    最高分为<span class="score-highlight">{{ data.arts.max_score }}</span>分，
-                                    归属于<span class="school-highlight">{{ data.arts.top_school }}</span>。
+                                <h5 class="font-semibold text-green-600">文科综述</h5>
+                                <div class="summary-text text-gray-700">
+                                    本次考试，总计有<span class="number-highlight font-bold text-green-600">{{ data.arts.school_count }}</span>所学校，
+                                    参考总人数<span class="number-highlight font-bold text-green-600">{{ data.arts.student_count }}</span>人。
+                                    平均分为<span class="score-highlight font-bold text-blue-600">{{ data.arts.mean_score }}</span>分，
+                                    最高分为<span class="score-highlight font-bold text-blue-600">{{ data.arts.max_score }}</span>分，
+                                    归属于<span class="school-highlight font-bold text-indigo-600">{{ data.arts.top_school }}</span>。
 
                                     {% for key, line in data.arts.score_lines.items %}
-                                        {{ line.name }}模拟上线（<span class="score-highlight">{{ line.score }}</span>分）
-                                        人数<span class="number-highlight">{{ line.count }}</span>人
-                                        （<span class="rate-highlight">{{ line.rate }}%</span>）
+                                        {{ line.name }}模拟上线（<span class="score-highlight font-bold text-blue-600">{{ line.score }}</span>分）
+                                        人数<span class="number-highlight font-bold text-green-600">{{ line.count }}</span>人
+                                        （<span class="rate-highlight font-bold text-yellow-600">{{ line.rate }}%</span>）
                                     {% endfor %}
                                 </div>
                             </div>
@@ -113,8 +111,8 @@
 </div>
 
 
-<div class="score-distribution-section">
-<h3>分数线达线分布</h3>
+<div class="score-distribution-section bg-white rounded-2xl shadow-lg p-6 mb-8 animate__animated animate__fadeInUp">
+    <h3 class="text-lg font-semibold text-blue-700 mb-4"><i class="fas fa-chart-bar mr-2"></i>分数线达线分布</h3>
     <div class="subject-tabs">
         <input type="radio" id="science-tab" name="subject" checked>
         <label for="science-tab" class="tab-button">理科分数线分布</label>
@@ -176,8 +174,8 @@
     </div>
 </div>
 <!-- 总分排名分布情况 -->
-<div class="score-distribution-section">
-    <h3>总分排名分布</h3>
+<div class="score-distribution-section bg-white rounded-2xl shadow-lg p-6 mb-8 animate__animated animate__fadeInUp">
+    <h3 class="text-lg font-semibold text-blue-700 mb-4"><i class="fas fa-chart-bar mr-2"></i>总分排名分布</h3>
 
     <!-- 文理科切换按钮 -->
     <div class="subject-tabs">
@@ -253,8 +251,8 @@
     </div>
 </div>
 <!-- 四分位分析 -->
-<div class="quartile-section">
-    <h3>各科四分位分析</h3>
+<div class="quartile-section bg-white rounded-2xl shadow-lg p-6 mb-8 animate__animated animate__fadeInUp">
+    <h3 class="text-lg font-semibold text-blue-700 mb-4"><i class="fas fa-chart-bar mr-2"></i>各科四分位分析</h3>
 
     <!-- 文理科切换按钮 -->
     <div class="quartile-tabs">
@@ -326,8 +324,8 @@
     </div>
 </div>
 <!-- 各校各科平均分分析 -->
-<div class="school-means-section">
-    <h3>各校各科平均分分析</h3>
+<div class="school-means-section bg-white rounded-2xl shadow-lg p-6 mb-8 animate__animated animate__fadeInUp">
+    <h3 class="text-lg font-semibold text-blue-700 mb-4"><i class="fas fa-chart-bar mr-2"></i>各校各科平均分分析</h3>
 
     <!-- 文理科切换按钮 -->
     <div class="school-means-tabs">

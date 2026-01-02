@@ -16,15 +16,6 @@
 <!-- ECharts -->
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 
-<!-- Font Awesome -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-
-<!-- Tailwind CSS -->
-<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
-<!-- Animate.css -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-
 <style>
     /* 基础样式 */
     [v-cloak] {
@@ -125,12 +116,12 @@
 </style>
 
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
+<body>
     <!-- 添加CSRF Token -->
     {% csrf_token %}
 
 
-<div id="app" class="container mx-auto py-10 px-2 md:px-0" v-cloak>
+<div id="app" class="container" v-cloak>
     <script type="text/javascript">
         // 将Django模板变量转换为JavaScript变量
         window.INIT_DATA = {
@@ -141,10 +132,9 @@
     </script>
     {% verbatim %}
         <!-- 考试选择区域 -->
-        <el-card class="exam-select mb-8 bg-white rounded-2xl shadow-lg animate__animated animate__fadeInDown">
-            <div slot="header" class="flex items-center text-xl font-bold text-blue-700">
-                <i class="fas fa-list-ul mr-2"></i>
-                <span>选择要分析的考试</span>
+        <el-card class="exam-select">
+            <div slot="header">
+                   <span>选择要分析的考试</span>
             </div>
             <el-form :inline="true" @submit.native.prevent>
                 <el-form-item label="考试列表">
@@ -188,24 +178,24 @@
             <!-- 核心指标卡片 -->
             <el-row :gutter="20">
                 <el-col :span="8">
-                    <el-card class="metrics-card bg-blue-50 rounded-xl shadow p-4">
-                        <div class="metric-title text-gray-500">整体增值率</div>
-                        <div class="metric-value text-2xl font-bold text-blue-600" :class="valueAddedClass">
+                    <el-card class="metrics-card">
+                        <div class="metric-title">整体增值率</div>
+                        <div class="metric-value" :class="valueAddedClass">
                             {{ formatPercent(coreMetrics.value_added_rate) }}
                         </div>
                     </el-card>
                 </el-col>
                 <el-col :span="8">
-                    <el-card class="metrics-card bg-blue-50 rounded-xl shadow p-4">
-                        <div class="metric-title text-gray-500">教学质量评分</div>
+                    <el-card class="metrics-card">
+                        <div class="metric-title">教学质量评分</div>
                         <div class="metric-value">
                             {{ formatScore(coreMetrics.quality_score) }}
                         </div>
                     </el-card>
                 </el-col>
                 <el-col :span="8">
-                    <el-card class="metrics-card bg-blue-50 rounded-xl shadow p-4">
-                        <div class="metric-title text-gray-500">进步学生比例</div>
+                    <el-card class="metrics-card">
+                        <div class="metric-title">进步学生比例</div>
                         <div class="metric-value positive">
                             {{ formatPercent(coreMetrics.improvement_ratio) }}
                         </div>

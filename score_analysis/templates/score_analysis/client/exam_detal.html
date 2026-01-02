@@ -4,38 +4,41 @@
 {% block title %}{{ exam.exam_name }} - 考试详情{% endblock %}
 
 {% block content %}
-<div class="statistics-result-container">
+<div class="statistics-result-container py-8 px-2 md:px-0 bg-gradient-to-br from-blue-50 to-green-50 min-h-screen">
     <!-- 考试基本信息 -->
-    <div class="exam-header">
-        <h1>{{ exam.exam_name }}</h1>
-        <div class="exam-info">
-            <span>考试日期：{{ exam.exam_date|date:"Y-m-d" }}</span>
-            <span>考试类型：{{ exam.exam_type }}</span>
+    <div class="exam-header mb-8 bg-white rounded-xl shadow p-6 flex flex-col md:flex-row md:items-center md:justify-between">
+        <h1 class="text-2xl font-bold text-blue-700 mb-4 md:mb-0">
+            <i class="fas fa-file-alt mr-2"></i>{{ exam.exam_name }}
+        </h1>
+        <div class="exam-info flex flex-col md:flex-row md:space-x-6 text-gray-600">
+            <span><i class="far fa-calendar-alt mr-1 text-blue-400"></i>考试日期：{{ exam.exam_date|date:"Y-m-d" }}</span>
+            <span><i class="fas fa-tasks mr-1 text-green-400"></i>考试类型：{{ exam.exam_type }}</span>
         </div>
     </div>
 
     <!-- 统计数据展示 -->
-    <div class="statistics-content">
+    <div class="statistics-content bg-white rounded-2xl shadow-lg p-6 mb-8 animate__animated animate__fadeInUp">
         {% if statistics %}
             {{ statistics|safe }}
         {% else %}
-            <div class="no-data">
-                <p>暂无统计数据</p>
+            <div class="no-data text-center text-gray-400 py-10">
+                <i class="fas fa-info-circle text-3xl mb-2"></i>
+                <p class="text-lg">暂无统计数据</p>
             </div>
         {% endif %}
     </div>
 
     <!-- 操作按钮 -->
-    <div class="exam-actions">
+    <div class="exam-actions flex flex-col sm:flex-row justify-center gap-4 mt-8">
         <!-- 返回列表按钮 -->
-        <a href="{% url 'score_analysis:client_exam_list' %}" class="back-btn">
-            返回列表
+        <a href="{% url 'score_analysis:client_exam_list' %}" class="back-btn inline-block bg-gray-200 text-gray-700 font-semibold px-6 py-2 rounded-lg shadow hover:bg-gray-300 transition">
+            <i class="fas fa-arrow-left mr-2"></i> 返回列表
         </a>
-        
         <!-- 查看详细统计按钮 -->
-         <a href="{% url 'score_analysis:view_statistics_result' exam_id=exam.exam_id %}"
-           class="view-stats-btn" target="_blank">
-            查看详细统计
+        <a href="{% url 'score_analysis:view_statistics_result' exam_id=exam.exam_id %}"
+           class="view-stats-btn inline-block bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition"
+           target="_blank">
+            <i class="fas fa-chart-bar mr-2"></i> 查看详细统计
         </a>
     </div>
 </div>

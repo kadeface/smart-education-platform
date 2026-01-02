@@ -157,52 +157,59 @@
 {% block content %}
 <div class="tracking-content">
     <!-- 考试信息卡片 -->
-    <div class="exam-info-card">
-        <h2>{{ exam_info.exam_name }}</h2>
-        <div class="exam-meta">
-            <div class="exam-meta-item">
-                <i class="fas fa-calendar"></i>
-                <span>考试时间：{{ exam_info.create_time|date:"Y-m-d" }}</span>
-            </div>
-            <div class="exam-meta-item">
-                <i class="fas fa-users"></i>
-                <span>参考人数：{{ exam_info.student_count }}</span>
-            </div>
-        </div>
+    <div class="exam-info-card bg-white rounded-2xl shadow-lg animate__animated animate__fadeInUp mb-4 px-5 py-4 d-flex align-items-center justify-content-center">
+        <span class="me-5 text-secondary fs-5">
+            <span class="fw-bold text-dark">考试时间：</span>
+            <span class="fw-bold">{{ exam_info.create_time|date:"Y-m-d" }}</span>
+        </span>
+        <span class="text-secondary fs-5">
+            <span class="fw-bold text-dark">参考人数：</span>
+            <span class="fw-bold">{{ exam_info.student_count }}</span>
+        </span>
     </div>
 
     <!-- 概览数据卡片 -->
-    <div class="overview-cards">
-        <div class="overview-card">
-            <div class="value">{{ overview.avg_score }}</div>
-            <div class="label">平均分</div>
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="bg-white rounded-2xl shadow-lg animate__animated animate__fadeInUp text-center py-6">
+                <div class="h3 text-success mb-2 font-weight-bold">{{ overview.total_students }}</div>
+                <div class="text-secondary">总人数</div>
+            </div>
         </div>
-        <div class="overview-card">
-            <div class="value">{{ overview.top_count }}</div>
-            <div class="label">尖子生人数</div>
+        <div class="col-md-3 mb-3">
+            <div class="bg-white rounded-2xl shadow-lg animate__animated animate__fadeInUp text-center py-6">
+                <div class="h3 text-success mb-2 font-weight-bold">{{ overview.avg_score }}</div>
+                <div class="text-secondary">平均分</div>
+            </div>
         </div>
-        <div class="overview-card">
-            <div class="value">{{ overview.improved_count }}</div>
-            <div class="label">进步人数</div>
+        <div class="col-md-3 mb-3">
+            <div class="bg-white rounded-2xl shadow-lg animate__animated animate__fadeInUp text-center py-6">
+                <div class="h3 text-success mb-2 font-weight-bold">{{ overview.top_count }}</div>
+                <div class="text-secondary">尖子生人数</div>
+            </div>
         </div>
-        <div class="overview-card">
-            <div class="value">{{ overview.total_students }}</div>
-            <div class="label">总人数</div>
+        <div class="col-md-3 mb-3">
+            <div class="bg-white rounded-2xl shadow-lg animate__animated animate__fadeInUp text-center py-6">
+                <div class="h3 text-success mb-2 font-weight-bold">{{ overview.improved_count }}</div>
+                <div class="text-secondary">进步人数</div>
+            </div>
         </div>
     </div>
 
     <!-- 功能模块卡片 -->
-    <div class="module-cards">
+    <div class="row">
         {% for module in modules %}
-        <div class="module-card">
-            <div class="module-icon">
-                <i class="{{ module.icon }}"></i>
+        <div class="col-md-3 mb-4">
+            <div class="module-card bg-white rounded-2xl shadow-lg animate__animated animate__fadeInUp d-flex flex-column align-items-center text-center p-4 h-100">
+                <div class="module-icon mb-3">
+                    <i class="{{ module.icon }} text-success" style="font-size: 2rem;"></i>
+                </div>
+                <h3 class="text-success mb-2">{{ module.name }}</h3>
+                <p class="text-secondary mb-3">{{ module.description }}</p>
+                <a href="{% url module.url module_type exam_id %}" class="btn btn-success shadow transition animate__animated animate__fadeInUp">
+                    进入分析
+                </a>
             </div>
-            <h3>{{ module.name }}</h3>
-            <p>{{ module.description }}</p>
-            <a href="{% url module.url module_type exam_id %}" class="module-btn">
-                进入分析
-            </a>
         </div>
         {% endfor %}
     </div>
